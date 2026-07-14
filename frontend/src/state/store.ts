@@ -190,8 +190,8 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
           });
           break;
         case "action_confirming":
-          upsertAction(frame.name, { status: "confirming", prompt: frame.prompt });
-          set({ pendingConfirmation: { name: frame.name, prompt: frame.prompt, risk: "high" } });
+          upsertAction(frame.name, { status: "confirming", prompt: frame.prompt, risk: frame.risk });
+          set({ pendingConfirmation: { name: frame.name, prompt: frame.prompt, risk: frame.risk } });
           break;
         case "action_result":
           upsertAction(frame.name, {

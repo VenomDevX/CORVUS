@@ -5,16 +5,17 @@ Protocol (JSON frames):
   client -> {"type": "confirm", "approved": bool}   answer to an action prompt
   client -> {"type": "cancel"}                       stop generation
   server -> {"type": "start", "conversation_id", "user_message_id"}
-  server -> {"type": "delta", "content"}             streamed final answer
+  server -> {"type": "delta", "content"}             streamed assistant text
   server -> {"type": "action_proposed", "name", "arguments", "risk", "category"}
-  server -> {"type": "action_confirming", "name", "prompt"}   awaits a confirm frame
+  server -> {"type": "action_confirming", "name", "prompt", "risk"}  awaits confirm
   server -> {"type": "action_result", "name", "ok", "message", ...}
   server -> {"type": "done", "message_id", "conversation_id"}
   server -> {"type": "error", "message"}
 
-Text answers stream token-by-token when no tools are involved. When the model
-requests actions, they run first (with confirmation for risky ones), then the
-final answer streams.
+Text streams token-by-token as the model produces it, including the preamble
+before a tool call. Cancel keeps and persists the partial output, matching the
+stop-generation button semantics in the UI; a cancel while an action awaits
+confirmation also declines that action.
 """
 
 import asyncio
@@ -69,15 +70,15 @@ async def chat(ws: WebSocket) -> None:
     # Pending-confirmation plumbing: the agent loop calls confirm(), which
     # sends an action_confirming frame and waits for the client's reply.
     pending: dict[str, asyncio.Future] = {}
+    cancelled = asyncio.Event()
 
     async def emit(event: dict) -> None:
-        # The final text is streamed separately as deltas; skip the whole-text event.
-        if event.get("type") == "text":
-            return
         with contextlib.suppress(WebSocketDisconnect, RuntimeError):
             await ws.send_json(event)
 
     async def confirm(name: str, prompt: str, args: dict) -> bool:
+        if cancelled.is_set():
+            return False
         future: asyncio.Future = asyncio.get_running_loop().create_future()
         pending["current"] = future
         # action_confirming was already emitted by the agent loop.
@@ -88,19 +89,23 @@ async def chat(ws: WebSocket) -> None:
         finally:
             pending.pop("current", None)
 
+    def resolve_pending(approved: bool) -> None:
+        fut = pending.get("current")
+        if fut is not None and not fut.done():
+            fut.set_result(approved)
+
     async def read_client() -> None:
         """Feed confirm/cancel frames to the agent loop."""
         with contextlib.suppress(WebSocketDisconnect, RuntimeError):
             while True:
                 frame = await ws.receive_json()
-                if frame.get("type") == "confirm" and "current" in pending:
-                    fut = pending["current"]
-                    if not fut.done():
-                        fut.set_result(bool(frame.get("approved")))
-                elif frame.get("type") == "cancel" and "current" in pending:
-                    fut = pending["current"]
-                    if not fut.done():
-                        fut.set_result(False)
+                if frame.get("type") == "confirm":
+                    resolve_pending(bool(frame.get("approved")))
+                elif frame.get("type") == "cancel":
+                    # Stop generating, and decline whatever is awaiting an answer.
+                    cancelled.set()
+                    resolve_pending(False)
+                    return
 
     reader = asyncio.create_task(read_client())
 
@@ -113,11 +118,9 @@ async def chat(ws: WebSocket) -> None:
     try:
         outcome = await run_agent_turn(
             provider, model, messages, registry, confirm, emit=emit, log_action=log_action,
+            should_stop=cancelled.is_set,
         )
         assistant_text = outcome.text
-        # Stream the final answer for a typing feel (agent path returns it whole).
-        if assistant_text:
-            await _stream_text(ws, assistant_text)
     except Exception as exc:
         error = str(exc)
         log.error("chat_turn_error", conversation_id=conversation_id, error=error)
@@ -139,20 +142,13 @@ async def chat(ws: WebSocket) -> None:
             )
         await ws.close()
 
-    log.info("chat_turn_done", conversation_id=conversation_id, chars=len(assistant_text))
+    log.info(
+        "chat_turn_done",
+        conversation_id=conversation_id,
+        chars=len(assistant_text),
+        cancelled=cancelled.is_set(),
+    )
 
-    if assistant_text:
+    if assistant_text and not cancelled.is_set():
+        # Background, bounded second pass; failures only log.
         await extract_memory(provider, model, repo, content, assistant_text, conversation_id)
-
-
-async def _stream_text(ws: WebSocket, text: str) -> None:
-    """Send text as word-chunk deltas so the UI animates it."""
-    words = text.split(" ")
-    buffer = ""
-    for i, word in enumerate(words):
-        buffer += word + (" " if i < len(words) - 1 else "")
-        if len(buffer) >= 12 or i == len(words) - 1:
-            with contextlib.suppress(WebSocketDisconnect, RuntimeError):
-                await ws.send_json({"type": "delta", "content": buffer})
-            buffer = ""
-            await asyncio.sleep(0.01)

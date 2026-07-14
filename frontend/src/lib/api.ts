@@ -124,7 +124,7 @@ export type StreamFrame =
   | { type: "start"; conversation_id: number; user_message_id: number }
   | { type: "delta"; content: string }
   | { type: "action_proposed"; name: string; arguments: Record<string, unknown>; risk: RiskTier; category: string }
-  | { type: "action_confirming"; name: string; prompt: string }
+  | { type: "action_confirming"; name: string; prompt: string; risk: RiskTier }
   | { type: "action_result"; name: string; ok: boolean; message: string; declined?: boolean; data?: Record<string, unknown> }
   | { type: "done"; message_id: number; conversation_id: number }
   | { type: "error"; message: string };

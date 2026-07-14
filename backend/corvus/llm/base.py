@@ -1,7 +1,7 @@
 """The single internal LLM interface every provider implements.
 
 Milestone 8 adds OpenAI/Anthropic/Gemini/DeepSeek implementations behind this
-same protocol; tool-calling will extend Delta with tool-call variants then.
+same protocol.
 """
 
 from collections.abc import AsyncIterator
@@ -20,10 +20,15 @@ class ToolCall:
 
 @dataclass(frozen=True)
 class Delta:
-    """One streamed chunk of assistant output."""
+    """One streamed chunk of assistant output.
+
+    A chunk carries text, tool-call requests, or both: models typically
+    narrate ("Let me check…") before requesting a tool.
+    """
 
     content: str
     done: bool = False
+    tool_calls: list[ToolCall] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -37,7 +42,8 @@ class Message:
 
 @dataclass(frozen=True)
 class TurnResult:
-    """Outcome of one non-streaming model turn that may call tools."""
+    """The accumulated outcome of one model turn: everything it said, plus
+    every tool it asked for."""
 
     content: str
     tool_calls: list[ToolCall]
@@ -51,12 +57,12 @@ class LLMProvider(Protocol):
         """Stream one assistant turn (text only) for the given history."""
         ...
 
-    async def chat_with_tools(
+    def stream_chat_with_tools(
         self, messages: list[Message], model: str, tools: list[dict[str, Any]]
-    ) -> TurnResult:
-        """One turn that may request tool calls. Non-streaming: the caller
-        runs tools and loops. Providers without tool support return plain text
-        (empty tool_calls) - graceful degradation."""
+    ) -> AsyncIterator[Delta]:
+        """Stream one turn that may also request tool calls. The caller runs
+        the tools and loops. Providers without tool support just never yield
+        tool_calls - graceful degradation to plain chat."""
         ...
 
     async def list_models(self) -> list[str]:

@@ -1,0 +1,123 @@
+import { useRef, useState } from "react";
+import { Tooltip } from "@fluentui/react-components";
+import { useCorvus } from "../state/store";
+import { FileCard, type Attachment } from "./FileCard";
+
+const VOICE_TOOLTIP = "Voice arrives in Milestone 5";
+
+export function InputBar() {
+  const [text, setText] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const generating = useCorvus((s) => s.generating);
+  const backendOnline = useCorvus((s) => s.backendOnline);
+  const send = useCorvus((s) => s.send);
+  const stopGeneration = useCorvus((s) => s.stopGeneration);
+  const imageInput = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  function submit() {
+    const body = text.trim();
+    if (!body || generating || !backendOnline) return;
+    send(body);
+    setText("");
+    setAttachments([]);
+  }
+
+  function addFiles(list: FileList | null) {
+    if (!list) return;
+    const next = Array.from(list).map((f) => ({
+      name: f.name,
+      size: f.size,
+      type: f.type || "application/octet-stream",
+      url: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
+    }));
+    setAttachments((prev) => [...prev, ...next]);
+  }
+
+  return (
+    <div className="glass rounded-lg p-3">
+      {attachments.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-2">
+          {attachments.map((a, i) => (
+            <FileCard
+              key={`${a.name}-${i}`}
+              attachment={a}
+              onRemove={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+            />
+          ))}
+        </div>
+      )}
+      <div className="flex items-end gap-2">
+        <Tooltip content={VOICE_TOOLTIP} relationship="label">
+          <button
+            disabled
+            aria-label="Microphone (voice arrives in Milestone 5)"
+            className="cursor-not-allowed rounded p-2 text-fg-faint"
+          >
+            🎤
+          </button>
+        </Tooltip>
+        <button
+          aria-label="Attach image"
+          onClick={() => imageInput.current?.click()}
+          className="rounded p-2 text-fg-muted transition-colors duration-fast hover:bg-accent/10 hover:text-fg"
+        >
+          🖼️
+        </button>
+        <button
+          aria-label="Attach file"
+          onClick={() => fileInput.current?.click()}
+          className="rounded p-2 text-fg-muted transition-colors duration-fast hover:bg-accent/10 hover:text-fg"
+        >
+          📎
+        </button>
+        <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
+        <input ref={fileInput} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
+
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          rows={Math.min(6, Math.max(1, text.split("\n").length))}
+          placeholder={backendOnline ? "Message Corvus…" : "Corvus core is offline — start the backend"}
+          aria-label="Message Corvus"
+          className="flex-1 resize-none bg-transparent px-2 py-2 text-body text-fg outline-none placeholder:text-fg-faint"
+        />
+
+        {generating ? (
+          <button
+            onClick={stopGeneration}
+            aria-label="Stop generating"
+            className="rounded bg-danger/20 px-3 py-2 text-body text-danger transition-colors duration-fast hover:bg-danger/30"
+          >
+            ⬛ Stop
+          </button>
+        ) : (
+          <button
+            onClick={submit}
+            disabled={!text.trim() || !backendOnline}
+            aria-label="Send message"
+            className="rounded bg-accent px-4 py-2 text-body font-medium text-white shadow-glow transition-all duration-fast enabled:hover:bg-accent-bright disabled:opacity-40 disabled:shadow-none"
+          >
+            Send
+          </button>
+        )}
+
+        <Tooltip content={VOICE_TOOLTIP} relationship="label">
+          <button
+            disabled
+            aria-label="Voice mode (arrives in Milestone 5)"
+            className="cursor-not-allowed rounded p-2 text-fg-faint"
+          >
+            🔊
+          </button>
+        </Tooltip>
+      </div>
+    </div>
+  );
+}

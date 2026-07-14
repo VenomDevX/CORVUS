@@ -3,8 +3,6 @@ import { Tooltip } from "@fluentui/react-components";
 import { useCorvus } from "../state/store";
 import { FileCard, type Attachment } from "./FileCard";
 
-const VOICE_TOOLTIP = "Voice arrives in Milestone 5";
-
 export function InputBar() {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -12,6 +10,8 @@ export function InputBar() {
   const backendOnline = useCorvus((s) => s.backendOnline);
   const send = useCorvus((s) => s.send);
   const stopGeneration = useCorvus((s) => s.stopGeneration);
+  const setVoiceMode = useCorvus((s) => s.setVoiceMode);
+  const pushToTalk = useCorvus((s) => s.pushToTalk);
   const imageInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -48,11 +48,15 @@ export function InputBar() {
         </div>
       )}
       <div className="flex items-end gap-2">
-        <Tooltip content={VOICE_TOOLTIP} relationship="label">
+        <Tooltip content="Push to talk" relationship="label">
           <button
-            disabled
-            aria-label="Microphone (voice arrives in Milestone 5)"
-            className="cursor-not-allowed rounded p-2 text-fg-faint"
+            disabled={!backendOnline}
+            onClick={() => {
+              setVoiceMode(true);
+              pushToTalk();
+            }}
+            aria-label="Push to talk"
+            className="rounded p-2 text-fg-muted transition-colors duration-fast enabled:hover:bg-accent/10 enabled:hover:text-fg disabled:cursor-not-allowed disabled:text-fg-faint"
           >
             🎤
           </button>
@@ -108,11 +112,12 @@ export function InputBar() {
           </button>
         )}
 
-        <Tooltip content={VOICE_TOOLTIP} relationship="label">
+        <Tooltip content="Voice mode" relationship="label">
           <button
-            disabled
-            aria-label="Voice mode (arrives in Milestone 5)"
-            className="cursor-not-allowed rounded p-2 text-fg-faint"
+            disabled={!backendOnline}
+            onClick={() => setVoiceMode(true)}
+            aria-label="Enter voice mode"
+            className="rounded p-2 text-fg-muted transition-colors duration-fast enabled:hover:bg-accent/10 enabled:hover:text-fg disabled:cursor-not-allowed disabled:text-fg-faint"
           >
             🔊
           </button>

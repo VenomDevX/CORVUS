@@ -5,8 +5,10 @@ import {
   createLightTheme,
   type BrandVariants,
 } from "@fluentui/react-components";
+import { AnimatePresence } from "framer-motion";
 import { Sidebar } from "./components/Sidebar";
 import { ChatView } from "./components/ChatView";
+import { VoiceMode } from "./components/VoiceMode";
 import { HistoryView } from "./sections/HistoryView";
 import { MemoryView } from "./sections/MemoryView";
 import { SettingsView } from "./sections/SettingsView";
@@ -67,7 +69,16 @@ export default function App() {
   const section = useCorvus((s) => s.section);
   const setBackendOnline = useCorvus((s) => s.setBackendOnline);
   const newConversation = useCorvus((s) => s.newConversation);
+  const voiceMode = useCorvus((s) => s.voiceMode);
+  const backendOnline = useCorvus((s) => s.backendOnline);
+  const connectVoiceSocket = useCorvus((s) => s.connectVoiceSocket);
   const Body = SECTIONS[section];
+
+  // Keep the voice socket up whenever the backend is reachable, so a wake
+  // word can summon voice mode even while the user is typing.
+  useEffect(() => {
+    if (backendOnline) connectVoiceSocket();
+  }, [backendOnline, connectVoiceSocket]);
 
   useEffect(() => applyThemeVars(theme), [theme]);
 
@@ -92,7 +103,8 @@ export default function App() {
 
   return (
     <FluentProvider theme={theme === "dark" ? darkTheme : lightTheme} className="h-full !bg-transparent">
-      <div className="app-bg flex h-full flex-col">
+      <div className="app-bg relative flex h-full flex-col">
+        <AnimatePresence>{voiceMode && <VoiceMode />}</AnimatePresence>
         {/* Draggable titlebar strip (native window buttons overlay the right edge) */}
         <header className="titlebar-drag flex h-10 shrink-0 items-center gap-2 px-4">
           <img src="/logo.svg" alt="" className="h-4 w-4" />

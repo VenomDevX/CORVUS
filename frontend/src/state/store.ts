@@ -1,10 +1,12 @@
 import { create } from "zustand";
 import {
   api,
+  connectVoice,
   streamChat,
   type ChatMessage,
   type Conversation,
   type StreamHandle,
+  type VoiceSocket,
 } from "../lib/api";
 import type { OrbState } from "../lib/tokens";
 
@@ -39,6 +41,16 @@ export function orbStateFor(opts: { generating: boolean; listening: boolean; spe
   return "idle";
 }
 
+interface VoiceState {
+  connected: boolean;
+  available: boolean;
+  wakeEnabled: boolean;
+  level: number;
+  transcript: string;
+  assistantLive: string;
+  error: string | null;
+}
+
 interface CorvusStore {
   theme: Theme;
   section: Section;
@@ -49,6 +61,8 @@ interface CorvusStore {
   generating: boolean;
   orbState: OrbState;
   stream: StreamHandle | null;
+  voiceMode: boolean;
+  voice: VoiceState;
 
   setTheme: (theme: Theme) => void;
   setSection: (section: Section) => void;
@@ -58,7 +72,15 @@ interface CorvusStore {
   newConversation: () => void;
   send: (content: string) => void;
   stopGeneration: () => void;
+  setVoiceMode: (on: boolean) => void;
+  connectVoiceSocket: () => void;
+  pushToTalk: () => void;
+  setWakeEnabled: (enabled: boolean) => void;
+  stopSpeaking: () => void;
 }
+
+let voiceSocket: VoiceSocket | null = null;
+let voiceReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useCorvus = create<CorvusStore>((set, get) => ({
   theme: (localStorage.getItem(THEME_KEY) as Theme) ?? "dark",
@@ -70,6 +92,16 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
   generating: false,
   orbState: "idle",
   stream: null,
+  voiceMode: false,
+  voice: {
+    connected: false,
+    available: false,
+    wakeEnabled: false,
+    level: 0.5,
+    transcript: "",
+    assistantLive: "",
+    error: null,
+  },
 
   setTheme: (theme) => {
     localStorage.setItem(THEME_KEY, theme);
@@ -132,6 +164,80 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
 
   stopGeneration: () => {
     get().stream?.cancel();
+  },
+
+  setVoiceMode: (on) => {
+    set({ voiceMode: on });
+    if (on) get().connectVoiceSocket();
+  },
+
+  connectVoiceSocket: () => {
+    if (voiceSocket || !get().backendOnline) return;
+
+    voiceSocket = connectVoice(
+      (event) => {
+        const patch = (v: Partial<VoiceState>) => set((s) => ({ voice: { ...s.voice, ...v } }));
+        switch (event.type) {
+          case "state":
+            set({
+              orbState: event.state,
+              ...(event.conversation_id != null ? { conversationId: event.conversation_id } : {}),
+            });
+            patch({ connected: true, available: true });
+            if (event.state === "idle") patch({ level: 0.5 });
+            break;
+          case "level":
+            patch({ level: event.value });
+            break;
+          case "wake":
+            // "Hey Corvus" summons the voice-first UI.
+            set({ voiceMode: true });
+            patch({ transcript: "", assistantLive: "" });
+            break;
+          case "transcript":
+            patch({ transcript: event.text, assistantLive: "" });
+            break;
+          case "assistant_delta":
+            set((s) => ({ voice: { ...s.voice, assistantLive: s.voice.assistantLive + event.text } }));
+            break;
+          case "assistant_done":
+            void get().refreshConversations();
+            break;
+          case "wake_enabled":
+            patch({ wakeEnabled: event.enabled });
+            break;
+          case "unavailable":
+            patch({ available: false, error: event.reason });
+            break;
+          case "error":
+            patch({ error: event.message });
+            break;
+        }
+      },
+      () => {
+        voiceSocket = null;
+        set((s) => ({ voice: { ...s.voice, connected: false }, orbState: "idle" }));
+        if (voiceReconnectTimer) clearTimeout(voiceReconnectTimer);
+        voiceReconnectTimer = setTimeout(() => {
+          if (get().backendOnline) get().connectVoiceSocket();
+        }, 3000);
+      },
+    );
+    set((s) => ({ voice: { ...s.voice, connected: true, error: null } }));
+  },
+
+  pushToTalk: () => {
+    get().connectVoiceSocket();
+    set((s) => ({ voice: { ...s.voice, transcript: "", assistantLive: "" } }));
+    voiceSocket?.send({ type: "ptt" });
+  },
+
+  setWakeEnabled: (enabled) => {
+    voiceSocket?.send({ type: "set_wake", enabled });
+  },
+
+  stopSpeaking: () => {
+    voiceSocket?.send({ type: "stop" });
   },
 }));
 

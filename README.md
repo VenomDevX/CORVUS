@@ -23,6 +23,17 @@ cd backend; python -m venv .venv; .venv\Scripts\pip install -e .[dev]; cd ..
 npm run dev      # starts the FastAPI backend, Vite, and Electron together
 ```
 
+### Troubleshooting
+
+If Electron fails to start with a missing-binary error, its postinstall step
+downloaded the zip but failed to extract it silently. Fix:
+
+```powershell
+cd frontend
+Expand-Archive -Force "$env:LOCALAPPDATA\electron\Cache\<hash>\electron-v*-win32-x64.zip" node_modules\electron\dist
+Set-Content node_modules\electron\path.txt "electron.exe" -NoNewline -Encoding ascii
+```
+
 ## Other commands
 
 ```powershell

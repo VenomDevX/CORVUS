@@ -1,0 +1,102 @@
+import { useEffect, useState } from "react";
+import { Switch } from "@fluentui/react-components";
+import { SectionShell } from "./SectionShell";
+import { api } from "../lib/api";
+import { useCorvus } from "../state/store";
+import { Orb } from "../components/Orb";
+import { ORB_STATES, type OrbState } from "../lib/tokens";
+
+export function SettingsView() {
+  const theme = useCorvus((s) => s.theme);
+  const setTheme = useCorvus((s) => s.setTheme);
+  const backendOnline = useCorvus((s) => s.backendOnline);
+  const [models, setModels] = useState<string[]>([]);
+  const [model, setModel] = useState("");
+  const [orbPreview, setOrbPreview] = useState<OrbState>("idle");
+
+  useEffect(() => {
+    if (!backendOnline) return;
+    void (async () => {
+      const [{ models }, settings] = await Promise.all([api.listModels(), api.getSettings()]);
+      setModels(models);
+      setModel(settings.model);
+    })();
+  }, [backendOnline]);
+
+  async function changeModel(next: string) {
+    setModel(next);
+    await api.updateSettings({ model: next });
+  }
+
+  return (
+    <SectionShell title="Settings">
+      <div className="max-w-2xl space-y-6">
+        <section className="glass rounded-lg p-4">
+          <h2 className="mb-3 text-h4">Appearance</h2>
+          <Switch
+            checked={theme === "light"}
+            onChange={(_e, data) => setTheme(data.checked ? "light" : "dark")}
+            label={`Theme: ${theme === "dark" ? "Dark (default)" : "Light"}`}
+          />
+        </section>
+
+        <section className="glass rounded-lg p-4">
+          <h2 className="mb-1 text-h4">AI model</h2>
+          <p className="mb-3 text-body-sm text-fg-muted">
+            Provider: local Ollama. More providers (OpenAI, Anthropic, Gemini, DeepSeek) arrive in
+            Milestone 8.
+          </p>
+          {backendOnline ? (
+            <select
+              value={model}
+              onChange={(e) => void changeModel(e.target.value)}
+              aria-label="Ollama model"
+              className="w-72 rounded border border-white/10 bg-surface px-3 py-2 text-body text-fg outline-none focus:border-accent"
+            >
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-body text-danger">Corvus core is offline — model list unavailable.</p>
+          )}
+        </section>
+
+        <section className="glass rounded-lg p-4">
+          <h2 className="mb-1 text-h4">Backend status</h2>
+          <p className="text-body">
+            {backendOnline ? (
+              <span className="text-success">● Corvus core online (127.0.0.1:8765)</span>
+            ) : (
+              <span className="text-danger">● Corvus core offline</span>
+            )}
+          </p>
+        </section>
+
+        {import.meta.env.DEV && (
+          <section className="glass rounded-lg p-4">
+            <h2 className="mb-3 text-h4">Orb states (dev preview)</h2>
+            <div className="mb-3 flex gap-2">
+              {ORB_STATES.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setOrbPreview(s)}
+                  className={`rounded px-3 py-1.5 text-body-sm transition-colors duration-fast ${
+                    orbPreview === s ? "bg-accent/30 text-fg" : "bg-white/5 text-fg-muted hover:text-fg"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-center">
+              <Orb state={orbPreview} size={140} />
+            </div>
+          </section>
+        )}
+      </div>
+    </SectionShell>
+  );
+}

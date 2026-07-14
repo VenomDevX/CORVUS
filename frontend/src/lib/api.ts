@@ -76,6 +76,8 @@ export const api = {
   listModels: () => request<{ models: string[] }>("/models"),
   tailLogs: (limit = 200) => request<LogEntry[]>(`/logs?limit=${limit}`),
   voiceStatus: () => request<VoiceStatus>("/voice/status"),
+  listActionSpecs: () => request<ActionSpec[]>("/actions"),
+  actionLog: (limit = 100) => request<ActionLogEntry[]>(`/actions/log?limit=${limit}`),
 };
 
 export type VoiceEvent =
@@ -116,14 +118,38 @@ export function connectVoice(
   };
 }
 
+export type RiskTier = "safe" | "low" | "medium" | "high";
+
 export type StreamFrame =
   | { type: "start"; conversation_id: number; user_message_id: number }
   | { type: "delta"; content: string }
+  | { type: "action_proposed"; name: string; arguments: Record<string, unknown>; risk: RiskTier; category: string }
+  | { type: "action_confirming"; name: string; prompt: string }
+  | { type: "action_result"; name: string; ok: boolean; message: string; declined?: boolean; data?: Record<string, unknown> }
   | { type: "done"; message_id: number; conversation_id: number }
   | { type: "error"; message: string };
 
 export interface StreamHandle {
   cancel: () => void;
+  confirm: (approved: boolean) => void;
+}
+
+export interface ActionSpec {
+  name: string;
+  description: string;
+  risk: RiskTier;
+  category: string;
+  requires_confirmation: boolean;
+}
+
+export interface ActionLogEntry {
+  id: number;
+  conversation_id: number | null;
+  action: string;
+  arguments: string;
+  outcome: "executed" | "declined" | "failed";
+  message: string;
+  created_at: string;
 }
 
 /**
@@ -148,9 +174,11 @@ export function streamChat(
   ws.onmessage = (event) => onFrame(JSON.parse(event.data) as StreamFrame);
   ws.onerror = () => onFrame({ type: "error", message: "Connection to the Corvus backend failed." });
   ws.onclose = onClose;
+  const send = (msg: object) => {
+    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+  };
   return {
-    cancel: () => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "cancel" }));
-    },
+    cancel: () => send({ type: "cancel" }),
+    confirm: (approved: boolean) => send({ type: "confirm", approved }),
   };
 }

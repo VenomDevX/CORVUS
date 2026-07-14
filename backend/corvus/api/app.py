@@ -43,8 +43,11 @@ def create_app(
 
     app = FastAPI(title="Corvus", version=__version__, lifespan=lifespan)
 
+    from ..actions.registry import build_default_registry
+
     app.state.repo = repo or Repository(database or db_path())
     app.state.provider = provider or OllamaProvider()
+    app.state.registry = build_default_registry()
     app.state.log = log
     app.state.voice = None
     if app.state.repo.get_setting("model") is None:

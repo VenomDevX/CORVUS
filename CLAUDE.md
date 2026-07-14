@@ -33,7 +33,9 @@ docs/adr/    architecture decision records
 
 ## Milestones / don't-touch list
 
-Done: M1 scaffold, M2 design system, M3 shell, M4 chat+memory (this session). Not yet built — do not stub or partially implement outside their milestone: voice pipeline (M5), agent action registry + confirmations (M6), browser automation/CV (M7), multi-provider switching, plugins, workflows, notifications (M8), installer/auto-update (M9). Section 15 of the product spec (avatars, phone app, home automation) is out of scope entirely.
+Done: M1 scaffold, M2 design system, M3 shell, M4 chat+memory, M5 voice pipeline, M6 agent action registry + confirmations. Not yet built — do not stub or partially implement outside their milestone: browser automation/CV (M7), multi-provider switching, plugins, workflows, notifications (M8), installer/auto-update (M9). Section 15 of the product spec (avatars, phone app, home automation) is out of scope entirely.
+
+Actions (M6) live in `backend/corvus/actions/`: every OS capability is a registered `ActionSpec` with a risk tier (`safe`/`low`/`medium`/`high`) and, for anything that confirms, a `confirm_prompt` that states the exact consequence. Adding a capability = write a handler, register a spec — never a new if/else branch in the agent loop. `medium`/`high` always route through the user; voice mode (M5) deliberately stays text-chat-only for actions, since confirmations need the visible card.
 
 ## Quality bar
 

@@ -112,3 +112,24 @@ async def list_models(request: Request) -> dict:
 @router.get("/logs")
 def logs(limit: int = 200) -> list[dict]:
     return tail_log(min(limit, 1000))
+
+
+@router.get("/actions")
+def list_actions(request: Request) -> list[dict]:
+    """The registered action catalog (for the Tasks view)."""
+    registry = request.app.state.registry
+    return [
+        {
+            "name": spec.name,
+            "description": spec.description,
+            "risk": spec.risk.value,
+            "category": spec.category,
+            "requires_confirmation": spec.requires_confirmation,
+        }
+        for spec in registry.all()
+    ]
+
+
+@router.get("/actions/log")
+def action_log(request: Request, limit: int = 100) -> list[dict]:
+    return request.app.state.repo.list_actions(min(limit, 500))

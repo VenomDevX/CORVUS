@@ -32,6 +32,16 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS action_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    arguments TEXT NOT NULL,
+    outcome TEXT NOT NULL CHECK (outcome IN ('executed', 'declined', 'failed')),
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 """
 

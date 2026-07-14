@@ -5,8 +5,17 @@ same protocol; tool-calling will extend Delta with tool-call variants then.
 """
 
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from dataclasses import dataclass, field
+from typing import Any, Protocol, runtime_checkable
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """A model request to invoke a registered action."""
+
+    name: str
+    arguments: dict[str, Any]
+    id: str = ""
 
 
 @dataclass(frozen=True)
@@ -19,8 +28,19 @@ class Delta:
 
 @dataclass(frozen=True)
 class Message:
-    role: str  # "system" | "user" | "assistant"
+    role: str  # "system" | "user" | "assistant" | "tool"
     content: str
+    # Set on assistant messages that requested tools, and on tool results.
+    tool_calls: list[ToolCall] = field(default_factory=list)
+    tool_name: str | None = None
+
+
+@dataclass(frozen=True)
+class TurnResult:
+    """Outcome of one non-streaming model turn that may call tools."""
+
+    content: str
+    tool_calls: list[ToolCall]
 
 
 @runtime_checkable
@@ -28,7 +48,15 @@ class LLMProvider(Protocol):
     name: str
 
     def stream_chat(self, messages: list[Message], model: str) -> AsyncIterator[Delta]:
-        """Stream one assistant turn for the given message history."""
+        """Stream one assistant turn (text only) for the given history."""
+        ...
+
+    async def chat_with_tools(
+        self, messages: list[Message], model: str, tools: list[dict[str, Any]]
+    ) -> TurnResult:
+        """One turn that may request tool calls. Non-streaming: the caller
+        runs tools and loops. Providers without tool support return plain text
+        (empty tool_calls) - graceful degradation."""
         ...
 
     async def list_models(self) -> list[str]:

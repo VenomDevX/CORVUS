@@ -2,11 +2,27 @@
 
 import json
 from collections.abc import AsyncIterator
+from typing import Any
 
 import httpx
 
 from ..config import OLLAMA_URL
-from .base import Delta, Message
+from .base import Delta, Message, ToolCall, TurnResult
+
+
+def _to_wire(messages: list[Message]) -> list[dict]:
+    """Serialize Corvus messages to Ollama's chat schema, including tools."""
+    wire: list[dict] = []
+    for m in messages:
+        entry: dict[str, Any] = {"role": m.role, "content": m.content}
+        if m.tool_calls:
+            entry["tool_calls"] = [
+                {"function": {"name": c.name, "arguments": c.arguments}} for c in m.tool_calls
+            ]
+        if m.tool_name:
+            entry["tool_name"] = m.tool_name
+        wire.append(entry)
+    return wire
 
 
 class OllamaProvider:
@@ -42,6 +58,35 @@ class OllamaProvider:
                         yield Delta(content=content, done=done)
                     if done:
                         return
+
+    async def chat_with_tools(
+        self, messages: list[Message], model: str, tools: list[dict[str, Any]]
+    ) -> TurnResult:
+        payload = {
+            "model": model,
+            "messages": _to_wire(messages),
+            "tools": tools,
+            "stream": False,
+            # Bound the context so the KV cache fits modest GPUs; the tool
+            # schemas + short history stay well under this.
+            "options": {"num_ctx": 8192},
+        }
+        async with self._client(timeout=300.0) as client:
+            response = await client.post("/api/chat", json=payload)
+            response.raise_for_status()
+            body = response.json()
+        message = body.get("message", {})
+        calls = []
+        for raw in message.get("tool_calls", []) or []:
+            fn = raw.get("function", {})
+            args = fn.get("arguments", {})
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    args = {}
+            calls.append(ToolCall(name=fn.get("name", ""), arguments=args or {}))
+        return TurnResult(content=message.get("content", "") or "", tool_calls=calls)
 
     async def complete(self, messages: list[Message], model: str) -> str:
         """Non-streaming convenience used by the memory extractor."""

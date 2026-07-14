@@ -13,6 +13,7 @@ import { HistoryView } from "./sections/HistoryView";
 import { MemoryView } from "./sections/MemoryView";
 import { SettingsView } from "./sections/SettingsView";
 import { LogsView } from "./sections/LogsView";
+import { TasksView } from "./sections/TasksView";
 import { UpcomingSection } from "./sections/SectionShell";
 import { useCorvus, type Section } from "./state/store";
 import { applyThemeVars } from "./lib/theme";
@@ -34,13 +35,7 @@ const SECTIONS: Record<Section, () => JSX.Element> = {
   memory: MemoryView,
   settings: SettingsView,
   logs: LogsView,
-  tasks: () => (
-    <UpcomingSection
-      title="Tasks"
-      milestone={6}
-      detail="Multi-step agent tasks with per-action confirmation land with the action registry."
-    />
-  ),
+  tasks: TasksView,
   extensions: () => (
     <UpcomingSection
       title="Extensions"

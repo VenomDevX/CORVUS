@@ -3,6 +3,7 @@ import json
 from fastapi.testclient import TestClient
 
 from corvus.api.app import create_app
+from corvus.llm.base import ToolCall, TurnResult
 from corvus.memory.repository import Repository
 from tests.conftest import FakeProvider
 
@@ -89,6 +90,64 @@ def test_settings_and_models(tmp_path, fake_provider):
 
     assert client.patch("/settings", json={"provider": "openai"}).status_code == 400
     assert client.get("/models").json() == {"models": ["fake-model:latest"]}
+
+
+def test_actions_catalog_endpoint(tmp_path, fake_provider):
+    client = make_client(tmp_path, fake_provider)
+    actions = client.get("/actions").json()
+    names = {a["name"] for a in actions}
+    assert "shutdown_windows" in names and "open_app" in names
+    shutdown = next(a for a in actions if a["name"] == "shutdown_windows")
+    assert shutdown["requires_confirmation"] is True
+    assert shutdown["risk"] == "high"
+
+
+def test_ws_chat_confirmation_flow_approve(tmp_path):
+    # Model asks to take a screenshot (SAFE, no confirm) then a risky delete.
+    provider = FakeProvider(tool_script=[
+        TurnResult("", [ToolCall("system_status", {})]),
+        TurnResult("Here's your status.", []),
+    ])
+    client = make_client(tmp_path, provider)
+    with client.websocket_connect("/ws/chat") as ws:
+        ws.send_json({"type": "start", "conversation_id": None, "content": "how's my pc"})
+        types = []
+        while True:
+            frame = ws.receive_json()
+            types.append(frame["type"])
+            if frame["type"] in ("done", "error"):
+                break
+        assert "action_proposed" in types
+        assert "action_result" in types
+        assert "done" in types
+
+    # SAFE action was logged as executed.
+    log = client.get("/actions/log").json()
+    assert any(a["action"] == "system_status" for a in log)
+
+
+def test_ws_chat_confirmation_flow_decline(tmp_path):
+    provider = FakeProvider(tool_script=[
+        TurnResult("", [ToolCall("delete_item", {"path": "notes.txt"})]),
+        TurnResult("Okay, I won't delete it.", []),
+    ])
+    client = make_client(tmp_path, provider)
+    with client.websocket_connect("/ws/chat") as ws:
+        ws.send_json({"type": "start", "conversation_id": None, "content": "delete my notes"})
+        declined = False
+        while True:
+            frame = ws.receive_json()
+            if frame["type"] == "action_confirming":
+                assert "notes.txt" in frame["prompt"]
+                ws.send_json({"type": "confirm", "approved": False})
+            if frame["type"] == "action_result" and frame.get("declined"):
+                declined = True
+            if frame["type"] in ("done", "error"):
+                break
+        assert declined
+
+    log = client.get("/actions/log").json()
+    assert any(a["action"] == "delete_item" and a["outcome"] == "declined" for a in log)
 
 
 def test_logs_endpoint_returns_structured_entries(tmp_path, fake_provider):

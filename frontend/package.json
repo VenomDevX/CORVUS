@@ -3,6 +3,7 @@
   "productName": "Corvus",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Corvus desktop app (Electron + React)",
   "main": "dist-electron/main.cjs",
   "scripts": {

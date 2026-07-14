@@ -1,0 +1,24 @@
+{
+  "name": "corvus",
+  "productName": "Corvus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Corvus — Windows desktop AI assistant",
+  "author": "Corvus",
+  "type": "module",
+  "scripts": {
+    "guard": "node scripts/naming-guard.mjs",
+    "assets": "node scripts/export-assets.mjs",
+    "dev": "npm run dev --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "test": "npm run guard && npm run test --prefix frontend && npm run test:backend",
+    "test:backend": "cd backend && .venv/Scripts/python.exe -m pytest -q",
+    "precommit": "npm run guard",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.34.1"
+  }
+}

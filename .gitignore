@@ -1,0 +1,32 @@
+# Node
+node_modules/
+dist/
+dist-electron/
+*.tsbuildinfo
+npm-debug.log*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Generated assets (the export script rebuilds these; committed exceptions below)
+design/exports/*
+!design/exports/corvus.ico
+!design/exports/tray-dark-16.png
+!design/exports/tray-dark-32.png
+!design/exports/tray-light-16.png
+!design/exports/tray-light-32.png
+!design/exports/icon-256.png
+
+# Local data / logs
+*.log
+.env
+.env.*
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db

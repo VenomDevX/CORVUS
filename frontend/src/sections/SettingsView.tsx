@@ -6,12 +6,23 @@ import { useCorvus } from "../state/store";
 import { Orb } from "../components/Orb";
 import { ORB_STATES, type OrbState } from "../lib/tokens";
 
+const TTS_VOICES = [
+  "en-US-AriaNeural",
+  "en-US-JennyNeural",
+  "en-US-MichelleNeural",
+  "en-GB-SoniaNeural",
+  "en-AU-NatashaNeural",
+];
+
 export function SettingsView() {
   const theme = useCorvus((s) => s.theme);
   const setTheme = useCorvus((s) => s.setTheme);
   const backendOnline = useCorvus((s) => s.backendOnline);
+  const voice = useCorvus((s) => s.voice);
+  const setWakeEnabled = useCorvus((s) => s.setWakeEnabled);
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState("");
+  const [ttsVoice, setTtsVoice] = useState(TTS_VOICES[0]);
   const [orbPreview, setOrbPreview] = useState<OrbState>("idle");
 
   useEffect(() => {
@@ -20,12 +31,18 @@ export function SettingsView() {
       const [{ models }, settings] = await Promise.all([api.listModels(), api.getSettings()]);
       setModels(models);
       setModel(settings.model);
+      if (settings.tts_voice) setTtsVoice(settings.tts_voice);
     })();
   }, [backendOnline]);
 
   async function changeModel(next: string) {
     setModel(next);
     await api.updateSettings({ model: next });
+  }
+
+  async function changeTtsVoice(next: string) {
+    setTtsVoice(next);
+    await api.updateSettings({ tts_voice: next });
   }
 
   return (
@@ -62,6 +79,38 @@ export function SettingsView() {
           ) : (
             <p className="text-body text-danger">Corvus core is offline — model list unavailable.</p>
           )}
+        </section>
+
+        <section className="glass rounded-lg p-4">
+          <h2 className="mb-1 text-h4">Voice</h2>
+          <p className="mb-3 text-body-sm text-fg-muted">
+            Wake word runs locally (Whisper tiny). Speech uses Microsoft neural voices online, with
+            a Windows offline fallback.
+          </p>
+          <Switch
+            checked={voice.wakeEnabled}
+            disabled={!voice.connected}
+            onChange={(_e, data) => setWakeEnabled(data.checked)}
+            label={`Always listening for “Hey Corvus”: ${voice.wakeEnabled ? "on" : "off"}`}
+          />
+          <div className="mt-3">
+            <label className="mb-1 block text-body-sm text-fg-muted" htmlFor="tts-voice">
+              Voice
+            </label>
+            <select
+              id="tts-voice"
+              value={ttsVoice}
+              disabled={!backendOnline}
+              onChange={(e) => void changeTtsVoice(e.target.value)}
+              className="w-72 rounded border border-white/10 bg-surface px-3 py-2 text-body text-fg outline-none focus:border-accent"
+            >
+              {TTS_VOICES.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
         </section>
 
         <section className="glass rounded-lg p-4">

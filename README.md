@@ -2,7 +2,7 @@
 
 Corvus is a Windows desktop AI assistant — an animated, voice-ready companion that lives in your taskbar, remembers what matters, and (in later milestones) acts on your behalf across the OS and the web.
 
-**Current state (Milestones 1–4):** Electron shell with the Corvus orb and Fluent dark/light theming, streaming text chat against local [Ollama](https://ollama.com), persistent conversation history and inspectable memory in SQLite, structured logging.
+**Current state (Milestones 1–5):** Electron shell with the Corvus orb and Fluent dark/light theming, streaming text chat against local [Ollama](https://ollama.com), persistent conversation history and inspectable memory in SQLite, structured logging, and a full voice pipeline — local "Hey Corvus" wake word (Whisper tiny), local speech recognition (Whisper base), and natural streamed speech (Microsoft neural voices, offline SAPI fallback) with barge-in interruption. Whisper models (~220 MB) download on first voice use.
 
 ## Prerequisites
 

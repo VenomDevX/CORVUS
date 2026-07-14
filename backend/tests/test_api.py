@@ -9,7 +9,7 @@ from tests.conftest import FakeProvider
 
 def make_client(tmp_path, provider: FakeProvider) -> TestClient:
     repo = Repository(tmp_path / "api.db")
-    app = create_app(repo=repo, provider=provider)
+    app = create_app(repo=repo, provider=provider, voice=False)
     return TestClient(app)
 
 

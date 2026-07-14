@@ -32,6 +32,14 @@ export interface Memory {
 export interface BackendSettings {
   provider: string;
   model: string;
+  tts_voice: string | null;
+}
+
+export interface VoiceStatus {
+  available: boolean;
+  state: string;
+  wake_enabled: boolean;
+  voice?: string;
 }
 
 export interface LogEntry {
@@ -67,7 +75,46 @@ export const api = {
     request<BackendSettings>("/settings", { method: "PATCH", body: JSON.stringify(settings) }),
   listModels: () => request<{ models: string[] }>("/models"),
   tailLogs: (limit = 200) => request<LogEntry[]>(`/logs?limit=${limit}`),
+  voiceStatus: () => request<VoiceStatus>("/voice/status"),
 };
+
+export type VoiceEvent =
+  | { type: "state"; state: "idle" | "listening" | "thinking" | "speaking"; conversation_id: number | null }
+  | { type: "level"; value: number }
+  | { type: "wake" }
+  | { type: "transcript"; text: string }
+  | { type: "assistant_delta"; text: string }
+  | { type: "assistant_done"; conversation_id: number }
+  | { type: "wake_enabled"; enabled: boolean }
+  | { type: "unavailable"; reason: string }
+  | { type: "error"; message: string };
+
+export type VoiceCommand =
+  | { type: "ptt" }
+  | { type: "set_wake"; enabled: boolean }
+  | { type: "stop" };
+
+export interface VoiceSocket {
+  send: (command: VoiceCommand) => void;
+  close: () => void;
+}
+
+/** Long-lived voice event socket; the caller owns reconnection policy. */
+export function connectVoice(
+  onEvent: (event: VoiceEvent) => void,
+  onClose: () => void,
+): VoiceSocket {
+  const ws = new WebSocket(`${BACKEND_WS}/ws/voice`);
+  ws.onmessage = (event) => onEvent(JSON.parse(event.data) as VoiceEvent);
+  ws.onclose = onClose;
+  ws.onerror = () => ws.close();
+  return {
+    send: (command) => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(command));
+    },
+    close: () => ws.close(),
+  };
+}
 
 export type StreamFrame =
   | { type: "start"; conversation_id: number; user_message_id: number }

@@ -7,6 +7,7 @@ import { useCorvus } from "../state/store";
 export function ChatView() {
   const messages = useCorvus((s) => s.messages);
   const orbState = useCorvus((s) => s.orbState);
+  const level = useCorvus((s) => s.voice.level);
   const generating = useCorvus((s) => s.generating);
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -20,11 +21,11 @@ export function ChatView() {
     <div className="flex h-full flex-col gap-3">
       {empty ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-6">
-          <Orb state={orbState} />
+          <Orb state={orbState} level={level} />
           <div className="text-center">
             <h1 className="text-h1 tracking-tight">Corvus</h1>
             <p className="mt-1 text-body text-fg-muted">
-              Ask anything, or say &ldquo;Hey Corvus&rdquo; once voice lands.
+              Ask anything, or just say &ldquo;Hey Corvus&rdquo;.
             </p>
           </div>
         </div>
@@ -51,7 +52,7 @@ export function ChatView() {
             {generating && <div className="h-2" aria-live="polite" />}
           </div>
           <div className="hidden w-56 shrink-0 items-start justify-center pt-4 xl:flex">
-            <Orb state={orbState} size={140} />
+            <Orb state={orbState} level={level} size={140} />
           </div>
         </div>
       )}

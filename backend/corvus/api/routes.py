@@ -16,6 +16,7 @@ class ConversationCreate(BaseModel):
 class SettingsPatch(BaseModel):
     provider: str | None = None
     model: str | None = None
+    tts_voice: str | None = None
 
 
 @router.get("/health")
@@ -77,7 +78,11 @@ def export_memories(request: Request) -> Response:
 @router.get("/settings")
 def get_settings(request: Request) -> dict:
     repo = request.app.state.repo
-    return {"provider": repo.get_setting("provider"), "model": repo.get_setting("model")}
+    return {
+        "provider": repo.get_setting("provider"),
+        "model": repo.get_setting("model"),
+        "tts_voice": repo.get_setting("tts_voice"),
+    }
 
 
 @router.patch("/settings")
@@ -89,7 +94,11 @@ def patch_settings(request: Request, body: SettingsPatch) -> dict:
         repo.set_setting("provider", body.provider)
     if body.model is not None:
         repo.set_setting("model", body.model)
-    return {"provider": repo.get_setting("provider"), "model": repo.get_setting("model")}
+    if body.tts_voice is not None:
+        repo.set_setting("tts_voice", body.tts_voice)
+        if request.app.state.voice is not None:
+            request.app.state.voice.speaker.voice = body.tts_voice
+    return get_settings(request)
 
 
 @router.get("/models")

@@ -150,6 +150,27 @@ def test_ws_chat_confirmation_flow_decline(tmp_path):
     assert any(a["action"] == "delete_item" and a["outcome"] == "declined" for a in log)
 
 
+def test_ws_chat_cancel_stops_and_keeps_partial_text(tmp_path):
+    # Paced chunks so the cancel lands mid-stream rather than after the turn.
+    provider = FakeProvider(chunks=[f"word{i} " for i in range(200)], chunk_delay=0.005)
+    client = make_client(tmp_path, provider)
+    with client.websocket_connect("/ws/chat") as ws:
+        ws.send_json({"type": "start", "conversation_id": None, "content": "say a lot"})
+        first = ws.receive_json()
+        conversation_id = first["conversation_id"]
+        ws.receive_json()  # first delta proves streaming has begun
+        ws.send_json({"type": "cancel"})
+        while ws.receive_json()["type"] not in ("done", "error"):
+            pass
+
+    # The turn ended early, and whatever was generated is still persisted.
+    messages = client.get(f"/conversations/{conversation_id}/messages").json()
+    assert [m["role"] for m in messages] == ["user", "assistant"]
+    content = messages[1]["content"]
+    assert content.startswith("word0")  # partial output survives, as in M4
+    assert "word199" not in content  # but generation really stopped short
+
+
 def test_logs_endpoint_returns_structured_entries(tmp_path, fake_provider):
     client = make_client(tmp_path, fake_provider)
     entries = client.get("/logs?limit=50").json()

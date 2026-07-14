@@ -3,12 +3,13 @@
 Given a conversation, the model may request actions from the registry. This
 loop runs those actions - pausing for explicit user confirmation on anything
 the action's risk tier requires - and feeds results back until the model
-produces a final text answer. Emits structured events so the UI can render
-action chips, confirmation cards, and results.
+produces a final text answer. Text streams to the UI as it arrives, and the
+loop emits structured events so the UI can render action chips, confirmation
+cards, and results.
 
 Confirmation is delegated to an injected async `confirm` callback: the WS
 layer prompts the user and returns their decision. Providers that don't
-support tool calls simply never return tool_calls, so this degrades to plain
+support tool calls simply never yield tool_calls, so this degrades to plain
 chat.
 """
 
@@ -19,17 +20,19 @@ from typing import Any
 
 import structlog
 
-from ..actions.registry import ActionResult, Registry, Risk
-from .base import LLMProvider, Message, ToolCall
+from ..actions.registry import ActionResult, Registry
+from .base import LLMProvider, Message, ToolCall, TurnResult
 
 log = structlog.get_logger("corvus")
 
 MAX_TOOL_ROUNDS = 6
 
-# event: {"type": "action_proposed"|"action_confirming"|"action_result"|"text", ...}
+# event: {"type": "delta"|"action_proposed"|"action_confirming"|"action_result", ...}
 EventSink = Callable[[dict[str, Any]], Awaitable[None] | None]
 # confirm(action_name, prompt, args) -> bool
 Confirmer = Callable[[str, str, dict[str, Any]], Awaitable[bool]]
+# should_stop() -> True once the user has asked to stop generating
+StopCheck = Callable[[], bool]
 
 
 @dataclass
@@ -46,6 +49,28 @@ async def _emit(sink: EventSink | None, event: dict[str, Any]) -> None:
         await result
 
 
+async def _stream_turn(
+    provider: LLMProvider,
+    model: str,
+    convo: list[Message],
+    tools: list[dict[str, Any]],
+    emit: EventSink | None,
+    should_stop: StopCheck | None,
+) -> TurnResult:
+    """Stream one model turn, emitting text deltas as they arrive."""
+    parts: list[str] = []
+    calls: list[ToolCall] = []
+    async for delta in provider.stream_chat_with_tools(convo, model, tools):
+        if should_stop and should_stop():
+            break
+        if delta.tool_calls:
+            calls.extend(delta.tool_calls)
+        if delta.content:
+            parts.append(delta.content)
+            await _emit(emit, {"type": "delta", "content": delta.content})
+    return TurnResult(content="".join(parts), tool_calls=calls)
+
+
 async def run_agent_turn(
     provider: LLMProvider,
     model: str,
@@ -54,19 +79,33 @@ async def run_agent_turn(
     confirm: Confirmer,
     emit: EventSink | None = None,
     log_action: Callable[[str, dict, ActionResult, str], None] | None = None,
+    should_stop: StopCheck | None = None,
 ) -> AgentOutcome:
     """Run one user turn to completion, executing any requested actions."""
     tools = registry.tool_schemas()
     convo = list(messages)
     actions_run: list[dict[str, Any]] = []
+    # Exactly the text the user saw stream by, across every round: a tool
+    # preamble ("Let me check…") plus the answer that follows read as one
+    # message. Persisting this verbatim keeps a reloaded conversation
+    # identical to what was on screen live.
+    spoken: list[str] = []
+
+    def outcome() -> AgentOutcome:
+        return AgentOutcome(text="".join(spoken).strip(), actions_run=actions_run)
 
     for _round in range(MAX_TOOL_ROUNDS):
-        turn = await provider.chat_with_tools(convo, model, tools)
+        turn = await _stream_turn(provider, model, convo, tools, emit, should_stop)
+        if turn.content:
+            spoken.append(turn.content)
 
-        if not turn.tool_calls:
-            if turn.content:
-                await _emit(emit, {"type": "text", "content": turn.content})
-            return AgentOutcome(text=turn.content, actions_run=actions_run)
+        if not turn.tool_calls or (should_stop and should_stop()):
+            return outcome()
+
+        # More is coming after the actions run, so break the preamble off it.
+        if turn.content.strip():
+            await _emit(emit, {"type": "delta", "content": "\n\n"})
+            spoken.append("\n\n")
 
         # Record the assistant's tool request in the running history.
         convo.append(Message("assistant", turn.content, tool_calls=turn.tool_calls))
@@ -76,11 +115,15 @@ async def run_agent_turn(
             actions_run.append({"name": call.name, "arguments": call.arguments, "ok": result.ok, "message": result.message})
             convo.append(Message("tool", json.dumps({"ok": result.ok, "message": result.message, **result.data}), tool_name=call.name))
 
+        if should_stop and should_stop():
+            return outcome()
+
     # Safety valve: ask for a plain summary after too many rounds.
     convo.append(Message("system", "Stop calling tools now and give the user a short summary of what you did."))
-    final = await provider.chat_with_tools(convo, model, [])
-    await _emit(emit, {"type": "text", "content": final.content})
-    return AgentOutcome(text=final.content, actions_run=actions_run)
+    final = await _stream_turn(provider, model, convo, [], emit, should_stop)
+    if final.content:
+        spoken.append(final.content)
+    return outcome()
 
 
 async def _run_one(
@@ -105,7 +148,8 @@ async def _run_one(
     outcome = "executed"
     if spec.requires_confirmation:
         prompt = spec.describe_confirmation(call.arguments)
-        await _emit(emit, {"type": "action_confirming", "name": call.name, "prompt": prompt})
+        await _emit(emit, {"type": "action_confirming", "name": call.name,
+                           "prompt": prompt, "risk": spec.risk.value})
         approved = await confirm(call.name, prompt, call.arguments)
         if not approved:
             log.info("action_declined", action=call.name)
@@ -128,14 +172,22 @@ async def _run_one(
 def agent_system_prompt(registry: Registry) -> str:
     lines = [
         "You can control this Windows PC through tools. When the user asks you to do "
-        "something the tools cover, call the matching tool rather than explaining how. "
-        "Announce what you're doing in a short friendly sentence. For anything "
-        "destructive or high-impact, the system will ask the user to confirm - you "
-        "don't need to ask separately, just call the tool. If a tool result reports a "
-        "failure, tell the user plainly. Only use tools that exist.",
+        "something an action below covers, you MUST actually invoke it - do not just "
+        "say you are doing it. Use the tool-calling mechanism, or if that is "
+        "unavailable, emit the call as a JSON object on its own line and nothing else "
+        'after it: {"name": "<action>", "arguments": {<params>}}. A sentence of '
+        'narration first is fine ("Opening Chrome…"), but it must be followed by the '
+        "actual call. Never describe how the user could do it themselves.",
+        "",
+        "For anything destructive or high-impact, the system asks the user to confirm - "
+        "you don't need to ask separately, just make the call. If a tool result reports "
+        "a failure, tell the user plainly. Only use actions that exist below; for "
+        "anything else, just answer normally without emitting JSON.",
         "",
         "Available actions:",
     ]
     for spec in registry.all():
-        lines.append(f"- {spec.name}: {spec.description}")
+        params = ", ".join((spec.parameters.get("properties") or {}).keys())
+        sig = f"({params})" if params else "()"
+        lines.append(f"- {spec.name}{sig}: {spec.description}")
     return "\n".join(lines)

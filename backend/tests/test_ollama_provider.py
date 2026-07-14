@@ -51,6 +51,187 @@ async def test_stream_chat_raises_on_ollama_error():
             pass
 
 
+async def test_stream_chat_with_tools_streams_text_and_collects_calls():
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["stream"] is True  # text must arrive as it is generated
+        assert payload["tools"][0]["function"]["name"] == "open_app"
+        return ndjson_response(
+            [
+                {"message": {"content": "Opening "}, "done": False},
+                {"message": {"content": "Chrome."}, "done": False},
+                {
+                    "message": {
+                        "content": "",
+                        "tool_calls": [
+                            {"function": {"name": "open_app", "arguments": {"app": "chrome"}}}
+                        ],
+                    },
+                    "done": True,
+                },
+            ]
+        )
+
+    tools = [{"type": "function", "function": {"name": "open_app", "parameters": {}}}]
+    provider = make_provider(handler)
+    deltas = [
+        d async for d in provider.stream_chat_with_tools([Message("user", "open chrome")], "m", tools)
+    ]
+    assert "".join(d.content for d in deltas) == "Opening Chrome."
+    calls = [c for d in deltas for c in d.tool_calls]
+    assert len(calls) == 1
+    assert calls[0].name == "open_app"
+    assert calls[0].arguments == {"app": "chrome"}
+
+
+async def test_tool_call_written_as_json_content_is_recovered():
+    # qwen2.5-coder and similar emit the call as JSON *content*, not the
+    # structured field. It must be recovered as a tool call, and the raw JSON
+    # must never leak to the user as assistant text.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return ndjson_response(
+            [
+                {"message": {"content": '{"name": "system_status",'}, "done": False},
+                {"message": {"content": ' "arguments": {}}'}, "done": True},
+            ]
+        )
+
+    tools = [{"type": "function", "function": {"name": "system_status", "parameters": {}}}]
+    provider = make_provider(handler)
+    deltas = [
+        d async for d in provider.stream_chat_with_tools([Message("user", "status?")], "m", tools)
+    ]
+    assert "".join(d.content for d in deltas) == ""  # no JSON leaked as text
+    calls = [c for d in deltas for c in d.tool_calls]
+    assert len(calls) == 1 and calls[0].name == "system_status"
+
+
+async def test_narration_then_json_tool_call_streams_prose_and_recovers_call():
+    # The real qwen2.5-coder pattern: a sentence of narration, then the call as
+    # a JSON object. The prose must stream to the user; the JSON must not.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return ndjson_response(
+            [
+                {"message": {"content": "Getting system status..."}, "done": False},
+                {"message": {"content": '\n\n{"name": "system_status",'}, "done": False},
+                {"message": {"content": ' "arguments": {}}'}, "done": True},
+            ]
+        )
+
+    tools = [{"type": "function", "function": {"name": "system_status", "parameters": {}}}]
+    provider = make_provider(handler)
+    deltas = [
+        d async for d in provider.stream_chat_with_tools([Message("user", "status?")], "m", tools)
+    ]
+    text = "".join(d.content for d in deltas)
+    assert text.strip() == "Getting system status..."  # prose kept, JSON dropped
+    assert "{" not in text
+    calls = [c for d in deltas for c in d.tool_calls]
+    assert len(calls) == 1 and calls[0].name == "system_status"
+
+
+async def test_code_block_reply_still_streams_and_is_not_a_tool_call():
+    # A python code fence must not be mistaken for a tool call or buffered.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return ndjson_response(
+            [
+                {"message": {"content": "Here you go:\n"}, "done": False},
+                {"message": {"content": "```python\n"}, "done": False},
+                {"message": {"content": "print({1: 2})\n```"}, "done": True},
+            ]
+        )
+
+    tools = [{"type": "function", "function": {"name": "open_app", "parameters": {}}}]
+    provider = make_provider(handler)
+    deltas = [
+        d async for d in provider.stream_chat_with_tools([Message("user", "code")], "m", tools)
+    ]
+    text = "".join(d.content for d in deltas)
+    assert "print({1: 2})" in text
+    assert [c for d in deltas for c in d.tool_calls] == []
+    # Code streamed incrementally rather than arriving in one blob at the end.
+    assert sum(1 for d in deltas if d.content) >= 2
+
+
+async def test_fenced_json_tool_call_is_recovered_with_args():
+    def handler(request: httpx.Request) -> httpx.Response:
+        blob = '```json\n{"name": "open_app", "arguments": {"app": "Chrome"}}\n```'
+        return ndjson_response([{"message": {"content": blob}, "done": True}])
+
+    tools = [{"type": "function", "function": {"name": "open_app", "parameters": {}}}]
+    provider = make_provider(handler)
+    calls = [
+        c
+        async for d in provider.stream_chat_with_tools([Message("user", "open chrome")], "m", tools)
+        for c in d.tool_calls
+    ]
+    assert calls[0].name == "open_app"
+    assert calls[0].arguments == {"app": "Chrome"}
+
+
+async def test_json_content_not_matching_a_tool_is_left_as_text():
+    # Ordinary JSON the user asked for must pass through as text, not be
+    # misread as an action.
+    def handler(request: httpx.Request) -> httpx.Response:
+        blob = '{"name": "not_a_registered_action", "arguments": {}}'
+        return ndjson_response([{"message": {"content": blob}, "done": True}])
+
+    tools = [{"type": "function", "function": {"name": "open_app", "parameters": {}}}]
+    provider = make_provider(handler)
+    deltas = [
+        d async for d in provider.stream_chat_with_tools([Message("user", "give me json")], "m", tools)
+    ]
+    assert "not_a_registered_action" in "".join(d.content for d in deltas)
+    assert [c for d in deltas for c in d.tool_calls] == []
+
+
+async def test_plain_text_streams_incrementally_with_tools_available():
+    # A normal prose reply must still stream chunk-by-chunk, not buffer.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return ndjson_response(
+            [
+                {"message": {"content": "Your CPU "}, "done": False},
+                {"message": {"content": "looks fine."}, "done": False},
+                {"message": {"content": ""}, "done": True},
+            ]
+        )
+
+    tools = [{"type": "function", "function": {"name": "system_status", "parameters": {}}}]
+    provider = make_provider(handler)
+    text_deltas = [
+        d.content
+        async for d in provider.stream_chat_with_tools([Message("user", "hi")], "m", tools)
+        if d.content
+    ]
+    assert text_deltas == ["Your CPU ", "looks fine."]  # streamed, not coalesced
+
+
+async def test_stream_chat_with_tools_accepts_stringified_arguments():
+    # Some models emit `arguments` as a JSON string rather than an object.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return ndjson_response(
+            [
+                {
+                    "message": {
+                        "content": "",
+                        "tool_calls": [
+                            {"function": {"name": "web_search", "arguments": '{"query": "corvus"}'}}
+                        ],
+                    },
+                    "done": True,
+                }
+            ]
+        )
+
+    provider = make_provider(handler)
+    calls = [
+        c
+        async for d in provider.stream_chat_with_tools([Message("user", "s")], "m", [])
+        for c in d.tool_calls
+    ]
+    assert calls[0].arguments == {"query": "corvus"}
+
+
 async def test_complete_concatenates():
     def handler(request: httpx.Request) -> httpx.Response:
         return ndjson_response(

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Corvus mark (monochrome)">
+  <!-- Monochrome silhouette; fill inherits currentColor for theme-aware use. -->
+  <defs>
+    <mask id="eye-cut-mono">
+      <rect width="512" height="512" fill="white"/>
+      <circle cx="278" cy="196" r="17" fill="black"/>
+    </mask>
+  </defs>
+  <polygon points="150,180 280,118 430,260 246,362" fill="currentColor" mask="url(#eye-cut-mono)"/>
+</svg>

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="Corvus splash screen">
+  <defs>
+    <radialGradient id="sp-bg" cx="0.5" cy="0.45" r="0.8">
+      <stop offset="0" stop-color="#0E1A38"/>
+      <stop offset="0.5" stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#05060A"/>
+    </radialGradient>
+    <linearGradient id="sp-crown" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7AAAFF"/>
+      <stop offset="1" stop-color="#4F8CFF"/>
+    </linearGradient>
+    <linearGradient id="sp-beak" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#4F8CFF"/>
+      <stop offset="1" stop-color="#2E5FC7"/>
+    </linearGradient>
+    <linearGradient id="sp-back" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#2E5FC7"/>
+      <stop offset="1" stop-color="#1B3A80"/>
+    </linearGradient>
+    <linearGradient id="sp-neck" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1B3A80"/>
+      <stop offset="1" stop-color="#0B1220"/>
+    </linearGradient>
+    <mask id="sp-eye">
+      <rect width="1600" height="900" fill="white"/>
+      <circle cx="793" cy="334" r="12" fill="black"/>
+    </mask>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sp-bg)"/>
+  <!-- constellation accents -->
+  <g fill="#4F8CFF" opacity="0.35">
+    <circle cx="240" cy="180" r="2"/><circle cx="420" cy="640" r="1.5"/><circle cx="1310" cy="220" r="2"/>
+    <circle cx="1420" cy="560" r="1.5"/><circle cx="980" cy="130" r="1.5"/><circle cx="180" cy="470" r="1.5"/>
+  </g>
+  <g stroke="#4F8CFF" stroke-width="1" opacity="0.12">
+    <line x1="240" y1="180" x2="420" y2="640"/><line x1="1310" y1="220" x2="1420" y2="560"/><line x1="980" y1="130" x2="1310" y2="220"/>
+  </g>
+  <circle cx="800" cy="360" r="220" fill="#4F8CFF" opacity="0.10"/>
+  <g mask="url(#sp-eye)" transform="translate(626,216) scale(0.6)">
+    <polygon points="150,180 280,118 300,240" fill="url(#sp-crown)"/>
+    <polygon points="280,118 430,260 300,240" fill="url(#sp-beak)"/>
+    <polygon points="150,180 300,240 246,362" fill="url(#sp-back)"/>
+    <polygon points="300,240 430,260 246,362" fill="url(#sp-neck)"/>
+  </g>
+  <text x="800" y="600" text-anchor="middle" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="72" font-weight="600" letter-spacing="-1.5" fill="#F5F7FA">Corvus</text>
+  <text x="800" y="655" text-anchor="middle" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="22" font-weight="400" fill="#9AA7BD">Your Windows AI assistant</text>
+</svg>

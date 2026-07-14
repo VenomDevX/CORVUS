@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Corvus mark">
+  <!-- Corvus: abstract faceted raven head, facing right. Four sharp facets, electric-blue ramp. -->
+  <defs>
+    <linearGradient id="facet-crown" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7AAAFF"/>
+      <stop offset="1" stop-color="#4F8CFF"/>
+    </linearGradient>
+    <linearGradient id="facet-beak" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#4F8CFF"/>
+      <stop offset="1" stop-color="#2E5FC7"/>
+    </linearGradient>
+    <linearGradient id="facet-back" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#2E5FC7"/>
+      <stop offset="1" stop-color="#1B3A80"/>
+    </linearGradient>
+    <linearGradient id="facet-neck" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1B3A80"/>
+      <stop offset="1" stop-color="#0B1220"/>
+    </linearGradient>
+    <mask id="eye-cut">
+      <rect width="512" height="512" fill="white"/>
+      <circle cx="278" cy="196" r="17" fill="black"/>
+    </mask>
+  </defs>
+  <g mask="url(#eye-cut)">
+    <polygon points="150,180 280,118 300,240" fill="url(#facet-crown)"/>
+    <polygon points="280,118 430,260 300,240" fill="url(#facet-beak)"/>
+    <polygon points="150,180 300,240 246,362" fill="url(#facet-back)"/>
+    <polygon points="300,240 430,260 246,362" fill="url(#facet-neck)"/>
+  </g>
+</svg>

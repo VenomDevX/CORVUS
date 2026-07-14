@@ -101,6 +101,28 @@ class Repository:
         )
         return cur.fetchone() is not None
 
+    # -- action log --------------------------------------------------------
+
+    def log_action(
+        self, conversation_id: int | None, action: str, arguments: dict,
+        outcome: str, message: str,
+    ) -> dict[str, Any]:
+        import json
+
+        cur = self.conn.execute(
+            "INSERT INTO action_log (conversation_id, action, arguments, outcome, message) "
+            "VALUES (?, ?, ?, ?, ?) RETURNING *",
+            (conversation_id, action, json.dumps(arguments), outcome, message),
+        )
+        row = dict(cur.fetchone())
+        self.conn.commit()
+        return row
+
+    def list_actions(self, limit: int = 100) -> list[dict[str, Any]]:
+        return _rows(
+            self.conn.execute("SELECT * FROM action_log ORDER BY id DESC LIMIT ?", (limit,))
+        )
+
     # -- settings ----------------------------------------------------------
 
     def get_setting(self, key: str, default: str | None = None) -> str | None:

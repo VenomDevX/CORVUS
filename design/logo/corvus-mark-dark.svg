@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Corvus mark (dark, for light surfaces)">
+  <defs>
+    <mask id="eye-cut-d">
+      <rect width="512" height="512" fill="white"/>
+      <circle cx="278" cy="196" r="17" fill="black"/>
+    </mask>
+  </defs>
+  <polygon points="150,180 280,118 430,260 246,362" fill="#0B1220" mask="url(#eye-cut-d)"/>
+</svg>

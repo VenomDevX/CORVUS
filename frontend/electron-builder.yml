@@ -1,0 +1,47 @@
+appId: com.corvus.assistant
+productName: Corvus
+copyright: Copyright © Corvus
+
+directories:
+  output: ../dist-installer
+  buildResources: build
+
+# Renderer bundle + compiled main/preload.
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+
+# The PyInstaller-frozen backend is copied in beside the app, so the launcher
+# finds it at process.resourcesPath/backend/corvus-backend.exe.
+extraResources:
+  - from: ../dist-backend/corvus-backend
+    to: backend
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: ../design/exports/corvus.ico
+  artifactName: Corvus-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Corvus
+  installerIcon: ../design/exports/corvus.ico
+  uninstallerIcon: ../design/exports/corvus.ico
+  installerHeaderIcon: ../design/exports/corvus.ico
+
+# electron-updater reads this to know where to look for new versions.
+# Replace the URL with your real release host before publishing.
+publish:
+  - provider: generic
+    url: https://updates.corvus.app/releases
+    channel: latest

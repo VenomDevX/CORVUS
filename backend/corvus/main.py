@@ -2,8 +2,8 @@
 
 import uvicorn
 
-from .api.app import create_app
-from .config import HOST, PORT
+from corvus.api.app import create_app
+from corvus.config import HOST, PORT
 
 app = create_app()
 

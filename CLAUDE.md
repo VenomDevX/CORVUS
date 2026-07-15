@@ -49,6 +49,8 @@ Build note: `dist:backend` pins `OPENBLAS_NUM_THREADS`/`OMP_NUM_THREADS`/`MKL_NU
 
 Only one Corvus may run at a time (Electron single-instance lock, `main.ts`). A second launch — dev while the packaged app is open, or vice versa — quits instantly with exit code 0 instead of erroring. A running `Corvus.exe` also locks `dist-installer/win-unpacked/`, which fails the packaging step with "Access is denied"; close the app before `npm run dist`.
 
+Ollama 500s that mention allocation ("cudaMalloc failed", "unable to allocate CUDA_Host buffer", "failed to allocate CPU_REPACK buffer") are usually the **Windows commit limit**, not free RAM and not VRAM — Windows grants allocations against commit, so a 3GB request fails instantly while physical RAM sits free. This machine's pagefile is manually capped, pinning the commit limit near what a full desktop (multiple browsers + IDE) already charges. Diagnose with `(Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory` (commit available), *not* `FreePhysicalMemory`; the buffer named in the error just says which allocator hit the wall first. Closing a browser frees GB-scale commit. The 6GB RTX 4050 is a real ceiling too — `qwen2.5-coder` needs ~3.7GB VRAM for weights alone.
+
 ## Quality bar
 
 No TODO comments in shipped code — deferred work goes in the milestone list above. Destructive/high-risk agent actions (M6+) always require explicit, specific confirmation. API keys go through Windows credential vault/DPAPI, never plaintext. Run `npm run guard && npm test` before committing.

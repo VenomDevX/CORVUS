@@ -15,7 +15,7 @@ function CodeBlock({ language, value }: { language: string; value: string }) {
 
   return (
     <div className="group relative my-2 overflow-hidden rounded">
-      <div className="flex items-center justify-between bg-bg-midnight px-3 py-1.5">
+      <div className="flex items-center justify-between bg-bg-rein px-3 py-1.5">
         <span className="text-caption text-fg-faint">{language || "code"}</span>
         <button
           onClick={copy}

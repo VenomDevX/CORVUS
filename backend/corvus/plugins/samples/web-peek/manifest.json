@@ -1,0 +1,9 @@
+{
+  "id": "web-peek",
+  "name": "Web Peek",
+  "version": "1.0.0",
+  "description": "Fetch the title of a web page. Demonstrates the network permission.",
+  "author": "Corvus",
+  "permissions": ["network"],
+  "entry": "plugin.py"
+}

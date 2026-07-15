@@ -9,13 +9,15 @@
   "scripts": {
     "dev": "concurrently -k -n vite,electron,esbuild \"vite\" \"npm run dev:electron\" \"npm run build:electron -- --watch\"",
     "dev:electron": "wait-on tcp:127.0.0.1:5173 && wait-on file:dist-electron/main.cjs && electron .",
-    "build:electron": "esbuild electron/main.ts electron/preload.ts --bundle --platform=node --external:electron --format=cjs --outdir=dist-electron --out-extension:.js=.cjs",
+    "build:electron": "esbuild electron/main.ts electron/preload.ts --bundle --platform=node --external:electron --external:electron-updater --format=cjs --outdir=dist-electron --out-extension:.js=.cjs",
     "build": "tsc --noEmit && vite build && npm run build:electron",
     "lint": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dist": "npm run build && electron-builder --win --publish never"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.54.0",
+    "electron-updater": "^6.8.9",
     "framer-motion": "^11.11.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

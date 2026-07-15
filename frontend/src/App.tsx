@@ -9,6 +9,7 @@ import { AnimatePresence } from "framer-motion";
 import { Sidebar } from "./components/Sidebar";
 import { ChatView } from "./components/ChatView";
 import { VoiceMode } from "./components/VoiceMode";
+import { NotificationsLayer } from "./components/NotificationsLayer";
 import { HistoryView } from "./sections/HistoryView";
 import { MemoryView } from "./sections/MemoryView";
 import { SettingsView } from "./sections/SettingsView";
@@ -94,6 +95,7 @@ export default function App() {
   return (
     <FluentProvider theme={theme === "dark" ? darkTheme : lightTheme} className="h-full !bg-transparent">
       <div className="app-bg relative flex h-full flex-col">
+        <NotificationsLayer />
         <AnimatePresence>{voiceMode && <VoiceMode />}</AnimatePresence>
         {/* Draggable titlebar strip (native window buttons overlay the right edge) */}
         <header className="titlebar-drag flex h-10 shrink-0 items-center gap-2 px-4">

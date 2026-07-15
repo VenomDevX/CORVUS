@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { createTray, destroyTray } from "./tray";
 import { registerIpc } from "./ipc";
 import { startBackend, stopBackend } from "./backend-launcher";
+import { initAutoUpdate } from "./updater";
 
 const DEV_URL = "http://127.0.0.1:5173";
 const isDev = !app.isPackaged;
@@ -87,6 +88,7 @@ if (!gotLock) {
     });
     globalShortcut.register("Control+Shift+C", showMainWindow);
     void startBackend(isDev);
+    void initAutoUpdate(() => mainWindow, isDev);
   });
 
   app.on("before-quit", () => {

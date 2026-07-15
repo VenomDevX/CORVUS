@@ -1,10 +1,12 @@
-import { BrowserWindow, ipcMain, nativeTheme, shell } from "electron";
+import { BrowserWindow, app, ipcMain, nativeTheme, shell } from "electron";
 
 /** IPC surface exposed to the renderer via preload — keep this minimal and typed. */
 export function registerIpc(getWindow: () => BrowserWindow | null) {
   ipcMain.handle("corvus:get-system-theme", () =>
     nativeTheme.shouldUseDarkColors ? "dark" : "light",
   );
+
+  ipcMain.handle("corvus:get-version", () => app.getVersion());
 
   ipcMain.handle("corvus:open-external", async (_event, url: string) => {
     if (/^https?:\/\//.test(url)) await shell.openExternal(url);

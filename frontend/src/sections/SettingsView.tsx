@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { useCorvus } from "../state/store";
 import { Orb } from "../components/Orb";
 import { ProviderSettings } from "../components/ProviderSettings";
+import { AboutSettings } from "../components/AboutSettings";
 import { ORB_STATES, type OrbState } from "../lib/tokens";
 
 const TTS_VOICES = [
@@ -40,6 +41,11 @@ export function SettingsView() {
   return (
     <SectionShell title="Settings">
       <div className="max-w-2xl space-y-6">
+        <section className="glass rounded-lg p-4">
+          <h2 className="mb-3 text-h4">About &amp; updates</h2>
+          <AboutSettings />
+        </section>
+
         <section className="glass rounded-lg p-4">
           <h2 className="mb-3 text-h4">Appearance</h2>
           <Switch

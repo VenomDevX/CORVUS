@@ -33,6 +33,9 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        app.state.session.begin()
+        # The frontend surfaces recovery on its first /session fetch (no
+        # notification subscriber is connected this early in startup).
         if app.state.notifications is not None:
             await app.state.notifications.start()
         await app.state.workflows.start()
@@ -54,6 +57,7 @@ def create_app(
             await app.state.browser.close()
         if app.state.notifications is not None:
             await app.state.notifications.stop()
+        app.state.session.end()
         app.state.repo.close()
 
     app = FastAPI(title="Corvus", version=__version__, lifespan=lifespan)
@@ -63,7 +67,10 @@ def create_app(
     from ..llm.factory import ProviderManager
     from ..llm.vault import KeyVault
 
+    from ..session import SessionManager
+
     app.state.repo = repo or Repository(database or db_path())
+    app.state.session = SessionManager(app.state.repo)
     app.state.vault = KeyVault(app.state.repo)
     # A caller may inject a provider (tests); otherwise use the active-provider
     # manager so the selected backend (Ollama/OpenAI/Anthropic/…) is live.

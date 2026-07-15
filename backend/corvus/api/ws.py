@@ -58,6 +58,8 @@ async def chat(ws: WebSocket) -> None:
         conversation_id = repo.create_conversation(title)["id"]
 
     user_message = repo.add_message(conversation_id, "user", content)
+    # Remember where we are, so a crash mid-task restores this conversation.
+    ws.app.state.session.set_active_conversation(conversation_id)
     await ws.send_json(
         {"type": "start", "conversation_id": conversation_id, "user_message_id": user_message["id"]}
     )

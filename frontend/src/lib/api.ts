@@ -60,6 +60,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<{ status: string; version: string }>("/health"),
+  session: () => request<{ recovered: boolean; active_conversation: number | null }>("/session"),
   listConversations: () => request<Conversation[]>("/conversations"),
   createConversation: (title: string) =>
     request<Conversation>("/conversations", { method: "POST", body: JSON.stringify({ title }) }),

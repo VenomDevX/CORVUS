@@ -14,6 +14,7 @@ from ..memory.repository import Repository
 from .notifications import notify_router
 from .routes import router
 from .voice import voice_router
+from .workflows import workflow_router
 from .ws import ws_router
 
 
@@ -33,17 +34,21 @@ def create_app(
     async def lifespan(app: FastAPI):
         if app.state.notifications is not None:
             await app.state.notifications.start()
+        await app.state.workflows.start()
         if voice is not False:
             if voice is True:
                 from ..voice.pipeline import VoicePipeline
 
-                app.state.voice = VoicePipeline(app.state.repo, app.state.provider)
+                app.state.voice = VoicePipeline(
+                    app.state.repo, app.state.provider, workflows=app.state.workflows
+                )
             else:
                 app.state.voice = voice
             await app.state.voice.start()
         yield
         if app.state.voice is not None:
             await app.state.voice.stop()
+        await app.state.workflows.stop()
         if app.state.browser is not None:
             await app.state.browser.close()
         if app.state.notifications is not None:
@@ -94,6 +99,13 @@ def create_app(
         get_model=active_model,
         notifications=app.state.notifications,
     )
+
+    # Workflows reuse the assembled registry; their actions register back into it.
+    from ..workflows.engine import WorkflowEngine
+    from ..actions.workflow_handlers import register_workflow_actions
+
+    app.state.workflows = WorkflowEngine(app.state.repo, app.state.registry, app.state.notifications)
+    register_workflow_actions(app.state.registry, app.state.workflows)
     if app.state.repo.get_setting("provider") is None:
         app.state.repo.set_setting("provider", "ollama")
     if app.state.repo.get_setting("model:ollama") is None:
@@ -112,5 +124,6 @@ def create_app(
     app.include_router(ws_router)
     app.include_router(voice_router)
     app.include_router(notify_router)
+    app.include_router(workflow_router)
 
     return app

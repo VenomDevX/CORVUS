@@ -16,7 +16,8 @@ import { SettingsView } from "./sections/SettingsView";
 import { LogsView } from "./sections/LogsView";
 import { TasksView } from "./sections/TasksView";
 import { DownloadsView } from "./sections/DownloadsView";
-import { UpcomingSection } from "./sections/SectionShell";
+import { ExtensionsView } from "./sections/ExtensionsView";
+import { PluginsView } from "./sections/PluginsView";
 import { useCorvus, type Section } from "./state/store";
 import { applyThemeVars } from "./lib/theme";
 import { api } from "./lib/api";
@@ -38,21 +39,9 @@ const SECTIONS: Record<Section, () => JSX.Element> = {
   settings: SettingsView,
   logs: LogsView,
   tasks: TasksView,
-  extensions: () => (
-    <UpcomingSection
-      title="Extensions"
-      milestone={8}
-      detail="The plugin marketplace surface ships with the plugin SDK."
-    />
-  ),
+  extensions: ExtensionsView,
   downloads: DownloadsView,
-  plugins: () => (
-    <UpcomingSection
-      title="Plugins"
-      milestone={8}
-      detail="Installed plugins and their permission grants will be managed here."
-    />
-  ),
+  plugins: PluginsView,
 };
 
 export default function App() {

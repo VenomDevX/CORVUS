@@ -75,6 +75,10 @@ class Registry:
             raise ValueError(f"action {spec.name} needs a confirm_prompt for its risk tier")
         self._actions[spec.name] = spec
 
+    def unregister(self, name: str) -> bool:
+        """Remove an action (used when a plugin is disabled)."""
+        return self._actions.pop(name, None) is not None
+
     def get(self, name: str) -> ActionSpec | None:
         return self._actions.get(name)
 

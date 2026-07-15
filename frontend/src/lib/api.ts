@@ -95,6 +95,15 @@ export const api = {
     ),
   deleteWorkflow: (name: string) =>
     request<{ ok: boolean }>(`/workflows/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  listPlugins: () => request<Plugin[]>("/plugins"),
+  enablePlugin: (id: string) =>
+    request<{ loaded: boolean; error: string | null }>(`/plugins/${id}/enable`, { method: "POST" }),
+  disablePlugin: (id: string) => request<{ ok: boolean }>(`/plugins/${id}/disable`, { method: "POST" }),
+  setPluginPermissions: (id: string, permissions: string[]) =>
+    request<{ ok: boolean; granted: string[] }>(`/plugins/${id}/permissions`, {
+      method: "PUT",
+      body: JSON.stringify({ permissions }),
+    }),
   listProviders: () => request<ProviderInfo[]>("/providers"),
   setProviderKey: (provider: string, key: string) =>
     request<{ ok: boolean; has_key: boolean }>("/providers/key", {
@@ -104,6 +113,21 @@ export const api = {
   clearProviderKey: (provider: string) =>
     request<{ ok: boolean }>(`/providers/key/${provider}`, { method: "DELETE" }),
 };
+
+export interface Plugin {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  permissions: string[];
+  enabled: boolean;
+  granted_permissions: string[];
+  loaded: boolean;
+  actions: string[];
+  error: string | null;
+  bundled: boolean;
+}
 
 export interface WorkflowStep {
   action: string;

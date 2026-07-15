@@ -12,6 +12,7 @@ from ..llm.ollama import OllamaProvider
 from ..log import setup_logging
 from ..memory.repository import Repository
 from .notifications import notify_router
+from .plugins import plugin_router
 from .routes import router
 from .voice import voice_router
 from .workflows import workflow_router
@@ -106,6 +107,12 @@ def create_app(
 
     app.state.workflows = WorkflowEngine(app.state.repo, app.state.registry, app.state.notifications)
     register_workflow_actions(app.state.registry, app.state.workflows)
+
+    # Plugins load their actions into the same registry (enabled + granted only).
+    from ..plugins.manager import PluginManager
+
+    app.state.plugins = PluginManager(app.state.repo, app.state.registry)
+    app.state.plugins.load_enabled()
     if app.state.repo.get_setting("provider") is None:
         app.state.repo.set_setting("provider", "ollama")
     if app.state.repo.get_setting("model:ollama") is None:
@@ -125,5 +132,6 @@ def create_app(
     app.include_router(voice_router)
     app.include_router(notify_router)
     app.include_router(workflow_router)
+    app.include_router(plugin_router)
 
     return app

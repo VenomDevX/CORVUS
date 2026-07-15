@@ -88,8 +88,31 @@ def test_settings_and_models(tmp_path, fake_provider):
     updated = client.patch("/settings", json={"model": "fake-model:latest"}).json()
     assert updated["model"] == "fake-model:latest"
 
-    assert client.patch("/settings", json={"provider": "openai"}).status_code == 400
+    # Switching to a real provider is allowed now (Milestone 8); an unknown one 400s.
+    assert client.patch("/settings", json={"provider": "openai"}).json()["provider"] == "openai"
+    assert client.patch("/settings", json={"provider": "nope"}).status_code == 400
     assert client.get("/models").json() == {"models": ["fake-model:latest"]}
+
+
+def test_provider_catalog_and_key_vault(tmp_path, fake_provider):
+    client = make_client(tmp_path, fake_provider)
+    providers = {p["name"]: p for p in client.get("/providers").json()}
+    assert providers["ollama"]["needs_key"] is False
+    assert providers["openai"]["needs_key"] is True
+    assert providers["openai"]["has_key"] is False
+
+    # Store a key (encrypted at rest via DPAPI) and confirm it registers.
+    r = client.put("/providers/key", json={"provider": "openai", "key": "sk-abc123"})
+    assert r.json()["has_key"] is True
+    assert {p["name"]: p["has_key"] for p in client.get("/providers").json()}["openai"] is True
+
+    # The raw stored value must be ciphertext, never the key.
+    from corvus.llm.vault import _KEY_PREFIX
+    raw = client.app.state.repo.get_setting(_KEY_PREFIX + "openai")
+    assert raw and "sk-abc123" not in raw
+
+    client.delete("/providers/key/openai")
+    assert {p["name"]: p["has_key"] for p in client.get("/providers").json()}["openai"] is False
 
 
 def test_actions_catalog_endpoint(tmp_path, fake_provider):

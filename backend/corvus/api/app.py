@@ -48,8 +48,14 @@ def create_app(
 
     from ..actions.registry import build_default_registry
 
+    from ..llm.factory import ProviderManager
+    from ..llm.vault import KeyVault
+
     app.state.repo = repo or Repository(database or db_path())
-    app.state.provider = provider or OllamaProvider()
+    app.state.vault = KeyVault(app.state.repo)
+    # A caller may inject a provider (tests); otherwise use the active-provider
+    # manager so the selected backend (Ollama/OpenAI/Anthropic/…) is live.
+    app.state.provider = provider or ProviderManager(app.state.repo, app.state.vault)
     app.state.log = log
     app.state.voice = None
 
@@ -62,15 +68,22 @@ def create_app(
     else:
         app.state.browser = browser
 
+    def active_model() -> str:
+        prov = app.state.provider
+        if hasattr(prov, "current_model"):
+            return prov.current_model()
+        return app.state.repo.get_setting("model") or DEFAULT_MODEL
+
+    app.state.active_model = active_model
     app.state.registry = build_default_registry(
         browser=app.state.browser,
         provider=app.state.provider,
-        get_model=lambda: app.state.repo.get_setting("model"),
+        get_model=active_model,
     )
-    if app.state.repo.get_setting("model") is None:
-        app.state.repo.set_setting("model", DEFAULT_MODEL)
     if app.state.repo.get_setting("provider") is None:
         app.state.repo.set_setting("provider", "ollama")
+    if app.state.repo.get_setting("model:ollama") is None:
+        app.state.repo.set_setting("model:ollama", DEFAULT_MODEL)
 
     # The server binds to loopback only; the Electron renderer's origin varies
     # (vite dev server / file://), so allow any origin on this local socket.

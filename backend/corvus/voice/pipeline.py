@@ -266,7 +266,7 @@ class VoicePipeline:
         history = self.repo.list_messages(self.conversation_id)[-MAX_HISTORY_MESSAGES:]
         messages = [Message("system", SYSTEM_PROMPT + "\nYou are in voice mode: keep replies short and conversational - a few sentences, no markdown, no code blocks unless asked to dictate code.")]
         messages += [Message(m["role"], m["content"]) for m in history]
-        model = self.repo.get_setting("model")
+        model = self._model()
 
         self._interrupt.clear()
         chunker = SentenceChunker()
@@ -309,9 +309,14 @@ class VoicePipeline:
         self._set_state("idle")
         if assistant_text and not interrupted:
             await extract_memory(
-                self.provider, self.repo.get_setting("model"), self.repo,
+                self.provider, self._model(), self.repo,
                 user_text, assistant_text, self.conversation_id,
             )
+
+    def _model(self) -> str:
+        if hasattr(self.provider, "current_model"):
+            return self.provider.current_model()
+        return self.repo.get_setting("model") or self.repo.get_setting("model:ollama")
 
     async def _speak_loop(self, sentences: asyncio.Queue) -> bool:
         """Speak queued sentences while watching the mic for barge-in.

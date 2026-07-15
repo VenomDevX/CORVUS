@@ -10,6 +10,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     if (/^https?:\/\//.test(url)) await shell.openExternal(url);
   });
 
+  ipcMain.handle("corvus:open-path", async (_event, path: string) => {
+    // Local files Corvus created (e.g. browser downloads); shell picks the app.
+    await shell.openPath(path);
+  });
+
   ipcMain.handle("corvus:set-titlebar-symbol-color", (_event, color: string) => {
     const win = getWindow();
     if (win && /^#[0-9A-Fa-f]{6,8}$/.test(color)) {

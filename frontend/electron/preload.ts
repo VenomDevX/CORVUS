@@ -6,6 +6,8 @@ const corvusBridge = {
     ipcRenderer.invoke("corvus:get-system-theme"),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("corvus:open-external", url),
+  openPath: (path: string): Promise<void> =>
+    ipcRenderer.invoke("corvus:open-path", path),
   setTitlebarSymbolColor: (color: string): Promise<void> =>
     ipcRenderer.invoke("corvus:set-titlebar-symbol-color", color),
 };

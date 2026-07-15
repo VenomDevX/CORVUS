@@ -3,8 +3,8 @@
  * REST for CRUD, one WebSocket per in-flight generation for token streaming.
  */
 
-export const BACKEND_HTTP = "http://127.0.0.1:8765";
-export const BACKEND_WS = "ws://127.0.0.1:8765";
+const BACKEND_HTTP = "http://127.0.0.1:8765";
+const BACKEND_WS = "ws://127.0.0.1:8765";
 
 export interface Conversation {
   id: number;

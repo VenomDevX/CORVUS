@@ -101,6 +101,84 @@ class Repository:
         )
         return cur.fetchone() is not None
 
+    # -- action log --------------------------------------------------------
+
+    def log_action(
+        self, conversation_id: int | None, action: str, arguments: dict,
+        outcome: str, message: str,
+    ) -> dict[str, Any]:
+        import json
+
+        cur = self.conn.execute(
+            "INSERT INTO action_log (conversation_id, action, arguments, outcome, message) "
+            "VALUES (?, ?, ?, ?, ?) RETURNING *",
+            (conversation_id, action, json.dumps(arguments), outcome, message),
+        )
+        row = dict(cur.fetchone())
+        self.conn.commit()
+        return row
+
+    def list_actions(self, limit: int = 100) -> list[dict[str, Any]]:
+        return _rows(
+            self.conn.execute("SELECT * FROM action_log ORDER BY id DESC LIMIT ?", (limit,))
+        )
+
+    # -- reminders ---------------------------------------------------------
+
+    def add_reminder(self, text: str, kind: str, fire_at: str) -> dict[str, Any]:
+        cur = self.conn.execute(
+            "INSERT INTO reminders (text, kind, fire_at) VALUES (?, ?, ?) RETURNING *",
+            (text, kind, fire_at),
+        )
+        row = dict(cur.fetchone())
+        self.conn.commit()
+        return row
+
+    def pending_reminders(self) -> list[dict[str, Any]]:
+        return _rows(
+            self.conn.execute("SELECT * FROM reminders WHERE fired = 0 ORDER BY fire_at")
+        )
+
+    def mark_reminder_fired(self, reminder_id: int) -> None:
+        self.conn.execute("UPDATE reminders SET fired = 1 WHERE id = ?", (reminder_id,))
+        self.conn.commit()
+
+    def delete_reminder(self, reminder_id: int) -> bool:
+        cur = self.conn.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    # -- workflows ---------------------------------------------------------
+
+    def create_workflow(self, name: str, steps: list, trigger_type: str = "manual",
+                        trigger_config: dict | None = None) -> dict[str, Any]:
+        import json
+
+        cur = self.conn.execute(
+            "INSERT INTO workflows (name, steps, trigger_type, trigger_config) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(name) DO UPDATE SET steps=excluded.steps, "
+            "trigger_type=excluded.trigger_type, trigger_config=excluded.trigger_config "
+            "RETURNING *",
+            (name, json.dumps(steps), trigger_type, json.dumps(trigger_config or {})),
+        )
+        row = dict(cur.fetchone())
+        self.conn.commit()
+        return row
+
+    def list_workflows(self) -> list[dict[str, Any]]:
+        return _rows(self.conn.execute("SELECT * FROM workflows ORDER BY name"))
+
+    def get_workflow(self, name: str) -> dict[str, Any] | None:
+        cur = self.conn.execute("SELECT * FROM workflows WHERE name = ?", (name,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+    def delete_workflow(self, name: str) -> bool:
+        cur = self.conn.execute("DELETE FROM workflows WHERE name = ?", (name,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
     # -- settings ----------------------------------------------------------
 
     def get_setting(self, key: str, default: str | None = None) -> str | None:

@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { Orb } from "./Orb";
 import { MarkdownContent } from "./MarkdownContent";
 import { InputBar } from "./InputBar";
+import { ActionChip } from "./ActionChip";
+import { ConfirmationCard } from "./ConfirmationCard";
 import { useCorvus } from "../state/store";
 
 export function ChatView() {
@@ -32,23 +34,33 @@ export function ChatView() {
       ) : (
         <div className="flex min-h-0 flex-1 gap-4">
           <div ref={scroller} className="min-w-0 flex-1 space-y-4 overflow-y-auto pr-2 pt-2">
-            {messages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-3 ${
-                    m.role === "user"
-                      ? "bg-accent/20 text-fg"
-                      : "glass text-fg shadow-glass-1"
-                  }`}
-                >
-                  {m.content ? (
-                    <MarkdownContent content={m.content} />
-                  ) : (
-                    <span className="text-fg-muted">Corvus is thinking…</span>
+            {messages.map((m, i) => {
+              const actions = "actions" in m ? m.actions : undefined;
+              return (
+                <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
+                  <div
+                    className={`max-w-[80%] rounded-lg px-4 py-3 ${
+                      m.role === "user" ? "bg-accent/20 text-fg" : "glass text-fg shadow-glass-1"
+                    }`}
+                  >
+                    {m.content ? (
+                      <MarkdownContent content={m.content} />
+                    ) : actions && actions.length > 0 ? (
+                      <span className="text-fg-muted">Corvus is working…</span>
+                    ) : (
+                      <span className="text-fg-muted">Corvus is thinking…</span>
+                    )}
+                  </div>
+                  {actions && actions.length > 0 && (
+                    <div className="mt-2 flex max-w-[80%] flex-col gap-1.5">
+                      {actions.map((a, j) => (
+                        <ActionChip key={`${a.name}-${j}`} action={a} />
+                      ))}
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {generating && <div className="h-2" aria-live="polite" />}
           </div>
           <div className="hidden w-56 shrink-0 items-start justify-center pt-4 xl:flex">
@@ -56,6 +68,7 @@ export function ChatView() {
           </div>
         </div>
       )}
+      <ConfirmationCard />
       <InputBar />
     </div>
   );

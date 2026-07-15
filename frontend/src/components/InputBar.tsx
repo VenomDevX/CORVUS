@@ -1,7 +1,9 @@
 import { useRef, useState } from "react";
 import { Tooltip } from "@fluentui/react-components";
 import { useCorvus } from "../state/store";
+import { api } from "../lib/api";
 import { FileCard, type Attachment } from "./FileCard";
+import { Mic, Image as ImageIcon, Paperclip, Square, Volume2 } from "lucide-react";
 
 export function InputBar() {
   const [text, setText] = useState("");
@@ -15,10 +17,32 @@ export function InputBar() {
   const imageInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  function submit() {
+  const [uploading, setUploading] = useState(false);
+
+  async function submit() {
     const body = text.trim();
-    if (!body || generating || !backendOnline) return;
-    send(body);
+    if ((!body && attachments.length === 0) || generating || !backendOnline || uploading) return;
+
+    // Upload attachments so agent actions can read them by path, then reference
+    // each path in the message so the model can act on it (e.g. describe_image).
+    let content = body;
+    if (attachments.length > 0) {
+      setUploading(true);
+      try {
+        for (const a of attachments) {
+          if (!a.file) continue;
+          const { path } = await api.uploadFile(a.file);
+          const kind = a.type.startsWith("image/") ? "image" : "file";
+          content += `\n\n[Attached ${kind}: ${path}]`;
+        }
+      } catch {
+        content += "\n\n[An attachment failed to upload.]";
+      } finally {
+        setUploading(false);
+      }
+    }
+
+    send(content || "(no message)");
     setText("");
     setAttachments([]);
   }
@@ -30,6 +54,7 @@ export function InputBar() {
       size: f.size,
       type: f.type || "application/octet-stream",
       url: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
+      file: f,
     }));
     setAttachments((prev) => [...prev, ...next]);
   }
@@ -58,7 +83,7 @@ export function InputBar() {
             aria-label="Push to talk"
             className="rounded p-2 text-fg-muted transition-colors duration-fast enabled:hover:bg-accent/10 enabled:hover:text-fg disabled:cursor-not-allowed disabled:text-fg-faint"
           >
-            🎤
+            <Mic className="h-5 w-5" />
           </button>
         </Tooltip>
         <button
@@ -66,14 +91,14 @@ export function InputBar() {
           onClick={() => imageInput.current?.click()}
           className="rounded p-2 text-fg-muted transition-colors duration-fast hover:bg-accent/10 hover:text-fg"
         >
-          🖼️
+          <ImageIcon className="h-5 w-5" />
         </button>
         <button
           aria-label="Attach file"
           onClick={() => fileInput.current?.click()}
           className="rounded p-2 text-fg-muted transition-colors duration-fast hover:bg-accent/10 hover:text-fg"
         >
-          📎
+          <Paperclip className="h-5 w-5" />
         </button>
         <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
         <input ref={fileInput} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
@@ -99,16 +124,16 @@ export function InputBar() {
             aria-label="Stop generating"
             className="rounded bg-danger/20 px-3 py-2 text-body text-danger transition-colors duration-fast hover:bg-danger/30"
           >
-            ⬛ Stop
+            <span className="flex items-center gap-2"><Square className="h-4 w-4 fill-current" /> Stop</span>
           </button>
         ) : (
           <button
             onClick={submit}
-            disabled={!text.trim() || !backendOnline}
+            disabled={(!text.trim() && attachments.length === 0) || !backendOnline || uploading}
             aria-label="Send message"
             className="rounded bg-accent px-4 py-2 text-body font-medium text-white shadow-glow transition-all duration-fast enabled:hover:bg-accent-bright disabled:opacity-40 disabled:shadow-none"
           >
-            Send
+            {uploading ? "Uploading…" : "Send"}
           </button>
         )}
 
@@ -119,7 +144,7 @@ export function InputBar() {
             aria-label="Enter voice mode"
             className="rounded p-2 text-fg-muted transition-colors duration-fast enabled:hover:bg-accent/10 enabled:hover:text-fg disabled:cursor-not-allowed disabled:text-fg-faint"
           >
-            🔊
+            <Volume2 className="h-5 w-5" />
           </button>
         </Tooltip>
       </div>

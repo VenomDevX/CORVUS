@@ -4,6 +4,8 @@ import { SectionShell } from "./SectionShell";
 import { api } from "../lib/api";
 import { useCorvus } from "../state/store";
 import { Orb } from "../components/Orb";
+import { ProviderSettings } from "../components/ProviderSettings";
+import { AboutSettings } from "../components/AboutSettings";
 import { ORB_STATES, type OrbState } from "../lib/tokens";
 
 const TTS_VOICES = [
@@ -20,25 +22,16 @@ export function SettingsView() {
   const backendOnline = useCorvus((s) => s.backendOnline);
   const voice = useCorvus((s) => s.voice);
   const setWakeEnabled = useCorvus((s) => s.setWakeEnabled);
-  const [models, setModels] = useState<string[]>([]);
-  const [model, setModel] = useState("");
   const [ttsVoice, setTtsVoice] = useState(TTS_VOICES[0]);
   const [orbPreview, setOrbPreview] = useState<OrbState>("idle");
 
   useEffect(() => {
     if (!backendOnline) return;
     void (async () => {
-      const [{ models }, settings] = await Promise.all([api.listModels(), api.getSettings()]);
-      setModels(models);
-      setModel(settings.model);
+      const settings = await api.getSettings();
       if (settings.tts_voice) setTtsVoice(settings.tts_voice);
     })();
   }, [backendOnline]);
-
-  async function changeModel(next: string) {
-    setModel(next);
-    await api.updateSettings({ model: next });
-  }
 
   async function changeTtsVoice(next: string) {
     setTtsVoice(next);
@@ -49,6 +42,11 @@ export function SettingsView() {
     <SectionShell title="Settings">
       <div className="max-w-2xl space-y-6">
         <section className="glass rounded-lg p-4">
+          <h2 className="mb-3 text-h4">About &amp; updates</h2>
+          <AboutSettings />
+        </section>
+
+        <section className="glass rounded-lg p-4">
           <h2 className="mb-3 text-h4">Appearance</h2>
           <Switch
             checked={theme === "light"}
@@ -58,27 +56,12 @@ export function SettingsView() {
         </section>
 
         <section className="glass rounded-lg p-4">
-          <h2 className="mb-1 text-h4">AI model</h2>
+          <h2 className="mb-1 text-h4">AI provider &amp; model</h2>
           <p className="mb-3 text-body-sm text-fg-muted">
-            Provider: local Ollama. More providers (OpenAI, Anthropic, Gemini, DeepSeek) arrive in
-            Milestone 8.
+            Switch between local Ollama and cloud providers. Keys are stored encrypted on this
+            machine.
           </p>
-          {backendOnline ? (
-            <select
-              value={model}
-              onChange={(e) => void changeModel(e.target.value)}
-              aria-label="Ollama model"
-              className="w-72 rounded border border-white/10 bg-surface px-3 py-2 text-body text-fg outline-none focus:border-accent"
-            >
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-body text-danger">Corvus core is offline — model list unavailable.</p>
-          )}
+          <ProviderSettings />
         </section>
 
         <section className="glass rounded-lg p-4">

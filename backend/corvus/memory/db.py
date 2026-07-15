@@ -32,7 +32,38 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS action_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    arguments TEXT NOT NULL,
+    outcome TEXT NOT NULL CHECK (outcome IN ('executed', 'declined', 'failed')),
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS reminders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('timer', 'alarm', 'reminder')),
+    fire_at TEXT NOT NULL,
+    fired INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS workflows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    steps TEXT NOT NULL,
+    trigger_type TEXT NOT NULL DEFAULT 'manual'
+        CHECK (trigger_type IN ('manual', 'schedule', 'voice')),
+    trigger_config TEXT NOT NULL DEFAULT '{}',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_pending ON reminders(fired, fire_at);
 """
 
 

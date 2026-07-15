@@ -1,21 +1,32 @@
 import { useCorvus, type Section } from "../state/store";
+import {
+  MessageSquare,
+  Clock,
+  Brain,
+  CheckSquare,
+  Settings,
+  Blocks,
+  Download,
+  ScrollText,
+  Plug
+} from "lucide-react";
 
 interface Item {
   key: Section;
   label: string;
-  icon: string;
+  icon: React.ReactNode;
 }
 
 const ITEMS: Item[] = [
-  { key: "chat", label: "Chat", icon: "💬" },
-  { key: "history", label: "History", icon: "🕘" },
-  { key: "memory", label: "Memory", icon: "🧠" },
-  { key: "tasks", label: "Tasks", icon: "✅" },
-  { key: "settings", label: "Settings", icon: "⚙️" },
-  { key: "extensions", label: "Extensions", icon: "🧩" },
-  { key: "downloads", label: "Downloads", icon: "📥" },
-  { key: "logs", label: "Logs", icon: "📜" },
-  { key: "plugins", label: "Plugins", icon: "🔌" },
+  { key: "chat", label: "Chat", icon: <MessageSquare className="h-4 w-4" /> },
+  { key: "history", label: "History", icon: <Clock className="h-4 w-4" /> },
+  { key: "memory", label: "Memory", icon: <Brain className="h-4 w-4" /> },
+  { key: "tasks", label: "Tasks", icon: <CheckSquare className="h-4 w-4" /> },
+  { key: "settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
+  { key: "extensions", label: "Extensions", icon: <Blocks className="h-4 w-4" /> },
+  { key: "downloads", label: "Downloads", icon: <Download className="h-4 w-4" /> },
+  { key: "logs", label: "Logs", icon: <ScrollText className="h-4 w-4" /> },
+  { key: "plugins", label: "Plugins", icon: <Plug className="h-4 w-4" /> },
 ];
 
 export function Sidebar() {
@@ -26,7 +37,7 @@ export function Sidebar() {
   return (
     <nav className="glass flex h-full w-56 flex-col rounded-lg p-3" aria-label="Corvus sections">
       <div className="mb-4 flex items-center gap-2 px-2 pt-1">
-        <img src="/logo.svg" alt="" className="h-6 w-6" />
+        <img src="./logo.png" alt="" className="h-8 w-8" />
         <span className="text-h4 tracking-tight">Corvus</span>
       </div>
       <ul className="flex flex-1 flex-col gap-1">

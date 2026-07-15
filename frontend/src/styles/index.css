@@ -12,6 +12,9 @@
   color-scheme: light;
 }
 
+:root[data-theme="light"] img[src="./logo.png"] {
+  filter: invert(1);
+}
 html,
 body,
 #root {

@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, nativeTheme, shell } from "electron";
+import { BrowserWindow, app, ipcMain, nativeTheme, shell } from "electron";
 
 /** IPC surface exposed to the renderer via preload — keep this minimal and typed. */
 export function registerIpc(getWindow: () => BrowserWindow | null) {
@@ -6,8 +6,15 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     nativeTheme.shouldUseDarkColors ? "dark" : "light",
   );
 
+  ipcMain.handle("corvus:get-version", () => app.getVersion());
+
   ipcMain.handle("corvus:open-external", async (_event, url: string) => {
     if (/^https?:\/\//.test(url)) await shell.openExternal(url);
+  });
+
+  ipcMain.handle("corvus:open-path", async (_event, path: string) => {
+    // Local files Corvus created (e.g. browser downloads); shell picks the app.
+    await shell.openPath(path);
   });
 
   ipcMain.handle("corvus:set-titlebar-symbol-color", (_event, color: string) => {

@@ -5,6 +5,7 @@ import {
   streamChat,
   type ChatMessage,
   type Conversation,
+  type RiskTier,
   type StreamHandle,
   type VoiceSocket,
 } from "../lib/api";
@@ -23,11 +24,28 @@ export type Section =
 
 export type Theme = "dark" | "light";
 
+export interface ActionEvent {
+  name: string;
+  arguments: Record<string, unknown>;
+  risk: RiskTier;
+  category: string;
+  status: "proposed" | "confirming" | "ok" | "failed" | "declined";
+  message?: string;
+  prompt?: string;
+}
+
 /** Local (not yet persisted) rendering of an in-flight assistant turn. */
 export interface DraftMessage {
   role: "user" | "assistant";
   content: string;
   attachments?: { name: string; size: number; type: string; url?: string }[];
+  actions?: ActionEvent[];
+}
+
+export interface PendingConfirmation {
+  name: string;
+  prompt: string;
+  risk: RiskTier;
 }
 
 const THEME_KEY = "corvus.theme";
@@ -61,6 +79,7 @@ interface CorvusStore {
   generating: boolean;
   orbState: OrbState;
   stream: StreamHandle | null;
+  pendingConfirmation: PendingConfirmation | null;
   voiceMode: boolean;
   voice: VoiceState;
 
@@ -72,6 +91,7 @@ interface CorvusStore {
   newConversation: () => void;
   send: (content: string) => void;
   stopGeneration: () => void;
+  answerConfirmation: (approved: boolean) => void;
   setVoiceMode: (on: boolean) => void;
   connectVoiceSocket: () => void;
   pushToTalk: () => void;
@@ -92,6 +112,7 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
   generating: false,
   orbState: "idle",
   stream: null,
+  pendingConfirmation: null,
   voiceMode: false,
   voice: {
     connected: false,
@@ -133,22 +154,61 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
       orbState: orbStateFor({ generating: true, listening: false, speaking: false }),
     }));
 
-    const appendDelta = (delta: string) =>
+    const patchLast = (fn: (m: ChatMessage | DraftMessage) => ChatMessage | DraftMessage) =>
       set((s) => {
         const messages = [...s.messages];
-        const last = messages[messages.length - 1];
-        messages[messages.length - 1] = { ...last, content: last.content + delta };
+        messages[messages.length - 1] = fn(messages[messages.length - 1]);
         return { messages };
       });
 
+    const appendDelta = (delta: string) =>
+      patchLast((last) => ({ ...last, content: last.content + delta }));
+
+    const upsertAction = (name: string, patch: Partial<ActionEvent>) =>
+      patchLast((last) => {
+        const actions = [...((last as DraftMessage).actions ?? [])];
+        const idx = actions.findIndex((a) => a.name === name && a.status !== "ok" && a.status !== "failed" && a.status !== "declined");
+        if (idx >= 0) actions[idx] = { ...actions[idx], ...patch };
+        else actions.push({ name, arguments: {}, risk: "low", category: "", status: "proposed", ...patch });
+        return { ...last, actions };
+      });
+
     const handle = streamChat({ conversationId, content }, (frame) => {
-      if (frame.type === "start") set({ conversationId: frame.conversation_id });
-      if (frame.type === "delta") appendDelta(frame.content);
-      if (frame.type === "error") appendDelta(`\n\n> ⚠️ ${frame.message}`);
+      switch (frame.type) {
+        case "start":
+          set({ conversationId: frame.conversation_id });
+          break;
+        case "delta":
+          appendDelta(frame.content);
+          break;
+        case "action_proposed":
+          upsertAction(frame.name, {
+            arguments: frame.arguments,
+            risk: frame.risk,
+            category: frame.category,
+            status: "proposed",
+          });
+          break;
+        case "action_confirming":
+          upsertAction(frame.name, { status: "confirming", prompt: frame.prompt, risk: frame.risk });
+          set({ pendingConfirmation: { name: frame.name, prompt: frame.prompt, risk: frame.risk } });
+          break;
+        case "action_result":
+          upsertAction(frame.name, {
+            status: frame.declined ? "declined" : frame.ok ? "ok" : "failed",
+            message: frame.message,
+          });
+          if (get().pendingConfirmation?.name === frame.name) set({ pendingConfirmation: null });
+          break;
+        case "error":
+          appendDelta(`\n\n> ⚠️ ${frame.message}`);
+          break;
+      }
       if (frame.type === "done" || frame.type === "error") {
         set({
           generating: false,
           stream: null,
+          pendingConfirmation: null,
           orbState: orbStateFor({ generating: false, listening: false, speaking: false }),
         });
         void get().refreshConversations();
@@ -156,7 +216,7 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
     }, () => {
       // Socket closed without a done frame (backend crash/network drop).
       if (get().generating) {
-        set({ generating: false, stream: null, orbState: "idle" });
+        set({ generating: false, stream: null, pendingConfirmation: null, orbState: "idle" });
       }
     });
     set({ stream: handle });
@@ -164,6 +224,11 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
 
   stopGeneration: () => {
     get().stream?.cancel();
+  },
+
+  answerConfirmation: (approved) => {
+    get().stream?.confirm(approved);
+    set({ pendingConfirmation: null });
   },
 
   setVoiceMode: (on) => {

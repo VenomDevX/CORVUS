@@ -78,9 +78,11 @@ class VoicePipeline:
         transcriber: Transcriber | None = None,
         speaker: Speaker | None = None,
         wake: WakeDetector | None = None,
+        workflows=None,
     ) -> None:
         self.repo = repo
         self.provider = provider
+        self.workflows = workflows
         self.mic = mic if mic is not None else SoundDeviceMic()
         self.transcriber = transcriber or Transcriber(model_name="base.en")
         self.speaker = speaker or Speaker()
@@ -254,6 +256,17 @@ class VoicePipeline:
         log.info("voice_transcript", chars=len(text), reason=reason)
         self.emit({"type": "transcript", "text": text})
 
+        # A spoken phrase can trigger a saved workflow instead of a chat reply.
+        if self.workflows is not None:
+            matched = self.workflows.match_voice(text)
+            if matched:
+                self._set_state("thinking")
+                self.emit({"type": "assistant_delta", "text": f"Running workflow “{matched}”…"})
+                await self.workflows.run(matched)
+                self.emit({"type": "assistant_done", "conversation_id": self.conversation_id})
+                self._set_state("idle")
+                return
+
         await self._respond(text)
 
     async def _respond(self, user_text: str) -> None:
@@ -266,7 +279,7 @@ class VoicePipeline:
         history = self.repo.list_messages(self.conversation_id)[-MAX_HISTORY_MESSAGES:]
         messages = [Message("system", SYSTEM_PROMPT + "\nYou are in voice mode: keep replies short and conversational - a few sentences, no markdown, no code blocks unless asked to dictate code.")]
         messages += [Message(m["role"], m["content"]) for m in history]
-        model = self.repo.get_setting("model")
+        model = self._model()
 
         self._interrupt.clear()
         chunker = SentenceChunker()
@@ -309,9 +322,14 @@ class VoicePipeline:
         self._set_state("idle")
         if assistant_text and not interrupted:
             await extract_memory(
-                self.provider, self.repo.get_setting("model"), self.repo,
+                self.provider, self._model(), self.repo,
                 user_text, assistant_text, self.conversation_id,
             )
+
+    def _model(self) -> str:
+        if hasattr(self.provider, "current_model"):
+            return self.provider.current_model()
+        return self.repo.get_setting("model") or self.repo.get_setting("model:ollama")
 
     async def _speak_loop(self, sentences: asyncio.Queue) -> bool:
         """Speak queued sentences while watching the mic for barge-in.

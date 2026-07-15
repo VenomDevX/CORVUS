@@ -2,6 +2,9 @@
 node_modules/
 dist/
 dist-electron/
+dist-backend/
+dist-installer/
+build/pyinstaller/
 *.tsbuildinfo
 npm-debug.log*
 
@@ -30,3 +33,6 @@ design/exports/*
 .vscode/
 .idea/
 Thumbs.db
+
+# Electron-builder buildResources (icons come from design/exports)
+frontend/build/

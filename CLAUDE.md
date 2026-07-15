@@ -33,7 +33,23 @@ docs/adr/    architecture decision records
 
 ## Milestones / don't-touch list
 
-Done: M1 scaffold, M2 design system, M3 shell, M4 chat+memory (this session). Not yet built — do not stub or partially implement outside their milestone: voice pipeline (M5), agent action registry + confirmations (M6), browser automation/CV (M7), multi-provider switching, plugins, workflows, notifications (M8), installer/auto-update (M9). Section 15 of the product spec (avatars, phone app, home automation) is out of scope entirely.
+Done: **all milestones M1–M9 complete.** M1 scaffold, M2 design system, M3 shell, M4 chat+memory, M5 voice pipeline, M6 agent action registry + confirmations, M7 browser automation + computer vision, M8 multi-provider LLM + plugins + workflows + notifications, M9 installer + auto-update + crash recovery + logging hardening. Section 15 of the product spec (avatars, phone app, home automation) remains out of scope. Future work is refinement within the existing architecture, not new milestones.
+
+M9: crash recovery + session restore in `backend/corvus/session.py` (unclean-shutdown detection, active-conversation restore); rotating logs (`log.py`); auto-update via `frontend/electron/updater.ts` (electron-updater); installer config in `frontend/electron-builder.yml` (NSIS) + `installer/corvus-backend.spec` (PyInstaller freeze); `npm run dist` builds it. The final NSIS packaging step needs Windows Developer Mode on this machine (winCodeSign symlink extraction).
+
+M8 subsystems: multi-provider LLM in `backend/corvus/llm/` (`factory.py` ProviderManager + openai_compat/anthropic/gemini providers; API keys encrypted via `vault.py` DPAPI); notifications/reminders in `backend/corvus/notifications/`; workflows in `backend/corvus/workflows/` (ordered action sequences, no high-risk steps); plugin SDK in `backend/corvus/plugins/` (manifest.json + plugin.py, permission-gated). Plugins/workflows/notifications register their actions into the shared registry via `build_default_registry` kwargs and app wiring.
+
+Actions (M6) live in `backend/corvus/actions/`: every OS capability is a registered `ActionSpec` with a risk tier (`safe`/`low`/`medium`/`high`) and, for anything that confirms, a `confirm_prompt` that states the exact consequence. Adding a capability = write a handler, register a spec — never a new if/else branch in the agent loop. `medium`/`high` always route through the user; voice mode (M5) deliberately stays text-chat-only for actions, since confirmations need the visible card.
+
+Browser automation + computer vision (M7) live in `backend/corvus/automation/` (`browser.py` = Playwright Chromium engine, `vision.py` = rapidocr OCR + optional vision-model); their actions are registered from `actions/browser_handlers.py` and only when a browser engine + provider are supplied to `build_default_registry`. Web element targeting uses Playwright locators; native-window targeting uses screenshot OCR + PyAutoGUI. Corvus never types stored passwords — `browser_open_login` hands off to the browser's credential manager after per-site confirmation.
+
+Environment note: this machine runs a **Microsoft Store Python**, which filesystem-virtualizes `%LOCALAPPDATA%`. A file an external process (e.g. PowerShell) writes there isn't visible to the backend at the same path — keep file capture in-process (screenshots use Pillow `ImageGrab`, not a PowerShell shell-out).
+
+Build note: `dist:backend` pins `OPENBLAS_NUM_THREADS`/`OMP_NUM_THREADS`/`MKL_NUM_THREADS` to 1. Without them, PyInstaller's isolated `collect_all(faster_whisper)` subprocess loads OpenBLAS at full thread count and dies with "Memory allocation still failed after 10 retries" on this machine. Keep the caps.
+
+Only one Corvus may run at a time (Electron single-instance lock, `main.ts`). A second launch — dev while the packaged app is open, or vice versa — quits instantly with exit code 0 instead of erroring. A running `Corvus.exe` also locks `dist-installer/win-unpacked/`, which fails the packaging step with "Access is denied"; close the app before `npm run dist`.
+
+Ollama 500s that mention allocation ("cudaMalloc failed", "unable to allocate CUDA_Host buffer", "failed to allocate CPU_REPACK buffer") are usually the **Windows commit limit**, not free RAM and not VRAM — Windows grants allocations against commit, so a 3GB request fails instantly while physical RAM sits free. This machine's pagefile is manually capped, pinning the commit limit near what a full desktop (multiple browsers + IDE) already charges. Diagnose with `(Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory` (commit available), *not* `FreePhysicalMemory`; the buffer named in the error just says which allocator hit the wall first. Closing a browser frees GB-scale commit. The 6GB RTX 4050 is a real ceiling too — `qwen2.5-coder` needs ~3.7GB VRAM for weights alone.
 
 ## Quality bar
 

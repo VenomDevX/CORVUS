@@ -1,0 +1,9 @@
+{
+  "id": "text-tools",
+  "name": "Text Tools",
+  "version": "1.0.0",
+  "description": "Handy text transforms: word count, reverse, and title case. Needs no permissions.",
+  "author": "Corvus",
+  "permissions": [],
+  "entry": "plugin.py"
+}

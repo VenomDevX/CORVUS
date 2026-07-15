@@ -1,9 +1,56 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { Tooltip } from "@fluentui/react-components";
 import { useCorvus } from "../state/store";
 import { api } from "../lib/api";
 import { FileCard, type Attachment } from "./FileCard";
-import { Mic, Image as ImageIcon, Paperclip, Square, Volume2 } from "lucide-react";
+import { 
+  Mic, 
+  Image as ImageIcon, 
+  Paperclip, 
+  Square, 
+  Volume2, 
+  ArrowUpIcon
+} from "lucide-react";
+import { cn } from "../lib/utils";
+import { Textarea } from "./ui/textarea";
+import { Button } from "./ui/button";
+
+interface AutoResizeProps {
+  minHeight: number;
+  maxHeight?: number;
+}
+
+function useAutoResizeTextarea({ minHeight, maxHeight }: AutoResizeProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const adjustHeight = useCallback(
+    (reset?: boolean) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      if (reset) {
+        textarea.style.height = `${minHeight}px`;
+        return;
+      }
+
+      textarea.style.height = `${minHeight}px`; // reset first
+      const newHeight = Math.max(
+        minHeight,
+        Math.min(textarea.scrollHeight, maxHeight ?? Infinity)
+      );
+      textarea.style.height = `${newHeight}px`;
+    },
+    [minHeight, maxHeight]
+  );
+
+  useEffect(() => {
+    if (textareaRef.current) textareaRef.current.style.height = `${minHeight}px`;
+  }, [minHeight]);
+
+  return { textareaRef, adjustHeight };
+}
+
+
 
 export function InputBar() {
   const [text, setText] = useState("");
@@ -19,12 +66,15 @@ export function InputBar() {
 
   const [uploading, setUploading] = useState(false);
 
+  const { textareaRef, adjustHeight } = useAutoResizeTextarea({
+    minHeight: 48,
+    maxHeight: 150,
+  });
+
   async function submit() {
     const body = text.trim();
     if ((!body && attachments.length === 0) || generating || !backendOnline || uploading) return;
 
-    // Upload attachments so agent actions can read them by path, then reference
-    // each path in the message so the model can act on it (e.g. describe_image).
     let content = body;
     if (attachments.length > 0) {
       setUploading(true);
@@ -45,6 +95,7 @@ export function InputBar() {
     send(content || "(no message)");
     setText("");
     setAttachments([]);
+    adjustHeight(true);
   }
 
   function addFiles(list: FileList | null) {
@@ -59,10 +110,12 @@ export function InputBar() {
     setAttachments((prev) => [...prev, ...next]);
   }
 
+
+
   return (
-    <div className="glass rounded-lg p-3">
+    <div className="w-full max-w-3xl mx-auto pb-4">
       {attachments.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-2">
+        <div className="mb-3 flex flex-wrap gap-2">
           {attachments.map((a, i) => (
             <FileCard
               key={`${a.name}-${i}`}
@@ -72,82 +125,116 @@ export function InputBar() {
           ))}
         </div>
       )}
-      <div className="flex items-end gap-2">
-        <Tooltip content="Push to talk" relationship="label">
-          <button
-            disabled={!backendOnline}
-            onClick={() => {
-              setVoiceMode(true);
-              pushToTalk();
-            }}
-            aria-label="Push to talk"
-            className="rounded p-2 text-fg-muted transition-colors duration-fast enabled:hover:bg-accent/10 enabled:hover:text-fg disabled:cursor-not-allowed disabled:text-fg-faint"
-          >
-            <Mic className="h-5 w-5" />
-          </button>
-        </Tooltip>
-        <button
-          aria-label="Attach image"
-          onClick={() => imageInput.current?.click()}
-          className="rounded p-2 text-fg-muted transition-colors duration-fast hover:bg-accent/10 hover:text-fg"
-        >
-          <ImageIcon className="h-5 w-5" />
-        </button>
-        <button
-          aria-label="Attach file"
-          onClick={() => fileInput.current?.click()}
-          className="rounded p-2 text-fg-muted transition-colors duration-fast hover:bg-accent/10 hover:text-fg"
-        >
-          <Paperclip className="h-5 w-5" />
-        </button>
-        <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
-        <input ref={fileInput} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
-
-        <textarea
+      
+      <div className="relative glass rounded-xl shadow-glass-1">
+        <Textarea
+          ref={textareaRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            adjustHeight();
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               submit();
             }
           }}
-          rows={Math.min(6, Math.max(1, text.split("\n").length))}
-          placeholder={backendOnline ? "Message Corvus…" : "Corvus core is offline — start the backend"}
-          aria-label="Message Corvus"
-          className="flex-1 resize-none bg-transparent px-2 py-2 text-body text-fg outline-none placeholder:text-fg-faint"
+          disabled={!backendOnline}
+          placeholder={backendOnline ? "Message Corvus..." : "Corvus core is offline — start the backend"}
+          className={cn(
+            "w-full px-4 py-3 resize-none border-none",
+            "bg-transparent text-black dark:text-white text-sm",
+            "focus-visible:ring-0 focus-visible:ring-offset-0",
+            "placeholder:text-neutral-500 dark:placeholder:text-neutral-400 min-h-[48px]"
+          )}
+          style={{ overflow: "hidden" }}
         />
 
-        {generating ? (
-          <button
-            onClick={stopGeneration}
-            aria-label="Stop generating"
-            className="rounded bg-danger/20 px-3 py-2 text-body text-danger transition-colors duration-fast hover:bg-danger/30"
-          >
-            <span className="flex items-center gap-2"><Square className="h-4 w-4 fill-current" /> Stop</span>
-          </button>
-        ) : (
-          <button
-            onClick={submit}
-            disabled={(!text.trim() && attachments.length === 0) || !backendOnline || uploading}
-            aria-label="Send message"
-            className="rounded bg-accent px-4 py-2 text-body font-medium text-white shadow-glow transition-all duration-fast enabled:hover:bg-accent-bright disabled:opacity-40 disabled:shadow-none"
-          >
-            {uploading ? "Uploading…" : "Send"}
-          </button>
-        )}
+        {/* Footer Buttons */}
+        <div className="flex items-center justify-between p-3 pt-0">
+          <div className="flex items-center gap-1">
+            <Tooltip content="Attach image" relationship="label">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => imageInput.current?.click()}
+                className="text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 h-8 w-8"
+              >
+                <ImageIcon className="w-4 h-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Attach file" relationship="label">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInput.current?.click()}
+                className="text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 h-8 w-8"
+              >
+                <Paperclip className="w-4 h-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Voice mode" relationship="label">
+              <Button
+                disabled={!backendOnline}
+                variant="ghost"
+                size="icon"
+                onClick={() => setVoiceMode(true)}
+                className="text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 h-8 w-8 disabled:opacity-30"
+              >
+                <Volume2 className="w-4 h-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Push to talk" relationship="label">
+              <Button
+                disabled={!backendOnline}
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setVoiceMode(true);
+                  pushToTalk();
+                }}
+                className="text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 h-8 w-8 disabled:opacity-30"
+              >
+                <Mic className="w-4 h-4" />
+              </Button>
+            </Tooltip>
+            <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
+            <input ref={fileInput} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
+          </div>
 
-        <Tooltip content="Voice mode" relationship="label">
-          <button
-            disabled={!backendOnline}
-            onClick={() => setVoiceMode(true)}
-            aria-label="Enter voice mode"
-            className="rounded p-2 text-fg-muted transition-colors duration-fast enabled:hover:bg-accent/10 enabled:hover:text-fg disabled:cursor-not-allowed disabled:text-fg-faint"
-          >
-            <Volume2 className="h-5 w-5" />
-          </button>
-        </Tooltip>
+          <div className="flex items-center gap-2">
+            {generating ? (
+              <Button
+                onClick={stopGeneration}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 h-8 rounded-lg transition-colors",
+                  "bg-danger/20 text-danger hover:bg-danger/30"
+                )}
+              >
+                <Square className="w-4 h-4 fill-current" />
+                <span className="text-sm">Stop</span>
+              </Button>
+            ) : (
+              <Button
+                onClick={submit}
+                disabled={(!text.trim() && attachments.length === 0) || !backendOnline || uploading}
+                className={cn(
+                  "flex items-center gap-1 px-3 py-1.5 h-8 rounded-lg transition-colors",
+                  ((!text.trim() && attachments.length === 0) || !backendOnline || uploading)
+                    ? "bg-neutral-200 text-neutral-400 dark:bg-neutral-700 dark:text-neutral-400 cursor-not-allowed"
+                    : "bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                )}
+              >
+                <ArrowUpIcon className="w-4 h-4" />
+                <span className="text-sm">{uploading ? "Uploading..." : "Send"}</span>
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
+
+
     </div>
   );
 }

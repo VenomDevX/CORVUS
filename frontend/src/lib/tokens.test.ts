@@ -6,7 +6,7 @@ import config from "../../tailwind.config";
 describe("design tokens → Tailwind theme", () => {
   it("exposes the brand palette from tokens.json", () => {
     const colors = tailwindColors();
-    expect(colors["bg-deep"]).toBe(tokens.color.bg["deep-black"]);
+    expect(colors["bg-caviar"]).toBe(tokens.color.bg.caviar);
     expect(colors.accent).toBe(tokens.color.accent["electric-blue"]);
     expect(colors.fg).toBe(tokens.color.fg.white);
   });

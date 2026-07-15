@@ -19,6 +19,10 @@ extraResources:
     to: backend
     filter:
       - "**/*"
+  - from: ../design/exports
+    to: design/exports
+    filter:
+      - "**/*"
 
 win:
   target:

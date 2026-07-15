@@ -33,7 +33,9 @@ docs/adr/    architecture decision records
 
 ## Milestones / don't-touch list
 
-Done: M1 scaffold, M2 design system, M3 shell, M4 chat+memory, M5 voice pipeline, M6 agent action registry + confirmations, M7 browser automation + computer vision, M8 multi-provider LLM + plugins + workflows + notifications. Not yet built — do not stub or partially implement outside their milestone: installer/auto-update/perf hardening (M9). Section 15 of the product spec (avatars, phone app, home automation) is out of scope entirely.
+Done: **all milestones M1–M9 complete.** M1 scaffold, M2 design system, M3 shell, M4 chat+memory, M5 voice pipeline, M6 agent action registry + confirmations, M7 browser automation + computer vision, M8 multi-provider LLM + plugins + workflows + notifications, M9 installer + auto-update + crash recovery + logging hardening. Section 15 of the product spec (avatars, phone app, home automation) remains out of scope. Future work is refinement within the existing architecture, not new milestones.
+
+M9: crash recovery + session restore in `backend/corvus/session.py` (unclean-shutdown detection, active-conversation restore); rotating logs (`log.py`); auto-update via `frontend/electron/updater.ts` (electron-updater); installer config in `frontend/electron-builder.yml` (NSIS) + `installer/corvus-backend.spec` (PyInstaller freeze); `npm run dist` builds it. The final NSIS packaging step needs Windows Developer Mode on this machine (winCodeSign symlink extraction).
 
 M8 subsystems: multi-provider LLM in `backend/corvus/llm/` (`factory.py` ProviderManager + openai_compat/anthropic/gemini providers; API keys encrypted via `vault.py` DPAPI); notifications/reminders in `backend/corvus/notifications/`; workflows in `backend/corvus/workflows/` (ordered action sequences, no high-risk steps); plugin SDK in `backend/corvus/plugins/` (manifest.json + plugin.py, permission-gated). Plugins/workflows/notifications register their actions into the shared registry via `build_default_registry` kwargs and app wiring.
 

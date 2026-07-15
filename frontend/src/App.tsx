@@ -111,7 +111,7 @@ export default function App() {
         <AnimatePresence>{voiceMode && <VoiceMode />}</AnimatePresence>
         {/* Draggable titlebar strip (native window buttons overlay the right edge) */}
         <header className="titlebar-drag flex h-10 shrink-0 items-center gap-2 px-4">
-          <img src="/logo.svg" alt="" className="h-4 w-4" />
+          <img src="./logo.png" alt="" className="h-5 w-5" />
           <span className="text-caption text-fg-muted">Corvus</span>
           <button
             onClick={() => {

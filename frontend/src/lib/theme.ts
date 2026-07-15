@@ -14,10 +14,10 @@ export function applyThemeVars(theme: Theme) {
   const vars: Record<string, string> =
     theme === "dark"
       ? {
-          "--c-bg": color.bg["deep-black"],
-          "--c-bg-secondary": color.bg["midnight-blue"],
-          "--c-surface": color.bg.surface,
-          "--c-surface-raised": color.bg["surface-raised"],
+          "--c-bg": color.bg.caviar,
+          "--c-bg-secondary": color.bg.rein,
+          "--c-surface": color.bg.shadow,
+          "--c-surface-raised": color.bg.saddle,
           "--c-fg": color.fg.white,
           "--c-fg-muted": color.fg.muted,
           "--c-fg-faint": color.fg.faint,

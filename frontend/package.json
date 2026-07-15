@@ -19,6 +19,7 @@
     "@fluentui/react-components": "^9.54.0",
     "electron-updater": "^6.8.9",
     "framer-motion": "^11.11.0",
+    "lucide-react": "^1.24.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",

@@ -15,10 +15,10 @@ export const motion = tokens.motion;
 /** Flattened color map for the Tailwind theme (dot keys → nested config). */
 export function tailwindColors() {
   return {
-    "bg-deep": color.bg["deep-black"],
-    "bg-midnight": color.bg["midnight-blue"],
-    surface: color.bg.surface,
-    "surface-raised": color.bg["surface-raised"],
+    "bg-caviar": color.bg.caviar,
+    "bg-rein": color.bg.rein,
+    surface: color.bg.shadow,
+    "surface-raised": color.bg.saddle,
     accent: color.accent["electric-blue"],
     "accent-bright": color.accent.bright,
     "accent-dim": color.accent.dim,

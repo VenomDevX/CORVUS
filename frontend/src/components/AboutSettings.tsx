@@ -36,7 +36,7 @@ export function AboutSettings() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <img src="/logo.svg" alt="" className="h-8 w-8" />
+        <img src="./logo.png" alt="" className="h-10 w-10" />
         <div>
           <div className="text-body font-semibold text-fg">Corvus</div>
           <div className="text-caption text-fg-faint">Version {version || "—"}</div>

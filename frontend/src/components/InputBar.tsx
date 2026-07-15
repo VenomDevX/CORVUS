@@ -3,6 +3,7 @@ import { Tooltip } from "@fluentui/react-components";
 import { useCorvus } from "../state/store";
 import { api } from "../lib/api";
 import { FileCard, type Attachment } from "./FileCard";
+import { Mic, Image as ImageIcon, Paperclip, Square, Volume2 } from "lucide-react";
 
 export function InputBar() {
   const [text, setText] = useState("");
@@ -82,7 +83,7 @@ export function InputBar() {
             aria-label="Push to talk"
             className="rounded p-2 text-fg-muted transition-colors duration-fast enabled:hover:bg-accent/10 enabled:hover:text-fg disabled:cursor-not-allowed disabled:text-fg-faint"
           >
-            🎤
+            <Mic className="h-5 w-5" />
           </button>
         </Tooltip>
         <button
@@ -90,14 +91,14 @@ export function InputBar() {
           onClick={() => imageInput.current?.click()}
           className="rounded p-2 text-fg-muted transition-colors duration-fast hover:bg-accent/10 hover:text-fg"
         >
-          🖼️
+          <ImageIcon className="h-5 w-5" />
         </button>
         <button
           aria-label="Attach file"
           onClick={() => fileInput.current?.click()}
           className="rounded p-2 text-fg-muted transition-colors duration-fast hover:bg-accent/10 hover:text-fg"
         >
-          📎
+          <Paperclip className="h-5 w-5" />
         </button>
         <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
         <input ref={fileInput} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
@@ -123,7 +124,7 @@ export function InputBar() {
             aria-label="Stop generating"
             className="rounded bg-danger/20 px-3 py-2 text-body text-danger transition-colors duration-fast hover:bg-danger/30"
           >
-            ⬛ Stop
+            <span className="flex items-center gap-2"><Square className="h-4 w-4 fill-current" /> Stop</span>
           </button>
         ) : (
           <button
@@ -143,7 +144,7 @@ export function InputBar() {
             aria-label="Enter voice mode"
             className="rounded p-2 text-fg-muted transition-colors duration-fast enabled:hover:bg-accent/10 enabled:hover:text-fg disabled:cursor-not-allowed disabled:text-fg-faint"
           >
-            🔊
+            <Volume2 className="h-5 w-5" />
           </button>
         </Tooltip>
       </div>

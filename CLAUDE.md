@@ -33,7 +33,9 @@ docs/adr/    architecture decision records
 
 ## Milestones / don't-touch list
 
-Done: M1 scaffold, M2 design system, M3 shell, M4 chat+memory, M5 voice pipeline, M6 agent action registry + confirmations, M7 browser automation + computer vision. Not yet built — do not stub or partially implement outside their milestone: multi-provider switching, plugins, workflows, notifications (M8), installer/auto-update (M9). Section 15 of the product spec (avatars, phone app, home automation) is out of scope entirely.
+Done: M1 scaffold, M2 design system, M3 shell, M4 chat+memory, M5 voice pipeline, M6 agent action registry + confirmations, M7 browser automation + computer vision, M8 multi-provider LLM + plugins + workflows + notifications. Not yet built — do not stub or partially implement outside their milestone: installer/auto-update/perf hardening (M9). Section 15 of the product spec (avatars, phone app, home automation) is out of scope entirely.
+
+M8 subsystems: multi-provider LLM in `backend/corvus/llm/` (`factory.py` ProviderManager + openai_compat/anthropic/gemini providers; API keys encrypted via `vault.py` DPAPI); notifications/reminders in `backend/corvus/notifications/`; workflows in `backend/corvus/workflows/` (ordered action sequences, no high-risk steps); plugin SDK in `backend/corvus/plugins/` (manifest.json + plugin.py, permission-gated). Plugins/workflows/notifications register their actions into the shared registry via `build_default_registry` kwargs and app wiring.
 
 Actions (M6) live in `backend/corvus/actions/`: every OS capability is a registered `ActionSpec` with a risk tier (`safe`/`low`/`medium`/`high`) and, for anything that confirms, a `confirm_prompt` that states the exact consequence. Adding a capability = write a handler, register a spec — never a new if/else branch in the agent loop. `medium`/`high` always route through the user; voice mode (M5) deliberately stays text-chat-only for actions, since confirmations need the visible card.
 

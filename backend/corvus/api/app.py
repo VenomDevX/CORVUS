@@ -11,6 +11,7 @@ from ..config import DEFAULT_MODEL, data_dir, db_path
 from ..llm.ollama import OllamaProvider
 from ..log import setup_logging
 from ..memory.repository import Repository
+from .notifications import notify_router
 from .routes import router
 from .voice import voice_router
 from .ws import ws_router
@@ -22,13 +23,16 @@ def create_app(
     database: Path | None = None,
     voice: bool | object = True,
     browser: bool | object = True,
+    notifications: bool = True,
 ) -> FastAPI:
     """voice/browser: True builds the real subsystem, False disables it (tests),
-    or pass a pre-built engine object."""
+    or pass a pre-built engine object. notifications: enable the reminder hub."""
     log = setup_logging()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        if app.state.notifications is not None:
+            await app.state.notifications.start()
         if voice is not False:
             if voice is True:
                 from ..voice.pipeline import VoicePipeline
@@ -42,6 +46,8 @@ def create_app(
             await app.state.voice.stop()
         if app.state.browser is not None:
             await app.state.browser.close()
+        if app.state.notifications is not None:
+            await app.state.notifications.stop()
         app.state.repo.close()
 
     app = FastAPI(title="Corvus", version=__version__, lifespan=lifespan)
@@ -68,6 +74,13 @@ def create_app(
     else:
         app.state.browser = browser
 
+    if notifications:
+        from ..notifications.hub import NotificationHub
+
+        app.state.notifications = NotificationHub(app.state.repo)
+    else:
+        app.state.notifications = None
+
     def active_model() -> str:
         prov = app.state.provider
         if hasattr(prov, "current_model"):
@@ -79,6 +92,7 @@ def create_app(
         browser=app.state.browser,
         provider=app.state.provider,
         get_model=active_model,
+        notifications=app.state.notifications,
     )
     if app.state.repo.get_setting("provider") is None:
         app.state.repo.set_setting("provider", "ollama")
@@ -97,5 +111,6 @@ def create_app(
     app.include_router(router)
     app.include_router(ws_router)
     app.include_router(voice_router)
+    app.include_router(notify_router)
 
     return app

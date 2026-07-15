@@ -101,12 +101,12 @@ class Registry:
             return ActionResult(False, f"{name} failed: {exc}")
 
 
-def build_default_registry(browser=None, provider=None, get_model=None) -> Registry:
+def build_default_registry(browser=None, provider=None, get_model=None, notifications=None) -> Registry:
     """Assemble the registry from the handler modules.
 
-    When a browser engine and provider are supplied (the real app), the
-    Milestone 7 browser-automation and computer-vision actions are registered
-    too; without them, only the OS actions are available (e.g. in tests).
+    Browser/vision actions (M7) register when a browser engine + provider are
+    supplied; notification actions (M8) register when a hub is supplied. Without
+    them, only the OS actions are available (e.g. in tests).
     """
     from . import handlers
 
@@ -119,4 +119,7 @@ def build_default_registry(browser=None, provider=None, get_model=None) -> Regis
     if browser is not None and provider is not None:
         from .browser_handlers import register_browser_actions
         register_browser_actions(registry, browser, provider, get_model or (lambda: ""))
+    if notifications is not None:
+        from .notify_handlers import register_notification_actions
+        register_notification_actions(registry, notifications)
     return registry

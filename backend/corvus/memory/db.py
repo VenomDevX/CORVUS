@@ -42,7 +42,17 @@ CREATE TABLE IF NOT EXISTS action_log (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS reminders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('timer', 'alarm', 'reminder')),
+    fire_at TEXT NOT NULL,
+    fired INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_pending ON reminders(fired, fire_at);
 """
 
 

@@ -106,6 +106,22 @@ export interface ProviderInfo {
   key_url: string;
 }
 
+export type NotificationEvent =
+  | { type: "notify"; title: string; message: string; level: string }
+  | { type: "reminder"; id: number; kind: string; title: string; message: string };
+
+/** Long-lived socket for desktop notifications and reminder fires. */
+export function connectNotifications(
+  onEvent: (event: NotificationEvent) => void,
+  onClose: () => void,
+): { close: () => void } {
+  const ws = new WebSocket(`${BACKEND_WS}/ws/notifications`);
+  ws.onmessage = (e) => onEvent(JSON.parse(e.data) as NotificationEvent);
+  ws.onclose = onClose;
+  ws.onerror = () => ws.close();
+  return { close: () => ws.close() };
+}
+
 export interface DownloadItem {
   filename: string;
   path: string;

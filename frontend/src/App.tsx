@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   FluentProvider,
   createDarkTheme,
@@ -59,6 +59,29 @@ export default function App() {
   useEffect(() => {
     if (backendOnline) connectVoiceSocket();
   }, [backendOnline, connectVoiceSocket]);
+
+  // Crash recovery: restore the conversation we were in, once per launch.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (!backendOnline || restored.current) return;
+    restored.current = true;
+    void (async () => {
+      const s = await api.session();
+      if (s.active_conversation != null) {
+        await useCorvus.getState().openConversation(s.active_conversation);
+      }
+      if (s.recovered) {
+        try {
+          if ("Notification" in window)
+            new Notification("Corvus recovered", {
+              body: "Picked up after an unexpected shutdown — your history is intact.",
+            });
+        } catch {
+          /* no notification support; recovery still happened silently */
+        }
+      }
+    })();
+  }, [backendOnline]);
 
   useEffect(() => applyThemeVars(theme), [theme]);
 

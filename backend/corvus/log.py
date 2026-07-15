@@ -6,6 +6,7 @@ timestamp/level/event keys - the Logs sidebar view renders these directly.
 
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import structlog
@@ -15,6 +16,10 @@ from .config import log_path
 
 _configured = False
 
+# Cap the log so it never grows without bound: 2 MB per file, 3 rotations kept.
+LOG_MAX_BYTES = 2 * 1024 * 1024
+LOG_BACKUPS = 3
+
 
 def setup_logging() -> structlog.stdlib.BoundLogger:
     global _configured
@@ -22,7 +27,9 @@ def setup_logging() -> structlog.stdlib.BoundLogger:
     if _configured:
         return logger
 
-    handler = logging.FileHandler(log_path(), encoding="utf-8")
+    handler = RotatingFileHandler(
+        log_path(), maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUPS, encoding="utf-8"
+    )
     handler.setFormatter(logging.Formatter("%(message)s"))
     console = logging.StreamHandler()
     console.setFormatter(logging.Formatter("%(message)s"))

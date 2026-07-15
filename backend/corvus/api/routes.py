@@ -32,6 +32,13 @@ def health() -> dict:
     return {"status": "ok", "version": __version__, "app": "Corvus"}
 
 
+@router.get("/session")
+def session_state(request: Request) -> dict:
+    """Crash-recovery state: whether the last run ended cleanly and which
+    conversation to restore."""
+    return request.app.state.session.state()
+
+
 @router.get("/conversations")
 def list_conversations(request: Request) -> list[dict]:
     return request.app.state.repo.list_conversations()

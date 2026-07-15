@@ -148,6 +148,37 @@ class Repository:
         self.conn.commit()
         return cur.rowcount > 0
 
+    # -- workflows ---------------------------------------------------------
+
+    def create_workflow(self, name: str, steps: list, trigger_type: str = "manual",
+                        trigger_config: dict | None = None) -> dict[str, Any]:
+        import json
+
+        cur = self.conn.execute(
+            "INSERT INTO workflows (name, steps, trigger_type, trigger_config) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(name) DO UPDATE SET steps=excluded.steps, "
+            "trigger_type=excluded.trigger_type, trigger_config=excluded.trigger_config "
+            "RETURNING *",
+            (name, json.dumps(steps), trigger_type, json.dumps(trigger_config or {})),
+        )
+        row = dict(cur.fetchone())
+        self.conn.commit()
+        return row
+
+    def list_workflows(self) -> list[dict[str, Any]]:
+        return _rows(self.conn.execute("SELECT * FROM workflows ORDER BY name"))
+
+    def get_workflow(self, name: str) -> dict[str, Any] | None:
+        cur = self.conn.execute("SELECT * FROM workflows WHERE name = ?", (name,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+    def delete_workflow(self, name: str) -> bool:
+        cur = self.conn.execute("DELETE FROM workflows WHERE name = ?", (name,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
     # -- settings ----------------------------------------------------------
 
     def get_setting(self, key: str, default: str | None = None) -> str | None:

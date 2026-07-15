@@ -78,9 +78,11 @@ class VoicePipeline:
         transcriber: Transcriber | None = None,
         speaker: Speaker | None = None,
         wake: WakeDetector | None = None,
+        workflows=None,
     ) -> None:
         self.repo = repo
         self.provider = provider
+        self.workflows = workflows
         self.mic = mic if mic is not None else SoundDeviceMic()
         self.transcriber = transcriber or Transcriber(model_name="base.en")
         self.speaker = speaker or Speaker()
@@ -253,6 +255,17 @@ class VoicePipeline:
             return
         log.info("voice_transcript", chars=len(text), reason=reason)
         self.emit({"type": "transcript", "text": text})
+
+        # A spoken phrase can trigger a saved workflow instead of a chat reply.
+        if self.workflows is not None:
+            matched = self.workflows.match_voice(text)
+            if matched:
+                self._set_state("thinking")
+                self.emit({"type": "assistant_delta", "text": f"Running workflow “{matched}”…"})
+                await self.workflows.run(matched)
+                self.emit({"type": "assistant_done", "conversation_id": self.conversation_id})
+                self._set_state("idle")
+                return
 
         await self._respond(text)
 

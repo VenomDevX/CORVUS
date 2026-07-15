@@ -51,6 +51,17 @@ CREATE TABLE IF NOT EXISTS reminders (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS workflows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    steps TEXT NOT NULL,
+    trigger_type TEXT NOT NULL DEFAULT 'manual'
+        CHECK (trigger_type IN ('manual', 'schedule', 'voice')),
+    trigger_config TEXT NOT NULL DEFAULT '{}',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_pending ON reminders(fired, fire_at);
 """

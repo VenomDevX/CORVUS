@@ -87,6 +87,14 @@ export const api = {
     if (!res.ok) throw new Error(`upload failed: ${res.status}`);
     return res.json();
   },
+  listWorkflows: () => request<Workflow[]>("/workflows"),
+  runWorkflow: (name: string) =>
+    request<{ results: { action: string; ok: boolean; message: string }[] }>(
+      `/workflows/${encodeURIComponent(name)}/run`,
+      { method: "POST" },
+    ),
+  deleteWorkflow: (name: string) =>
+    request<{ ok: boolean }>(`/workflows/${encodeURIComponent(name)}`, { method: "DELETE" }),
   listProviders: () => request<ProviderInfo[]>("/providers"),
   setProviderKey: (provider: string, key: string) =>
     request<{ ok: boolean; has_key: boolean }>("/providers/key", {
@@ -96,6 +104,20 @@ export const api = {
   clearProviderKey: (provider: string) =>
     request<{ ok: boolean }>(`/providers/key/${provider}`, { method: "DELETE" }),
 };
+
+export interface WorkflowStep {
+  action: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface Workflow {
+  id: number;
+  name: string;
+  steps: WorkflowStep[];
+  trigger_type: "manual" | "schedule" | "voice";
+  trigger_config: { at?: string; phrase?: string };
+  enabled: boolean;
+}
 
 export interface ProviderInfo {
   name: string;

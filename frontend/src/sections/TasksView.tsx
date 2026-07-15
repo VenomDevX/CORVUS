@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { SectionShell } from "./SectionShell";
 import { api, type ActionLogEntry, type ActionSpec, type RiskTier } from "../lib/api";
 import { useCorvus } from "../state/store";
+import { WorkflowsPanel } from "../components/WorkflowsPanel";
 
 const RISK_ORDER: RiskTier[] = ["safe", "low", "medium", "high"];
 const RISK_STYLE: Record<RiskTier, string> = {
@@ -51,6 +52,8 @@ export function TasksView() {
         </button>
       }
     >
+      <WorkflowsPanel />
+
       <section className="mb-6">
         <h2 className="mb-1 text-h4">Recent activity</h2>
         <p className="mb-3 text-body-sm text-fg-muted">

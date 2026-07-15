@@ -45,6 +45,10 @@ Browser automation + computer vision (M7) live in `backend/corvus/automation/` (
 
 Environment note: this machine runs a **Microsoft Store Python**, which filesystem-virtualizes `%LOCALAPPDATA%`. A file an external process (e.g. PowerShell) writes there isn't visible to the backend at the same path — keep file capture in-process (screenshots use Pillow `ImageGrab`, not a PowerShell shell-out).
 
+Build note: `dist:backend` pins `OPENBLAS_NUM_THREADS`/`OMP_NUM_THREADS`/`MKL_NUM_THREADS` to 1. Without them, PyInstaller's isolated `collect_all(faster_whisper)` subprocess loads OpenBLAS at full thread count and dies with "Memory allocation still failed after 10 retries" on this machine. Keep the caps.
+
+Only one Corvus may run at a time (Electron single-instance lock, `main.ts`). A second launch — dev while the packaged app is open, or vice versa — quits instantly with exit code 0 instead of erroring. A running `Corvus.exe` also locks `dist-installer/win-unpacked/`, which fails the packaging step with "Access is denied"; close the app before `npm run dist`.
+
 ## Quality bar
 
 No TODO comments in shipped code — deferred work goes in the milestone list above. Destructive/high-risk agent actions (M6+) always require explicit, specific confirmation. API keys go through Windows credential vault/DPAPI, never plaintext. Run `npm run guard && npm test` before committing.

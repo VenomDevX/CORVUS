@@ -4,6 +4,7 @@ import { MarkdownContent } from "./MarkdownContent";
 import { InputBar } from "./InputBar";
 import { ActionChip } from "./ActionChip";
 import { ConfirmationCard } from "./ConfirmationCard";
+import { ThinkingAnimation } from "./ThinkingAnimation";
 import { useCorvus } from "../state/store";
 
 export function ChatView() {
@@ -33,24 +34,32 @@ export function ChatView() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 gap-4">
-          <div ref={scroller} className="min-w-0 flex-1 space-y-4 overflow-y-auto pr-2 pt-2">
+          <div ref={scroller} className="min-w-0 flex-1 space-y-4 overflow-y-auto px-8 pt-2 pb-4">
             {messages.map((m, i) => {
               const actions = "actions" in m ? m.actions : undefined;
               return (
                 <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-lg px-4 py-3 ${
-                      m.role === "user" ? "bg-accent/20 text-fg" : "glass text-fg shadow-glass-1"
-                    }`}
-                  >
-                    {m.content ? (
-                      <MarkdownContent content={m.content} />
-                    ) : actions && actions.length > 0 ? (
-                      <span className="text-fg-muted">Corvus is working…</span>
-                    ) : (
-                      <span className="text-fg-muted">Corvus is thinking…</span>
-                    )}
-                  </div>
+                  {m.role === "user" ? (
+                    <div className="max-w-[80%] rounded-lg px-4 py-3 bg-accent/20 text-fg">
+                      {m.content && <MarkdownContent content={m.content} />}
+                    </div>
+                  ) : (
+                    <>
+                      {m.content ? (
+                        <div className="max-w-[80%] rounded-lg px-4 py-3 glass text-fg shadow-glass-1">
+                          <MarkdownContent content={m.content} />
+                        </div>
+                      ) : actions && actions.length > 0 ? (
+                        <div className="max-w-[80%] rounded-lg px-4 py-3 glass text-fg shadow-glass-1">
+                          <span className="text-fg-muted">Corvus is working…</span>
+                        </div>
+                      ) : (
+                        <div className="max-w-[80%] py-2 text-fg">
+                          <ThinkingAnimation />
+                        </div>
+                      )}
+                    </>
+                  )}
                   {actions && actions.length > 0 && (
                     <div className="mt-2 flex max-w-[80%] flex-col gap-1.5">
                       {actions.map((a, j) => (
@@ -63,9 +72,7 @@ export function ChatView() {
             })}
             {generating && <div className="h-2" aria-live="polite" />}
           </div>
-          <div className="hidden w-56 shrink-0 items-start justify-center pt-4 xl:flex">
-            <Orb state={orbState} level={level} size={140} />
-          </div>
+
         </div>
       )}
       <ConfirmationCard />

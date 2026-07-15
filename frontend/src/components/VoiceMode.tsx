@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { Mic, Square, X } from "lucide-react";
 import { Orb } from "./Orb";
 import { useCorvus } from "../state/store";
 
@@ -31,9 +32,9 @@ export function VoiceMode() {
         <button
           onClick={() => setVoiceMode(false)}
           aria-label="Exit voice mode"
-          className="titlebar-no-drag rounded px-3 py-1 text-body-sm text-fg-muted transition-colors duration-fast hover:bg-accent/10 hover:text-fg"
+          className="titlebar-no-drag flex items-center gap-2 rounded-full glass px-4 py-1.5 text-body-sm text-fg-muted transition-colors duration-fast hover:text-fg hover:bg-white/10"
         >
-          ✕ Exit voice mode
+          <X size={16} /> Exit
         </button>
       </div>
 
@@ -67,33 +68,43 @@ export function VoiceMode() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 pb-4">
-        <label className="flex cursor-pointer items-center gap-2 text-body-sm text-fg-muted">
+      <div className="flex items-center gap-6 pb-6">
+        <label className="flex cursor-pointer items-center gap-2 text-body-sm text-fg-muted transition-colors hover:text-fg">
           <input
             type="checkbox"
             checked={voice.wakeEnabled}
             onChange={(e) => setWakeEnabled(e.target.checked)}
-            className="accent-accent"
+            className="accent-accent h-4 w-4 rounded border-white/20 bg-black/20"
           />
           Always listening (&ldquo;Hey Corvus&rdquo;)
         </label>
+        
         <button
           onClick={pushToTalk}
           disabled={orbState === "listening"}
           aria-label="Push to talk"
-          className="rounded-full bg-accent p-5 text-h3 shadow-glow-strong transition-all duration-fast enabled:hover:bg-accent-bright disabled:opacity-60"
+          className="group relative flex h-16 w-16 items-center justify-center rounded-full bg-accent text-white shadow-glow-strong transition-all duration-300 enabled:hover:scale-105 enabled:hover:bg-accent-bright disabled:opacity-50 disabled:scale-95"
         >
-          🎤
+          <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 transition-opacity group-hover:opacity-100" />
+          <Mic size={28} className={orbState === "listening" ? "animate-pulse" : ""} />
         </button>
-        {orbState === "speaking" && (
-          <button
-            onClick={stopSpeaking}
-            aria-label="Stop speaking"
-            className="rounded bg-danger/20 px-4 py-2 text-body text-danger transition-colors duration-fast hover:bg-danger/30"
-          >
-            ⬛ Stop
-          </button>
-        )}
+        
+        <div className="w-[140px]"> {/* Fixed width container to keep mic centered */}
+          <AnimatePresence>
+            {orbState === "speaking" && (
+              <motion.button
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                onClick={stopSpeaking}
+                aria-label="Stop speaking"
+                className="flex items-center gap-2 rounded-full glass border-danger/30 bg-danger/10 px-4 py-2 text-body text-danger transition-all duration-fast hover:bg-danger/20 hover:border-danger/50"
+              >
+                <Square size={16} className="fill-current" /> Stop
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </motion.div>
   );

@@ -201,6 +201,31 @@ class OllamaProvider:
             parts.append(delta.content)
         return "".join(parts)
 
+    async def describe_image(self, image_path: str, model: str) -> str:
+        """Describe an image with a vision-capable Ollama model (llava-class).
+
+        Only called when such a model is installed; ordinary chat models don't
+        accept the images field.
+        """
+        import base64
+
+        data = base64.b64encode(open(image_path, "rb").read()).decode()
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Describe this image, including any visible UI elements or text.",
+                    "images": [data],
+                }
+            ],
+            "stream": False,
+        }
+        async with self._client(timeout=120.0) as client:
+            response = await client.post("/api/chat", json=payload)
+            response.raise_for_status()
+            return response.json().get("message", {}).get("content", "")
+
     async def list_models(self) -> list[str]:
         async with self._client(timeout=5.0) as client:
             response = await client.get("/api/tags")

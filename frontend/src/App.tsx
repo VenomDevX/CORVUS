@@ -14,6 +14,7 @@ import { MemoryView } from "./sections/MemoryView";
 import { SettingsView } from "./sections/SettingsView";
 import { LogsView } from "./sections/LogsView";
 import { TasksView } from "./sections/TasksView";
+import { DownloadsView } from "./sections/DownloadsView";
 import { UpcomingSection } from "./sections/SectionShell";
 import { useCorvus, type Section } from "./state/store";
 import { applyThemeVars } from "./lib/theme";
@@ -43,13 +44,7 @@ const SECTIONS: Record<Section, () => JSX.Element> = {
       detail="The plugin marketplace surface ships with the plugin SDK."
     />
   ),
-  downloads: () => (
-    <UpcomingSection
-      title="Downloads"
-      milestone={7}
-      detail="Files Corvus downloads during browser automation will be tracked here."
-    />
-  ),
+  downloads: DownloadsView,
   plugins: () => (
     <UpcomingSection
       title="Plugins"

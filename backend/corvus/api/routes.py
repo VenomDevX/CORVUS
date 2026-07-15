@@ -1,9 +1,12 @@
 """REST routes: health, conversations, memories, settings, models, logs."""
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from datetime import datetime
+
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel
 
 from .. import __version__
+from ..config import data_dir
 from ..log import tail_log
 
 router = APIRouter()
@@ -133,3 +136,35 @@ def list_actions(request: Request) -> list[dict]:
 @router.get("/actions/log")
 def action_log(request: Request, limit: int = 100) -> list[dict]:
     return request.app.state.repo.list_actions(min(limit, 500))
+
+
+@router.post("/upload")
+async def upload(file: UploadFile = File(...)) -> dict:
+    """Save a user-attached file so agent actions (e.g. describe_image) can read
+    it by path. Returned into the message so the model can act on it."""
+    uploads = data_dir() / "uploads"
+    uploads.mkdir(parents=True, exist_ok=True)
+    safe_name = "".join(c for c in (file.filename or "file") if c.isalnum() or c in "._- ")
+    dest = uploads / f"{datetime.now():%Y%m%d-%H%M%S}-{safe_name}"
+    dest.write_bytes(await file.read())
+    return {"path": str(dest), "filename": safe_name}
+
+
+@router.get("/downloads")
+def downloads(request: Request) -> list[dict]:
+    """Files Corvus has downloaded via browser automation (Milestone 7)."""
+    browser = request.app.state.browser
+    return browser.download_list() if browser is not None else []
+
+
+@router.get("/browser/status")
+def browser_status(request: Request) -> dict:
+    browser = request.app.state.browser
+    if browser is None:
+        return {"available": False, "open": False}
+    return {
+        "available": True,
+        "open": browser.is_open,
+        "consented_sites": sorted(browser.consented_sites),
+        "downloads": len(browser.downloads),
+    }

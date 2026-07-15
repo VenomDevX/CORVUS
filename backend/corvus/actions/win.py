@@ -110,16 +110,18 @@ def set_brightness(percent: int) -> None:
 
 
 def screenshot(dest: Path) -> Path:
+    """Capture the primary screen to a PNG, in-process.
+
+    Uses Pillow's ImageGrab rather than shelling out to PowerShell: under a
+    Microsoft Store Python the data dir is filesystem-virtualized, so a file an
+    external process writes lands at a different physical path than the backend
+    reads back. Keeping capture and read in the same process avoids that split.
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
-    ps = (
-        "Add-Type -AssemblyName System.Windows.Forms,System.Drawing;"
-        "$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds;"
-        "$bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height;"
-        "$g=[System.Drawing.Graphics]::FromImage($bmp);"
-        "$g.CopyFromScreen($b.Location,[System.Drawing.Point]::Empty,$b.Size);"
-        f"$bmp.Save('{dest.as_posix()}');$g.Dispose();$bmp.Dispose()"
-    )
-    _run(["powershell", "-NoProfile", "-Command", ps])
+    from PIL import ImageGrab
+
+    image = ImageGrab.grab()
+    image.save(str(dest), "PNG")
     return dest
 
 

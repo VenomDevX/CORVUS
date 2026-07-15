@@ -78,7 +78,30 @@ export const api = {
   voiceStatus: () => request<VoiceStatus>("/voice/status"),
   listActionSpecs: () => request<ActionSpec[]>("/actions"),
   actionLog: (limit = 100) => request<ActionLogEntry[]>(`/actions/log?limit=${limit}`),
+  downloads: () => request<DownloadItem[]>("/downloads"),
+  browserStatus: () => request<BrowserStatus>("/browser/status"),
+  uploadFile: async (file: File): Promise<{ path: string; filename: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BACKEND_HTTP}/upload`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+    return res.json();
+  },
 };
+
+export interface DownloadItem {
+  filename: string;
+  path: string;
+  url: string;
+  created_at: string;
+}
+
+export interface BrowserStatus {
+  available: boolean;
+  open: boolean;
+  consented_sites?: string[];
+  downloads?: number;
+}
 
 export type VoiceEvent =
   | { type: "state"; state: "idle" | "listening" | "thinking" | "speaking"; conversation_id: number | null }

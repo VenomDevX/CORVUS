@@ -3,6 +3,7 @@ export interface Attachment {
   size: number;
   type: string;
   url?: string;
+  file?: File;
 }
 
 export function formatSize(bytes: number): string {

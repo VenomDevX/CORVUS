@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Tooltip } from "@fluentui/react-components";
 import { useCorvus } from "../state/store";
+import { api } from "../lib/api";
 import { FileCard, type Attachment } from "./FileCard";
 
 export function InputBar() {
@@ -15,10 +16,32 @@ export function InputBar() {
   const imageInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  function submit() {
+  const [uploading, setUploading] = useState(false);
+
+  async function submit() {
     const body = text.trim();
-    if (!body || generating || !backendOnline) return;
-    send(body);
+    if ((!body && attachments.length === 0) || generating || !backendOnline || uploading) return;
+
+    // Upload attachments so agent actions can read them by path, then reference
+    // each path in the message so the model can act on it (e.g. describe_image).
+    let content = body;
+    if (attachments.length > 0) {
+      setUploading(true);
+      try {
+        for (const a of attachments) {
+          if (!a.file) continue;
+          const { path } = await api.uploadFile(a.file);
+          const kind = a.type.startsWith("image/") ? "image" : "file";
+          content += `\n\n[Attached ${kind}: ${path}]`;
+        }
+      } catch {
+        content += "\n\n[An attachment failed to upload.]";
+      } finally {
+        setUploading(false);
+      }
+    }
+
+    send(content || "(no message)");
     setText("");
     setAttachments([]);
   }
@@ -30,6 +53,7 @@ export function InputBar() {
       size: f.size,
       type: f.type || "application/octet-stream",
       url: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
+      file: f,
     }));
     setAttachments((prev) => [...prev, ...next]);
   }
@@ -104,11 +128,11 @@ export function InputBar() {
         ) : (
           <button
             onClick={submit}
-            disabled={!text.trim() || !backendOnline}
+            disabled={(!text.trim() && attachments.length === 0) || !backendOnline || uploading}
             aria-label="Send message"
             className="rounded bg-accent px-4 py-2 text-body font-medium text-white shadow-glow transition-all duration-fast enabled:hover:bg-accent-bright disabled:opacity-40 disabled:shadow-none"
           >
-            Send
+            {uploading ? "Uploading…" : "Send"}
           </button>
         )}
 

@@ -2,7 +2,16 @@
 
 Corvus is a Windows desktop AI assistant — an animated, voice-ready companion that lives in your taskbar, remembers what matters, and (in later milestones) acts on your behalf across the OS and the web.
 
-**Current state (Milestones 1–8):** Electron shell with the Corvus orb and Fluent dark/light theming; streaming chat across **multiple LLM providers** (local Ollama plus OpenAI, Anthropic, Gemini, DeepSeek, with API keys encrypted via Windows DPAPI); persistent history and inspectable memory in SQLite; a full voice pipeline (local "Hey Corvus" wake word + Whisper STT + streamed neural TTS with barge-in); an agent that controls Windows through a permissioned action registry with exact-consequence confirmations; browser automation + computer vision (Playwright navigation/research, OCR screenshot understanding and on-screen clicking); native **notifications, timers, and reminders**; user-definable **workflows** (manual/scheduled/voice triggers); and a **plugin SDK** with a marketplace and per-plugin permissions. Whisper (~220 MB), the OCR model, and Chromium download on first use.
+**Current state — feature-complete (Milestones 1–9):** Electron shell with the Corvus orb and Fluent dark/light theming; streaming chat across **multiple LLM providers** (local Ollama plus OpenAI, Anthropic, Gemini, DeepSeek, with API keys encrypted via Windows DPAPI); persistent history and inspectable memory in SQLite; a full voice pipeline (local "Hey Corvus" wake word + Whisper STT + streamed neural TTS with barge-in); an agent that controls Windows through a permissioned action registry with exact-consequence confirmations; browser automation + computer vision (Playwright navigation/research, OCR screenshot understanding and on-screen clicking); native **notifications, timers, and reminders**; user-definable **workflows** (manual/scheduled/voice triggers); a **plugin SDK** with a marketplace and per-plugin permissions; **crash recovery** with session restore and rotating logs; and a **Windows installer** (electron-builder NSIS) with **auto-update** (electron-updater). Whisper (~220 MB), the OCR model, and Chromium download on first use.
+
+## Build the installer
+
+```powershell
+cd backend; .venv\Scripts\pip install -e .[dev,build]; cd ..
+npm run dist   # freezes the backend (PyInstaller) then packages the app (electron-builder)
+```
+
+Output: `dist-installer/Corvus-Setup-<version>.exe`. See `installer/README.md` for details, the update feed, and code signing.
 
 ## Prerequisites
 

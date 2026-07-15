@@ -65,7 +65,7 @@ async def chat(ws: WebSocket) -> None:
     history = repo.list_messages(conversation_id)[-MAX_HISTORY_MESSAGES:]
     system = SYSTEM_PROMPT + "\n\n" + agent_system_prompt(registry)
     messages = [Message("system", system)] + [Message(m["role"], m["content"]) for m in history]
-    model = repo.get_setting("model")
+    model = ws.app.state.active_model()
 
     # Pending-confirmation plumbing: the agent loop calls confirm(), which
     # sends an action_confirming frame and waits for the client's reply.

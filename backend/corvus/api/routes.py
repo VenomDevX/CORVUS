@@ -22,6 +22,11 @@ class SettingsPatch(BaseModel):
     tts_voice: str | None = None
 
 
+class ApiKeyBody(BaseModel):
+    provider: str
+    key: str
+
+
 @router.get("/health")
 def health() -> dict:
     return {"status": "ok", "version": __version__, "app": "Corvus"}
@@ -80,28 +85,78 @@ def export_memories(request: Request) -> Response:
 
 @router.get("/settings")
 def get_settings(request: Request) -> dict:
+    from ..llm.factory import PROVIDERS, model_setting_key
+
     repo = request.app.state.repo
+    provider = repo.get_setting("provider") or "ollama"
+    model = repo.get_setting(model_setting_key(provider)) or (
+        PROVIDERS[provider].default_model if provider in PROVIDERS else None
+    )
     return {
-        "provider": repo.get_setting("provider"),
-        "model": repo.get_setting("model"),
+        "provider": provider,
+        "model": model,
         "tts_voice": repo.get_setting("tts_voice"),
     }
 
 
 @router.patch("/settings")
 def patch_settings(request: Request, body: SettingsPatch) -> dict:
+    from ..llm.factory import PROVIDERS, model_setting_key
+
     repo = request.app.state.repo
+    reload_provider = False
     if body.provider is not None:
-        if body.provider != "ollama":
-            raise HTTPException(400, "only the ollama provider is available until Milestone 8")
+        if body.provider not in PROVIDERS:
+            raise HTTPException(400, f"unknown provider: {body.provider}")
         repo.set_setting("provider", body.provider)
+        reload_provider = True
     if body.model is not None:
-        repo.set_setting("model", body.model)
+        provider = repo.get_setting("provider") or "ollama"
+        repo.set_setting(model_setting_key(provider), body.model)
     if body.tts_voice is not None:
         repo.set_setting("tts_voice", body.tts_voice)
         if request.app.state.voice is not None:
             request.app.state.voice.speaker.voice = body.tts_voice
+    if reload_provider and hasattr(request.app.state.provider, "reload"):
+        request.app.state.provider.reload()
     return get_settings(request)
+
+
+@router.get("/providers")
+def list_providers(request: Request) -> list[dict]:
+    """Catalog of LLM providers with which have a key configured."""
+    from ..llm.factory import PROVIDERS
+
+    vault = request.app.state.vault
+    return [
+        {
+            "name": info.name,
+            "label": info.label,
+            "needs_key": info.needs_key,
+            "has_key": vault.has_key(info.name) if info.needs_key else True,
+            "default_model": info.default_model,
+            "key_url": info.key_url,
+        }
+        for info in PROVIDERS.values()
+    ]
+
+
+@router.put("/providers/key")
+def set_provider_key(request: Request, body: ApiKeyBody) -> dict:
+    from ..llm.factory import PROVIDERS
+
+    if body.provider not in PROVIDERS or not PROVIDERS[body.provider].needs_key:
+        raise HTTPException(400, f"{body.provider} does not take an API key")
+    request.app.state.vault.set_key(body.provider, body.key)
+    if request.app.state.repo.get_setting("provider") == body.provider:
+        request.app.state.provider.reload()
+    return {"ok": True, "has_key": request.app.state.vault.has_key(body.provider)}
+
+
+@router.delete("/providers/key/{provider}")
+def clear_provider_key(request: Request, provider: str) -> dict:
+    request.app.state.vault.clear_key(provider)
+    return {"ok": True}
 
 
 @router.get("/models")
@@ -109,7 +164,7 @@ async def list_models(request: Request) -> dict:
     try:
         return {"models": await request.app.state.provider.list_models()}
     except Exception as exc:
-        raise HTTPException(502, f"Ollama unreachable: {exc}")
+        raise HTTPException(502, f"provider unreachable: {exc}")
 
 
 @router.get("/logs")

@@ -87,7 +87,24 @@ export const api = {
     if (!res.ok) throw new Error(`upload failed: ${res.status}`);
     return res.json();
   },
+  listProviders: () => request<ProviderInfo[]>("/providers"),
+  setProviderKey: (provider: string, key: string) =>
+    request<{ ok: boolean; has_key: boolean }>("/providers/key", {
+      method: "PUT",
+      body: JSON.stringify({ provider, key }),
+    }),
+  clearProviderKey: (provider: string) =>
+    request<{ ok: boolean }>(`/providers/key/${provider}`, { method: "DELETE" }),
 };
+
+export interface ProviderInfo {
+  name: string;
+  label: string;
+  needs_key: boolean;
+  has_key: boolean;
+  default_model: string;
+  key_url: string;
+}
 
 export interface DownloadItem {
   filename: string;

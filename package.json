@@ -13,6 +13,8 @@
     "lint": "npm run lint --prefix frontend",
     "test": "npm run guard && npm run test --prefix frontend && npm run test:backend",
     "test:backend": "cd backend && .venv\\Scripts\\python.exe -m pytest -q",
+    "dist:backend": "cd backend && .venv\\Scripts\\pyinstaller ../installer/corvus-backend.spec --distpath ../dist-backend --workpath ../build/pyinstaller --noconfirm",
+    "dist": "npm run dist:backend && npm run dist --prefix frontend",
     "precommit": "npm run guard",
     "prepare": "husky"
   },

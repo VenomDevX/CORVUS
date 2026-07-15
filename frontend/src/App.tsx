@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   FluentProvider,
   createDarkTheme,
@@ -10,6 +10,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatView } from "./components/ChatView";
 import { VoiceMode } from "./components/VoiceMode";
 import { NotificationsLayer } from "./components/NotificationsLayer";
+import { OnboardingSetup } from "./components/OnboardingSetup";
 import { HistoryView } from "./sections/HistoryView";
 import { MemoryView } from "./sections/MemoryView";
 import { SettingsView } from "./sections/SettingsView";
@@ -54,22 +55,24 @@ export default function App() {
   const connectVoiceSocket = useCorvus((s) => s.connectVoiceSocket);
   const Body = SECTIONS[section];
 
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+
   // Keep the voice socket up whenever the backend is reachable, so a wake
   // word can summon voice mode even while the user is typing.
   useEffect(() => {
     if (backendOnline) connectVoiceSocket();
   }, [backendOnline, connectVoiceSocket]);
 
-  // Crash recovery: restore the conversation we were in, once per launch.
+  // Check session on launch, but start a fresh chat by default.
   const restored = useRef(false);
   useEffect(() => {
     if (!backendOnline || restored.current) return;
     restored.current = true;
     void (async () => {
       const s = await api.session();
-      if (s.active_conversation != null) {
-        await useCorvus.getState().openConversation(s.active_conversation);
-      }
+      // We no longer restore active_conversation on startup.
+      // The user will start with a fresh chat, and previous chats remain in history.
+      
       if (s.recovered) {
         try {
           if ("Notification" in window)
@@ -107,6 +110,7 @@ export default function App() {
   return (
     <FluentProvider theme={theme === "dark" ? darkTheme : lightTheme} className="h-full !bg-transparent">
       <div className="app-bg relative flex h-full flex-col">
+        {!onboardingComplete && <OnboardingSetup onComplete={() => setOnboardingComplete(true)} />}
         <NotificationsLayer />
         <AnimatePresence>{voiceMode && <VoiceMode />}</AnimatePresence>
         {/* Draggable titlebar strip (native window buttons overlay the right edge) */}

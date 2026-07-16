@@ -56,6 +56,23 @@ export interface BackendSettings {
   provider: string;
   model: string;
   tts_voice: string | null;
+  onboarding_complete: boolean;
+}
+
+export interface SystemSpecs {
+  ram_gb: number;
+  cpu: string;
+  cpu_cores: number;
+  gpu: { name: string; vram_gb: number } | null;
+  ollama: { running: boolean; models: { name: string; size_gb: number }[] };
+  catalog: {
+    id: string;
+    label: string;
+    download_gb: number;
+    blurb: string;
+    fit: "recommended" | "cpu_ok" | "too_big";
+  }[];
+  suggested: string;
 }
 
 export interface VoiceStatus {
@@ -100,6 +117,7 @@ export const api = {
   deleteMemory: (id: number) => request<{ ok: boolean }>(`/memories/${id}`, { method: "DELETE" }),
   exportMemoriesUrl: () => `${BACKEND_HTTP}/memories/export${tokenQuery()}`,
   getSettings: () => request<BackendSettings>("/settings"),
+  systemSpecs: () => request<SystemSpecs>("/system/specs"),
   updateSettings: (settings: Partial<BackendSettings>) =>
     request<BackendSettings>("/settings", { method: "PATCH", body: JSON.stringify(settings) }),
   listModels: () => request<{ models: string[] }>("/models"),

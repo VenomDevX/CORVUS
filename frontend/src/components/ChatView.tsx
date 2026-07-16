@@ -38,7 +38,7 @@ export function ChatView() {
             {messages.map((m, i) => {
               const actions = "actions" in m ? m.actions : undefined;
               return (
-                <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
+                <div key={"id" in m ? m.id : i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
                   {m.role === "user" ? (
                     <div className="max-w-[80%] rounded-lg px-4 py-3 bg-accent/20 text-fg">
                       {m.content && <MarkdownContent content={m.content} />}

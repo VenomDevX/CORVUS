@@ -232,6 +232,58 @@ async def test_stream_chat_with_tools_accepts_stringified_arguments():
     assert calls[0].arguments == {"query": "corvus"}
 
 
+async def test_model_without_tool_support_falls_back_and_is_remembered():
+    # deepseek-coder-class models: Ollama 400s the whole request when `tools`
+    # is present. The provider must retry without tools (text-JSON recovery
+    # still enables actions) and skip the doomed attempt on later turns.
+    from corvus.llm import ollama as ollama_module
+
+    ollama_module._no_tools_models.discard("no-tools-model")
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        requests.append(payload)
+        if "tools" in payload:
+            return httpx.Response(
+                400, json={"error": "registry.ollama.ai/library/no-tools-model does not support tools"}
+            )
+        return ndjson_response(
+            [
+                {"message": {"content": "Hello from deepseek."}, "done": False},
+                {"message": {"content": ""}, "done": True},
+            ]
+        )
+
+    tools = [{"type": "function", "function": {"name": "open_app", "parameters": {}}}]
+    provider = make_provider(handler)
+
+    deltas = [
+        d async for d in provider.stream_chat_with_tools([Message("user", "hi")], "no-tools-model", tools)
+    ]
+    assert "".join(d.content for d in deltas) == "Hello from deepseek."
+    assert len(requests) == 2 and "tools" in requests[0] and "tools" not in requests[1]
+
+    # Second turn goes straight to the no-tools request.
+    deltas = [
+        d async for d in provider.stream_chat_with_tools([Message("user", "again")], "no-tools-model", tools)
+    ]
+    assert "".join(d.content for d in deltas) == "Hello from deepseek."
+    assert len(requests) == 3 and "tools" not in requests[2]
+    ollama_module._no_tools_models.discard("no-tools-model")
+
+
+async def test_unrelated_400_is_not_swallowed():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": "invalid request shape"})
+
+    tools = [{"type": "function", "function": {"name": "open_app", "parameters": {}}}]
+    provider = make_provider(handler)
+    with pytest.raises(RuntimeError, match="invalid request shape"):
+        async for _ in provider.stream_chat_with_tools([Message("user", "hi")], "m-400", tools):
+            pass
+
+
 async def test_complete_concatenates():
     def handler(request: httpx.Request) -> httpx.Response:
         return ndjson_response(

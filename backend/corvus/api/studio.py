@@ -69,7 +69,9 @@ async def preview(body: PreviewBody) -> Response:
     if body.engine not in ("edge", "piper"):
         raise HTTPException(400, f"unknown engine: {body.engine}")
     try:
-        audio, ext = await studio.synthesize(body.engine, studio.PREVIEW_TEXT, body.voice)
+        audio, ext = await studio.synthesize(
+            body.engine, studio.preview_text_for(body.voice), body.voice
+        )
     except FileNotFoundError as exc:
         raise HTTPException(409, str(exc))
     except Exception as exc:

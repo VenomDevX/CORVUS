@@ -13,8 +13,10 @@ Open a private security advisory on GitHub (Security → Advisories → Report a
 - Agent actions are risk-tiered (`safe`/`low`/`medium`/`high`); `medium`/`high` always require explicit user confirmation stating the exact consequence. Voice mode cannot trigger actions (confirmations need the visible card).
 - Corvus never types stored passwords — login flows hand off to the browser's own credential manager after per-site consent.
 - Electron renderer is locked down: `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`, minimal typed IPC bridge.
-- `openPath` IPC blocks executable extensions (`.exe`, `.bat`, `.ps1`, …); `openExternal` only accepts `http(s)` URLs.
+- `openPath` IPC blocks executable extensions (`.exe`, `.bat`, `.ps1`, …), and confines the target to the Corvus data dir (case-insensitive, separator-anchored prefix); `openExternal` only accepts `http(s)` URLs.
 - Single-instance lock prevents a second Corvus from racing the first.
+- The backend fails closed: if no launch token is provided it mints a random one (never open, never logged), so the API is always authenticated.
+- Voice Studio filenames and the Piper voice download are constrained: generated audio filenames are reduced to a safe character set (no traversal), and voice downloads accept only ids from the built-in catalog (no arbitrary-URL fetch / SSRF).
 
 ## Hardening roadmap
 
@@ -34,3 +36,12 @@ Status legend: ✅ done · 🔲 pending
 | 10 | P3 | **Supply chain** — Dependabot watches npm (root + frontend), pip, and GitHub Actions weekly; a `security` CI workflow runs the naming guard, `npm audit`, and `pip-audit` on every push/PR and weekly. `npm run audit` runs both npm audits locally. | ✅ done |
 
 Items are checked off in this file in the same commit that implements them.
+
+## Audit log
+
+**2026-07-16 — full review after Voice Studio, setup wizard, and model-manager features.**
+
+- **New endpoints reviewed** (`/system/specs`, `/studio/*`, onboarding settings): all sit behind the global launch-token middleware. `nvidia-smi` runs with a fixed argument list (no shell, no user input). Piper downloads are catalog-gated — an unknown voice id raises before any HTTP request, so there is no SSRF or arbitrary-file-write vector. Fixed: generated-audio filenames now sanitize the user-supplied voice id.
+- **`openPath` prefix check hardened** — was a bare `startsWith` (a sibling like `…\CorvusEvil` could slip through and it was case-sensitive on case-insensitive NTFS); now anchored on the path separator and case-insensitive.
+- **Token fallback no longer logs the token** — the generated fallback token was being written to the on-disk log (readable through `/logs`); now only a flag is logged.
+- **Dependency audit.** `pip-audit`: findings are only in the build toolchain (`pip`, `setuptools`) that PyInstaller does not bundle into the frozen backend — no runtime exposure; refresh the venv toolchain opportunistically. `npm audit`: all 18 findings are in **dev/build dependencies** (electron-builder→tar, vite/vitest/esbuild dev server, react-syntax-highlighter→prismjs, electron ASAR-integrity). None are reachable in the packaged app: the Vite/vitest/esbuild dev server never ships; `tar` is used only at build time; the Electron ASAR advisory is mitigated in depth by our nav guards + sandbox and is fully resolved by a major Electron bump. **Action:** schedule an Electron major-version upgrade (breaking) and a `react-syntax-highlighter` bump in a dedicated dependency PR; do not `npm audit fix --force` mid-feature.

@@ -27,8 +27,19 @@ export function registerIpc(getWindow: () => BrowserWindow | null, backendToken:
       return;
     }
 
-    // Attempt to restrict to the corvus data dir (where downloads and uploads are)
-    // Note: If you want to be extremely strict, you'd check if `normalized` startsWith the actual `data_dir`
+    // Restrict to the Corvus data dir (where downloads and uploads live).
+    // Compare case-insensitively (NTFS) and require the separator so a
+    // sibling like ...\CorvusEvil can't pass a bare prefix check.
+    const sep = require("node:path").sep;
+    const baseDir = process.env.LOCALAPPDATA
+      ? require("node:path").join(process.env.LOCALAPPDATA, "Corvus")
+      : require("node:path").join(require("node:os").homedir(), "Corvus");
+    const inBase = normalized.toLowerCase().startsWith(baseDir.toLowerCase() + sep);
+    if (!inBase) {
+      console.warn(`Blocked attempt to open path outside data dir: ${path}`);
+      return;
+    }
+
     await shell.openPath(normalized);
   });
 

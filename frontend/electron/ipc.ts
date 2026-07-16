@@ -1,10 +1,13 @@
 import { BrowserWindow, app, ipcMain, nativeTheme, shell } from "electron";
 
 /** IPC surface exposed to the renderer via preload — keep this minimal and typed. */
-export function registerIpc(getWindow: () => BrowserWindow | null) {
+export function registerIpc(getWindow: () => BrowserWindow | null, backendToken: string) {
   ipcMain.handle("corvus:get-system-theme", () =>
     nativeTheme.shouldUseDarkColors ? "dark" : "light",
   );
+
+  // Per-launch backend auth token; the renderer attaches it to every request.
+  ipcMain.handle("corvus:get-backend-token", () => backendToken);
 
   ipcMain.handle("corvus:get-version", () => app.getVersion());
 

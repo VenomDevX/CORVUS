@@ -57,7 +57,10 @@ async def generate(request: Request, body: GenerateBody) -> dict:
     except Exception as exc:
         raise HTTPException(502, f"synthesis failed: {exc}")
 
-    filename = f"{datetime.now():%Y%m%d-%H%M%S}-{body.voice}.{ext}"
+    # The voice id is user input: reduce it to a safe character set so the
+    # stored filename can never traverse out of the voiceovers directory.
+    safe_voice = "".join(c for c in body.voice if c.isalnum() or c in "._-") or "voice"
+    filename = f"{datetime.now():%Y%m%d-%H%M%S}-{safe_voice}.{ext}"
     (studio.voiceovers_dir() / filename).write_bytes(audio)
     return request.app.state.repo.add_voiceover(
         text, body.engine, body.voice, body.rate, body.pitch, body.volume, filename

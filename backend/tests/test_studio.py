@@ -88,6 +88,14 @@ def test_piper_catalog_lists_curated_voices(client):
     assert {"id", "name", "language", "gender", "size_mb", "installed"} <= set(piper[0])
 
 
+def test_generate_sanitizes_voice_in_filename(client):
+    row = _generate(client, voice="..\\..\\evil/../voice")
+    # No path separators may survive into the stored filename, and the file
+    # must land inside the voiceovers dir under exactly that name.
+    assert "\\" not in row["filename"] and "/" not in row["filename"]
+    assert (studio.voiceovers_dir() / row["filename"]).exists()
+
+
 def test_batches_short_text_is_one_request():
     assert studio._batches("Hello world. Two sentences.") == ["Hello world. Two sentences."]
 

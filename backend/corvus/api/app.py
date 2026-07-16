@@ -133,8 +133,15 @@ def create_app(
     # CORS stays outermost — preflight OPTIONS carries no custom header and
     # must be answered by the CORS layer, not rejected here.
     launch_token = os.environ.get("CORVUS_TOKEN")
-    if launch_token:
-        app.add_middleware(TokenAuthMiddleware, token=launch_token)
+    if not launch_token:
+        import secrets
+
+        # Fail closed: without a launch token, mint a random one so the API is
+        # never open. Never log the token itself - the log file is on disk and
+        # readable via /logs.
+        launch_token = secrets.token_hex(32)
+        log.warning("corvus_token_missing_generated_fallback")
+    app.add_middleware(TokenAuthMiddleware, token=launch_token)
 
     # Tight CORS (SECURITY.md item 7): the packaged renderer loads from
     # file:// (Origin "null"); the Vite dev-server origins are allowed only

@@ -105,6 +105,24 @@ export function SettingsView() {
         </section>
 
         <section className="glass rounded-lg p-4">
+          <h2 className="mb-1 text-h4">First-time setup</h2>
+          <p className="mb-3 text-body-sm text-fg-muted">
+            Re-run the welcome wizard to scan this device and choose or download a local model.
+          </p>
+          <button
+            onClick={() =>
+              void api
+                .updateSettings({ onboarding_complete: false })
+                .then(() => window.location.reload())
+            }
+            disabled={!backendOnline}
+            className="rounded bg-accent px-4 py-2 text-body text-white transition-colors duration-fast enabled:hover:bg-accent-bright disabled:opacity-40"
+          >
+            Re-run first-time setup
+          </button>
+        </section>
+
+        <section className="glass rounded-lg p-4">
           <h2 className="mb-1 text-h4">Backend status</h2>
           <p className="text-body">
             {backendOnline ? (

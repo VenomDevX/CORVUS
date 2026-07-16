@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "husky": "^9.1.7",
-    "png-to-ico": "^2.1.8",
+    "png-to-ico": "^3.0.2",
     "sharp": "^0.34.1"
   }
 }

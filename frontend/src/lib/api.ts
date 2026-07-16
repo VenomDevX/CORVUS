@@ -138,6 +138,32 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ permissions }),
     }),
+  studioVoices: () => request<StudioVoices>("/studio/voices"),
+  generateVoiceover: (body: GenerateVoiceoverBody) =>
+    request<Voiceover>("/studio/generate", { method: "POST", body: JSON.stringify(body) }),
+  listVoiceovers: () => request<Voiceover[]>("/studio/generations"),
+  deleteVoiceover: (id: number) =>
+    request<{ ok: boolean }>(`/studio/generations/${id}`, { method: "DELETE" }),
+  voiceoverAudioUrl: (id: number) =>
+    `${BACKEND_HTTP}/studio/generations/${id}/audio${tokenQuery()}`,
+  previewVoice: async (engine: VoiceEngine, voice: string): Promise<Blob> => {
+    const token = await ensureToken();
+    const res = await fetch(`${BACKEND_HTTP}/studio/preview`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "X-Corvus-Token": token } : {}),
+      },
+      body: JSON.stringify({ engine, voice }),
+    });
+    if (!res.ok) throw new Error(`preview failed: ${res.status}`);
+    return res.blob();
+  },
+  downloadPiperVoice: (voice: string) =>
+    request<{ ok: boolean; installed: string[] }>("/studio/piper/download", {
+      method: "POST",
+      body: JSON.stringify({ voice }),
+    }),
   listProviders: () => request<ProviderInfo[]>("/providers"),
   setProviderKey: (provider: string, key: string) =>
     request<{ ok: boolean; has_key: boolean }>("/providers/key", {
@@ -176,6 +202,50 @@ export interface Workflow {
   trigger_type: "manual" | "schedule" | "voice";
   trigger_config: { at?: string; phrase?: string };
   enabled: boolean;
+}
+
+export type VoiceEngine = "edge" | "piper";
+
+export interface EdgeVoice {
+  id: string;
+  name: string;
+  locale: string;
+  gender: string;
+}
+
+export interface PiperVoice {
+  id: string;
+  name: string;
+  language: string;
+  gender: string;
+  size_mb: number;
+  installed: boolean;
+}
+
+export interface StudioVoices {
+  edge: EdgeVoice[];
+  piper: PiperVoice[];
+}
+
+export interface GenerateVoiceoverBody {
+  text: string;
+  engine: VoiceEngine;
+  voice: string;
+  rate: number;
+  pitch: number;
+  volume: number;
+}
+
+export interface Voiceover {
+  id: number;
+  text: string;
+  engine: VoiceEngine;
+  voice: string;
+  rate: number;
+  pitch: number;
+  volume: number;
+  filename: string;
+  created_at: string;
 }
 
 export interface ProviderInfo {

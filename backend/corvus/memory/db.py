@@ -62,6 +62,18 @@ CREATE TABLE IF NOT EXISTS workflows (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS voiceovers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    engine TEXT NOT NULL CHECK (engine IN ('edge', 'piper')),
+    voice TEXT NOT NULL,
+    rate INTEGER NOT NULL DEFAULT 0,
+    pitch INTEGER NOT NULL DEFAULT 0,
+    volume INTEGER NOT NULL DEFAULT 0,
+    filename TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_pending ON reminders(fired, fire_at);
 """

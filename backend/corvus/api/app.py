@@ -16,6 +16,7 @@ from ..memory.repository import Repository
 from .notifications import notify_router
 from .plugins import plugin_router
 from .routes import router
+from .studio import studio_router
 from .voice import voice_router
 from .workflows import workflow_router
 from .ws import ws_router
@@ -153,6 +154,7 @@ def create_app(
     app.include_router(router)
     app.include_router(ws_router)
     app.include_router(voice_router)
+    app.include_router(studio_router)
     app.include_router(notify_router)
     app.include_router(workflow_router)
     app.include_router(plugin_router)

@@ -6,6 +6,29 @@
 const BACKEND_HTTP = "http://127.0.0.1:8765";
 const BACKEND_WS = "ws://127.0.0.1:8765";
 
+/**
+ * Per-launch auth token the backend enforces (SECURITY.md item 1). Fetched
+ * once from the main process via the preload bridge; empty outside Electron
+ * (vitest, plain browser against a manual dev backend, which doesn't enforce).
+ */
+let backendToken = "";
+let tokenFetch: Promise<string> | null = null;
+
+function ensureToken(): Promise<string> {
+  tokenFetch ??= (window.corvus?.getBackendToken?.() ?? Promise.resolve("")).then(
+    (token) => (backendToken = token ?? ""),
+    () => "",
+  );
+  return tokenFetch;
+}
+// Warm the cache immediately so WebSocket URLs (built synchronously) have it.
+void ensureToken();
+
+/** `?token=…` suffix for WebSocket URLs and plain-href endpoints. */
+function tokenQuery(): string {
+  return backendToken ? `?token=${backendToken}` : "";
+}
+
 export interface Conversation {
   id: number;
   title: string;
@@ -50,9 +73,14 @@ export interface LogEntry {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = await ensureToken();
   const res = await fetch(`${BACKEND_HTTP}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "X-Corvus-Token": token } : {}),
+      ...init?.headers,
+    },
   });
   if (!res.ok) throw new Error(`Corvus backend ${res.status}: ${await res.text()}`);
   return (await res.json()) as T;
@@ -70,7 +98,7 @@ export const api = {
     request<ChatMessage[]>(`/conversations/${conversationId}/messages`),
   listMemories: () => request<Memory[]>("/memories"),
   deleteMemory: (id: number) => request<{ ok: boolean }>(`/memories/${id}`, { method: "DELETE" }),
-  exportMemoriesUrl: () => `${BACKEND_HTTP}/memories/export`,
+  exportMemoriesUrl: () => `${BACKEND_HTTP}/memories/export${tokenQuery()}`,
   getSettings: () => request<BackendSettings>("/settings"),
   updateSettings: (settings: Partial<BackendSettings>) =>
     request<BackendSettings>("/settings", { method: "PATCH", body: JSON.stringify(settings) }),
@@ -82,9 +110,14 @@ export const api = {
   downloads: () => request<DownloadItem[]>("/downloads"),
   browserStatus: () => request<BrowserStatus>("/browser/status"),
   uploadFile: async (file: File): Promise<{ path: string; filename: string }> => {
+    const token = await ensureToken();
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${BACKEND_HTTP}/upload`, { method: "POST", body: form });
+    const res = await fetch(`${BACKEND_HTTP}/upload`, {
+      method: "POST",
+      body: form,
+      headers: token ? { "X-Corvus-Token": token } : undefined,
+    });
     if (!res.ok) throw new Error(`upload failed: ${res.status}`);
     return res.json();
   },
@@ -162,7 +195,7 @@ export function connectNotifications(
   onEvent: (event: NotificationEvent) => void,
   onClose: () => void,
 ): { close: () => void } {
-  const ws = new WebSocket(`${BACKEND_WS}/ws/notifications`);
+  const ws = new WebSocket(`${BACKEND_WS}/ws/notifications${tokenQuery()}`);
   ws.onmessage = (e) => onEvent(JSON.parse(e.data) as NotificationEvent);
   ws.onclose = onClose;
   ws.onerror = () => ws.close();
@@ -209,7 +242,7 @@ export function connectVoice(
   onEvent: (event: VoiceEvent) => void,
   onClose: () => void,
 ): VoiceSocket {
-  const ws = new WebSocket(`${BACKEND_WS}/ws/voice`);
+  const ws = new WebSocket(`${BACKEND_WS}/ws/voice${tokenQuery()}`);
   ws.onmessage = (event) => onEvent(JSON.parse(event.data) as VoiceEvent);
   ws.onclose = onClose;
   ws.onerror = () => ws.close();
@@ -265,7 +298,7 @@ export function streamChat(
   onFrame: (frame: StreamFrame) => void,
   onClose: () => void,
 ): StreamHandle {
-  const ws = new WebSocket(`${BACKEND_WS}/ws/chat`);
+  const ws = new WebSocket(`${BACKEND_WS}/ws/chat${tokenQuery()}`);
   ws.onopen = () =>
     ws.send(
       JSON.stringify({

@@ -30,7 +30,7 @@ function backendPath(isDev: boolean): string {
  * is still running, respawn it after a short delay. Quitting the app sets
  * `shuttingDown`, which suppresses the respawn.
  */
-function spawnBackend(isDev: boolean): void {
+function spawnBackend(isDev: boolean, token: string): void {
   if (shuttingDown || (child && !child.killed)) return;
 
   const python = backendPath(isDev);
@@ -45,6 +45,8 @@ function spawnBackend(isDev: boolean): void {
     cwd: isDev ? join(repoRoot, "backend") : undefined,
     stdio: "inherit",
     windowsHide: true,
+    // The backend enforces this token on every request (SECURITY.md item 1).
+    env: { ...process.env, CORVUS_TOKEN: token },
   });
 
   child.on("exit", (code) => {
@@ -56,7 +58,7 @@ function spawnBackend(isDev: boolean): void {
       restartTimer = null;
       // A backend may have come up in the meantime (e.g. started externally).
       void isHealthy().then((ok) => {
-        if (!ok) spawnBackend(isDev);
+        if (!ok) spawnBackend(isDev, token);
       });
     }, RESTART_DELAY_MS);
   });
@@ -68,11 +70,11 @@ function spawnBackend(isDev: boolean): void {
  * Resolves once /health responds or the startup window elapses; the renderer
  * also surfaces live backend status.
  */
-export async function startBackend(isDev: boolean): Promise<boolean> {
+export async function startBackend(isDev: boolean, token: string): Promise<boolean> {
   shuttingDown = false;
   if (await isHealthy()) return true;
 
-  spawnBackend(isDev);
+  spawnBackend(isDev, token);
 
   for (let i = 0; i < 40; i++) {
     if (await isHealthy()) return true;

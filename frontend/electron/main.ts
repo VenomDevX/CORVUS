@@ -1,4 +1,5 @@
 import { app, BrowserWindow, globalShortcut, nativeTheme } from "electron";
+import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { createTray, destroyTray } from "./tray";
 import { registerIpc } from "./ipc";
@@ -10,6 +11,10 @@ const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
 let quitting = false;
+
+// Per-launch token every backend request must present (SECURITY.md item 1).
+// The spawned backend receives it via CORVUS_TOKEN; the renderer via IPC.
+const backendToken = randomBytes(32).toString("hex");
 
 function assetPath(...parts: string[]) {
   // dist-electron/ sits inside frontend/; design assets live at the repo root.
@@ -75,7 +80,7 @@ if (!gotLock) {
   app.on("second-instance", showMainWindow);
 
   app.whenReady().then(() => {
-    registerIpc(() => mainWindow);
+    registerIpc(() => mainWindow, backendToken);
     createWindow();
     createTray({
       onShow: showMainWindow,
@@ -87,7 +92,7 @@ if (!gotLock) {
         assetPath(`tray-${variant}-${size}.png`),
     });
     globalShortcut.register("Control+Shift+C", showMainWindow);
-    void startBackend(isDev);
+    void startBackend(isDev, backendToken);
     void initAutoUpdate(() => mainWindow, isDev);
   });
 

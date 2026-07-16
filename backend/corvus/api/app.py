@@ -1,5 +1,6 @@
 """Corvus FastAPI application factory."""
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .. import __version__
+from .auth import TokenAuthMiddleware
 from ..config import DEFAULT_MODEL, data_dir, db_path
 from ..llm.ollama import OllamaProvider
 from ..log import setup_logging
@@ -124,6 +126,14 @@ def create_app(
         app.state.repo.set_setting("provider", "ollama")
     if app.state.repo.get_setting("model:ollama") is None:
         app.state.repo.set_setting("model:ollama", DEFAULT_MODEL)
+
+    # Launch-token auth (SECURITY.md item 1). Read at app-creation time, not
+    # module import, so tests can control it per-app. Added before CORS so
+    # CORS stays outermost — preflight OPTIONS carries no custom header and
+    # must be answered by the CORS layer, not rejected here.
+    launch_token = os.environ.get("CORVUS_TOKEN")
+    if launch_token:
+        app.add_middleware(TokenAuthMiddleware, token=launch_token)
 
     # The server binds to loopback only; the Electron renderer's origin varies
     # (vite dev server / file://), so allow any origin on this local socket.

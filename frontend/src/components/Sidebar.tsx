@@ -48,8 +48,8 @@ export function Sidebar() {
               aria-current={section === item.key ? "page" : undefined}
               className={`flex w-full items-center gap-3 rounded px-3 py-2 text-left text-body transition-colors duration-fast ${
                 section === item.key
-                  ? "bg-accent/20 text-fg shadow-glow"
-                  : "text-fg-muted hover:bg-accent/10 hover:text-fg"
+                  ? "bg-white/10 text-fg"
+                  : "text-fg-muted hover:bg-white/5 hover:text-fg"
               }`}
             >
               <span aria-hidden>{item.icon}</span>

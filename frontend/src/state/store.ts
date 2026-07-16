@@ -36,6 +36,7 @@ export interface ActionEvent {
 
 /** Local (not yet persisted) rendering of an in-flight assistant turn. */
 export interface DraftMessage {
+  id?: string | number;
   role: "user" | "assistant";
   content: string;
   attachments?: { name: string; size: number; type: string; url?: string }[];
@@ -149,7 +150,7 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
     if (generating || !content.trim()) return;
 
     set((s) => ({
-      messages: [...s.messages, { role: "user", content }, { role: "assistant", content: "" }],
+      messages: [...s.messages, { id: crypto.randomUUID(), role: "user", content }, { id: crypto.randomUUID(), role: "assistant", content: "" }],
       generating: true,
       orbState: orbStateFor({ generating: true, listening: false, speaking: false }),
     }));

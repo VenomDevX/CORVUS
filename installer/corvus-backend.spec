@@ -24,6 +24,7 @@ for package in (
     "edge_tts",
     "sounddevice",
     "miniaudio",
+    "piper",  # Voice Studio offline engine (espeak-ng data ships inside the package)
 ):
     pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)
     datas += pkg_datas

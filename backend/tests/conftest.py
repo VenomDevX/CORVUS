@@ -15,6 +15,7 @@ def pytest_configure(config):
 
     _tmp = tempfile.mkdtemp(prefix="corvus-test-")
     os.environ["CORVUS_DATA_DIR"] = _tmp
+    os.environ["CORVUS_TOKEN"] = "test-token"
 
 
 from corvus.llm.base import Delta, Message, ToolCall, TurnResult  # noqa: E402

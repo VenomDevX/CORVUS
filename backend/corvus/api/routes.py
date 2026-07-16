@@ -224,7 +224,10 @@ async def upload(file: UploadFile = File(...)) -> dict:
     it by path. Returned into the message so the model can act on it."""
     uploads = data_dir() / "uploads"
     uploads.mkdir(parents=True, exist_ok=True)
-    safe_name = "".join(c for c in (file.filename or "file") if c.isalnum() or c in "._- ")
+    raw_name = (file.filename or "file").replace("..", "")
+    safe_name = "".join(c for c in raw_name if c.isalnum() or c in "._- ")
+    if safe_name.startswith("."):
+        safe_name = "file" + safe_name
     dest = uploads / f"{datetime.now():%Y%m%d-%H%M%S}-{safe_name or 'file'}"
 
     bytes_read = 0

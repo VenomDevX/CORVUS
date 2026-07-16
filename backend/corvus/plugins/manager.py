@@ -73,11 +73,14 @@ class PluginManager:
         return {p for p in raw.split(",") if p}
 
     def code_hash(self, manifest: PluginManifest) -> str | None:
-        """SHA-256 of the plugin's entry file — what the user approves on enable."""
-        entry = manifest.path / manifest.entry
-        if not entry.exists():
+        """SHA-256 of all Python files in the plugin directory."""
+        if not manifest.path.exists():
             return None
-        return hashlib.sha256(entry.read_bytes()).hexdigest()
+        hasher = hashlib.sha256()
+        # Sort files to ensure deterministic hashing order
+        for py_file in sorted(manifest.path.rglob("*.py")):
+            hasher.update(py_file.read_bytes())
+        return hasher.hexdigest()
 
     def approved_hash(self, pid: str) -> str | None:
         return self.repo.get_setting(_hash_key(pid))

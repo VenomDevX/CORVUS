@@ -21,10 +21,10 @@ def make_client(tmp_path, monkeypatch, token: str | None) -> TestClient:
     return TestClient(app)
 
 
-def test_no_token_env_means_no_enforcement(tmp_path, monkeypatch):
+def test_no_token_env_generates_fallback_token(tmp_path, monkeypatch):
     client = make_client(tmp_path, monkeypatch, token=None)
     assert client.get("/health").status_code == 200
-    assert client.get("/conversations").status_code == 200
+    assert client.get("/conversations").status_code == 401
 
 
 def test_health_stays_open_without_token(tmp_path, monkeypatch):

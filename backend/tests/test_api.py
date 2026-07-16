@@ -11,7 +11,7 @@ from tests.conftest import FakeProvider
 def make_client(tmp_path, provider: FakeProvider) -> TestClient:
     repo = Repository(tmp_path / "api.db")
     app = create_app(repo=repo, provider=provider, voice=False, browser=False)
-    return TestClient(app)
+    return TestClient(app, headers={"X-Corvus-Token": "test-token"})
 
 
 def test_health(tmp_path, fake_provider):

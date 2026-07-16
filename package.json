@@ -8,6 +8,7 @@
   "type": "module",
   "scripts": {
     "guard": "node scripts/naming-guard.mjs",
+    "audit": "npm audit --audit-level=high && npm audit --prefix frontend --audit-level=high",
     "assets": "node scripts/export-assets.mjs",
     "dev": "npm run dev --prefix frontend",
     "lint": "npm run lint --prefix frontend",

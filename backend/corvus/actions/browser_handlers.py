@@ -13,6 +13,7 @@ from ..automation import vision
 from ..automation.browser import BrowserEngine, site_of
 from ..config import data_dir
 from ..llm.base import Message
+from ..untrusted import UNTRUSTED_RULE, wrap_untrusted
 from .registry import ActionResult, ActionSpec, Registry, Risk
 
 _STR = lambda name, desc, req=True: {  # noqa: E731 - tiny schema builder
@@ -24,11 +25,11 @@ _STR = lambda name, desc, req=True: {  # noqa: E731 - tiny schema builder
 
 async def _summarize(provider, model: str, title: str, text: str, instruction: str) -> str:
     prompt = (
-        f"{instruction}\n\nPage title: {title}\n\nPage content:\n{text[:5000]}"
+        f"{instruction}\n\nPage title: {title}\n\nPage content:\n{wrap_untrusted(text[:5000])}"
     )
     parts: list[str] = []
     async for delta in provider.stream_chat(
-        [Message("system", "You summarize web pages concisely and accurately."),
+        [Message("system", "You summarize web pages concisely and accurately. " + UNTRUSTED_RULE),
          Message("user", prompt)],
         model,
     ):
@@ -54,7 +55,8 @@ def register_browser_actions(reg: Registry, browser: BrowserEngine, provider, ge
     async def read_page() -> ActionResult:
         view = await browser.read()
         return ActionResult(True, f"Read “{view.title}” ({len(view.text)} chars).",
-                            {"title": view.title, "url": view.url, "text": view.text,
+                            {"title": view.title, "url": view.url,
+                             "text": wrap_untrusted(view.text),
                              "links": view.links})
 
     reg.register(ActionSpec(
@@ -184,6 +186,12 @@ def register_vision_actions(reg: Registry, provider) -> None:
         if not p.exists():
             return ActionResult(False, f"No image at {path}.")
         result = await vision.describe_image(provider, str(p))
+        # OCR text and model descriptions are outside-world content: wrap them
+        # so downstream turns treat them as data, not instructions.
+        if result.get("text"):
+            result["text"] = wrap_untrusted(result["text"])
+        if result.get("description"):
+            result["description"] = wrap_untrusted(result["description"])
         msg = result.get("description") or (
             f"Text found in the image:\n{result['text']}" if result["has_text"]
             else "No text detected in the image."
@@ -204,7 +212,7 @@ def register_vision_actions(reg: Registry, provider) -> None:
         win.screenshot(shot)
         text = vision.extract_text(str(shot))
         return ActionResult(True, f"Read {len(text.splitlines())} lines of text from the screen.",
-                            {"text": text, "screenshot": str(shot)})
+                            {"text": wrap_untrusted(text), "screenshot": str(shot)})
 
     reg.register(ActionSpec(
         "read_screen_text", "Take a screenshot of the screen and read the text on it (OCR).",

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, nativeTheme } from "electron";
+import { app, BrowserWindow, globalShortcut, nativeTheme, shell } from "electron";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { createTray, destroyTray } from "./tray";
@@ -53,6 +53,21 @@ function createWindow() {
   });
 
   mainWindow.setMenuBarVisibility(false);
+
+  // Navigation guards (SECURITY.md item 6): the window only ever shows local
+  // Corvus content. Any other navigation is denied; http(s) links open in the
+  // system browser instead of inside the app.
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    const allowed = isDev ? url.startsWith(DEV_URL) : url.startsWith("file://");
+    if (!allowed) {
+      event.preventDefault();
+      if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+    }
+  });
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
 
   if (isDev) {
     void mainWindow.loadURL(DEV_URL);

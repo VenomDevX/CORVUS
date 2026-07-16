@@ -38,6 +38,17 @@ function CodeBlock({ language, value }: { language: string; value: string }) {
 
 /** Markdown renderer for chat bubbles: GFM tables, code with copy button,
  * inline images, and links that open in the system browser. */
+
+function isSafeUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return ["http:", "https:", "mailto:"].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
 export function MarkdownContent({ content }: { content: string }) {
   return (
     <div className="markdown space-y-2 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-white/10 [&_th]:bg-white/5 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5">
@@ -49,7 +60,11 @@ export function MarkdownContent({ content }: { content: string }) {
               href={href}
               onClick={(e) => {
                 e.preventDefault();
-                if (href) void (window.corvus?.openExternal(href) ?? window.open(href, "_blank"));
+                if (isSafeUrl(href)) {
+                  void (window.corvus?.openExternal(href!) ?? window.open(href, "_blank"));
+                } else {
+                  console.warn(`Blocked unsafe URL: ${href}`);
+                }
               }}
               className="text-accent-bright underline decoration-accent/40 hover:decoration-accent-bright"
             >

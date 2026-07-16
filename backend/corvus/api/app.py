@@ -135,11 +135,17 @@ def create_app(
     if launch_token:
         app.add_middleware(TokenAuthMiddleware, token=launch_token)
 
-    # The server binds to loopback only; the Electron renderer's origin varies
-    # (vite dev server / file://), so allow any origin on this local socket.
+    # Tight CORS (SECURITY.md item 7): the packaged renderer loads from
+    # file:// (Origin "null"); the Vite dev-server origins are allowed only
+    # when running from source, never in a frozen build.
+    import sys
+
+    allowed_origins = ["null", "file://"]
+    if not getattr(sys, "frozen", False):
+        allowed_origins += ["http://localhost:5173", "http://127.0.0.1:5173"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )

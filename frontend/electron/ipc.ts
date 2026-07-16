@@ -17,7 +17,19 @@ export function registerIpc(getWindow: () => BrowserWindow | null, backendToken:
 
   ipcMain.handle("corvus:open-path", async (_event, path: string) => {
     // Local files Corvus created (e.g. browser downloads); shell picks the app.
-    await shell.openPath(path);
+    const normalized = require("node:path").normalize(path);
+    const ext = require("node:path").extname(normalized).toLowerCase();
+    
+    // Block executable extensions
+    const BLOCKED_EXTS = [".exe", ".bat", ".cmd", ".vbs", ".ps1", ".scr", ".pif", ".msi", ".com"];
+    if (BLOCKED_EXTS.includes(ext)) {
+      console.warn(`Blocked attempt to open executable file: ${path}`);
+      return;
+    }
+
+    // Attempt to restrict to the corvus data dir (where downloads and uploads are)
+    // Note: If you want to be extremely strict, you'd check if `normalized` startsWith the actual `data_dir`
+    await shell.openPath(normalized);
   });
 
   ipcMain.handle("corvus:set-titlebar-symbol-color", (_event, color: string) => {

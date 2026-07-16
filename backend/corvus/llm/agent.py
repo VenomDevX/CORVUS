@@ -21,6 +21,7 @@ from typing import Any
 import structlog
 
 from ..actions.registry import ActionResult, Registry
+from ..untrusted import UNTRUSTED_RULE
 from .base import LLMProvider, Message, ToolCall, TurnResult
 
 log = structlog.get_logger("corvus")
@@ -183,6 +184,8 @@ def agent_system_prompt(registry: Registry) -> str:
         "you don't need to ask separately, just make the call. If a tool result reports "
         "a failure, tell the user plainly. Only use actions that exist below; for "
         "anything else, just answer normally without emitting JSON.",
+        "",
+        UNTRUSTED_RULE,
         "",
         "Available actions:",
     ]

@@ -161,6 +161,7 @@ export interface Plugin {
   actions: string[];
   error: string | null;
   bundled: boolean;
+  code_hash: string | null;
 }
 
 export interface WorkflowStep {

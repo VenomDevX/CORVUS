@@ -40,6 +40,15 @@ export function PluginCard({ plugin, onChange }: { plugin: Plugin; onChange: () 
           </div>
           <p className="mt-1 text-body-sm text-fg-muted">{plugin.description}</p>
           <p className="mt-0.5 text-caption text-fg-faint">by {plugin.author}</p>
+          {plugin.code_hash && (
+            <p className="mt-0.5 text-caption text-fg-faint">
+              Code hash{" "}
+              <code className="rounded-sm bg-white/10 px-1 font-mono text-mono">
+                {plugin.code_hash.slice(0, 12)}
+              </code>
+              {" — "}enabling approves exactly this code; if it changes, Corvus asks again.
+            </p>
+          )}
         </div>
         <button
           onClick={() => void toggleEnabled()}

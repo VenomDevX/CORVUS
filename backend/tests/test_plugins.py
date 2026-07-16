@@ -62,6 +62,48 @@ def test_catalog_reports_state(manager):
     assert catalog["text-tools"]["bundled"] is True
 
 
+def _write_user_plugin(manager, body: str, pid: str = "hashy") -> None:
+    d = manager.user_dir() / pid
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "manifest.json").write_text(json.dumps({
+        "id": pid, "name": "Hashy", "version": "1", "description": "d", "author": "a",
+        "permissions": [],
+    }))
+    (d / "plugin.py").write_text(body)
+
+
+_PLUGIN_V1 = (
+    "def register(ctx):\n"
+    "    ctx.action('ping', 'ping', {'type': 'object', 'properties': {}},\n"
+    "               lambda: {'ok': True})\n"
+)
+_PLUGIN_V2 = _PLUGIN_V1 + "# changed\n"
+
+
+def test_code_change_blocks_load_until_reapproved(manager, repo):
+    _write_user_plugin(manager, _PLUGIN_V1)
+    manager.discover()
+    assert manager.enable("hashy")["loaded"] is True
+
+    # The code changes on disk; a fresh manager (new app run) must refuse it.
+    _write_user_plugin(manager, _PLUGIN_V2)
+    fresh = PluginManager(repo, Registry())
+    fresh.load_enabled()
+    assert "hashy" not in fresh.loaded
+    assert "changed" in fresh.errors["hashy"]
+    assert not any("hashy" in a.name for a in fresh.registry.all())
+
+    # Re-enabling is the re-approval: it pins the new hash and loads.
+    assert fresh.enable("hashy")["loaded"] is True
+
+
+def test_catalog_exposes_code_hash(manager):
+    manager.discover()
+    catalog = {p["id"]: p for p in manager.catalog()}
+    h = catalog["text-tools"]["code_hash"]
+    assert isinstance(h, str) and len(h) == 64
+
+
 def test_manifest_validation(tmp_path):
     (tmp_path / "manifest.json").write_text(json.dumps({"id": "x", "name": "X"}))
     with pytest.raises(PluginError, match="missing"):

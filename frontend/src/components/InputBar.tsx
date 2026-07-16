@@ -100,7 +100,22 @@ export function InputBar() {
 
   function addFiles(list: FileList | null) {
     if (!list) return;
-    const next = Array.from(list).map((f) => ({
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+    const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf", "text/plain", "text/markdown", "text/csv"];
+    
+    const validFiles = Array.from(list).filter((f) => {
+      if (f.size > MAX_SIZE) {
+        console.warn(`File ${f.name} exceeds the 50MB limit.`);
+        return false;
+      }
+      if (!ALLOWED_TYPES.includes(f.type) && !f.type.startsWith("image/")) {
+        console.warn(`File type ${f.type} is not supported.`);
+        return false;
+      }
+      return true;
+    });
+
+    const next = validFiles.map((f) => ({
       name: f.name,
       size: f.size,
       type: f.type || "application/octet-stream",

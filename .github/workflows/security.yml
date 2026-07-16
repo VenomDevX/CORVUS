@@ -1,0 +1,40 @@
+# Supply-chain checks (SECURITY.md item 10): naming guard plus dependency
+# audits for both ecosystems, on every push/PR and weekly for fresh advisories.
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Naming guard
+        run: node scripts/naming-guard.mjs
+
+      - name: npm audit (root)
+        run: npm audit --audit-level=high
+
+      - name: npm audit (frontend)
+        run: npm audit --audit-level=high
+        working-directory: frontend
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: pip-audit (backend)
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip install ./backend
+          pip-audit

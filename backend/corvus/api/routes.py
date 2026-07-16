@@ -200,6 +200,12 @@ def action_log(request: Request, limit: int = 100) -> list[dict]:
     return request.app.state.repo.list_actions(min(limit, 500))
 
 
+# Upload hardening (SECURITY.md item 9): streamed to disk in chunks with a
+# hard size cap, filename reduced to a safe character set (no path separators,
+# so no traversal out of the uploads dir).
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+
 @router.post("/upload")
 async def upload(file: UploadFile = File(...)) -> dict:
     """Save a user-attached file so agent actions (e.g. describe_image) can read
@@ -207,8 +213,24 @@ async def upload(file: UploadFile = File(...)) -> dict:
     uploads = data_dir() / "uploads"
     uploads.mkdir(parents=True, exist_ok=True)
     safe_name = "".join(c for c in (file.filename or "file") if c.isalnum() or c in "._- ")
-    dest = uploads / f"{datetime.now():%Y%m%d-%H%M%S}-{safe_name}"
-    dest.write_bytes(await file.read())
+    dest = uploads / f"{datetime.now():%Y%m%d-%H%M%S}-{safe_name or 'file'}"
+
+    bytes_read = 0
+    try:
+        with open(dest, "wb") as f:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                bytes_read += len(chunk)
+                if bytes_read > MAX_UPLOAD_BYTES:
+                    raise HTTPException(413, "File exceeds the 50MB upload limit")
+                f.write(chunk)
+    except HTTPException:
+        # Unlink only after the handle is closed — Windows can't delete open files.
+        dest.unlink(missing_ok=True)
+        raise
+
     return {"path": str(dest), "filename": safe_name}
 
 

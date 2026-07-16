@@ -9,6 +9,7 @@ registry.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 from pathlib import Path
 
@@ -29,6 +30,10 @@ def _enabled_key(pid: str) -> str:
 
 def _perms_key(pid: str) -> str:
     return f"plugin:{pid}:perms"
+
+
+def _hash_key(pid: str) -> str:
+    return f"plugin:{pid}:hash"
 
 
 class PluginManager:
@@ -67,6 +72,16 @@ class PluginManager:
         raw = self.repo.get_setting(_perms_key(pid)) or ""
         return {p for p in raw.split(",") if p}
 
+    def code_hash(self, manifest: PluginManifest) -> str | None:
+        """SHA-256 of the plugin's entry file — what the user approves on enable."""
+        entry = manifest.path / manifest.entry
+        if not entry.exists():
+            return None
+        return hashlib.sha256(entry.read_bytes()).hexdigest()
+
+    def approved_hash(self, pid: str) -> str | None:
+        return self.repo.get_setting(_hash_key(pid))
+
     def set_permissions(self, pid: str, granted: list[str]) -> None:
         self.repo.set_setting(_perms_key(pid), ",".join(sorted(set(granted))))
         # Reload so the action surface matches the new grants.
@@ -77,9 +92,14 @@ class PluginManager:
                 self._load_one(manifest)
 
     def enable(self, pid: str) -> dict:
+        """Enable is the consent moment: it pins the current code hash, so the
+        user approves exactly the plugin.py they were shown (SECURITY.md item 4)."""
         self.repo.set_setting(_enabled_key(pid), "true")
         if pid in self.manifests:
             manifest = self.manifests[pid]
+            current = self.code_hash(manifest)
+            if current:
+                self.repo.set_setting(_hash_key(pid), current)
             missing = set(manifest.permissions) - self.granted_permissions(pid)
             if not missing:
                 self._load_one(manifest)
@@ -115,6 +135,20 @@ class PluginManager:
         if not entry.exists():
             self.errors[manifest.id] = f"entry file {manifest.entry} not found"
             return
+        # Refuse to run code the user hasn't approved: the hash pinned at
+        # enable time must match the entry file on disk. A change (edit,
+        # update, tampering) requires an explicit re-enable to re-approve.
+        current = self.code_hash(manifest)
+        approved = self.approved_hash(manifest.id)
+        if approved != current:
+            self.errors[manifest.id] = (
+                "plugin code changed since it was approved — disable and re-enable "
+                "it to review and approve the new version"
+            )
+            log.warning(
+                "plugin_hash_mismatch", plugin=manifest.id, approved=approved, current=current
+            )
+            return
         try:
             spec = importlib.util.spec_from_file_location(f"corvus_plugin_{manifest.id}", entry)
             module = importlib.util.module_from_spec(spec)
@@ -149,5 +183,6 @@ class PluginManager:
                 "actions": self.loaded.get(pid, []),
                 "error": self.errors.get(pid),
                 "bundled": (m.path.parent == _BUNDLED),
+                "code_hash": self.code_hash(m),
             })
         return out

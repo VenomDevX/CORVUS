@@ -199,3 +199,26 @@ def test_logs_endpoint_returns_structured_entries(tmp_path, fake_provider):
     entries = client.get("/logs?limit=50").json()
     assert isinstance(entries, list)
     assert any(e.get("event") == "corvus_start" for e in entries)
+
+
+def test_upload_size_cap(tmp_path, fake_provider, monkeypatch):
+    import corvus.api.routes as routes
+
+    client = make_client(tmp_path, fake_provider)
+    monkeypatch.setattr(routes, "MAX_UPLOAD_BYTES", 10)
+
+    ok = client.post("/upload", files={"file": ("note.txt", b"tiny")})
+    assert ok.status_code == 200
+    assert ok.json()["filename"] == "note.txt"
+
+    too_big = client.post("/upload", files={"file": ("big.bin", b"x" * 11)})
+    assert too_big.status_code == 413
+
+
+def test_upload_sanitizes_filename(tmp_path, fake_provider):
+    client = make_client(tmp_path, fake_provider)
+    res = client.post("/upload", files={"file": ("..\\..\\evil<>.txt", b"data")})
+    assert res.status_code == 200
+    body = res.json()
+    assert "\\" not in body["filename"] and "/" not in body["filename"]
+    assert "<" not in body["filename"]

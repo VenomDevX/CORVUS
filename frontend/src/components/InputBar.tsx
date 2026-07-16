@@ -65,11 +65,36 @@ export function InputBar() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const [uploading, setUploading] = useState(false);
+  const [model, setModel] = useState("");
+  const [models, setModels] = useState<string[]>([]);
 
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 48,
     maxHeight: 150,
   });
+
+  // Active model + the provider's catalog for the inline picker.
+  useEffect(() => {
+    if (!backendOnline) return;
+    void (async () => {
+      try {
+        const [settings, list] = await Promise.all([api.getSettings(), api.listModels()]);
+        setModel(settings.model ?? "");
+        setModels(list.models);
+      } catch {
+        setModels([]);
+      }
+    })();
+  }, [backendOnline]);
+
+  async function changeModel(next: string) {
+    setModel(next);
+    try {
+      await api.updateSettings({ model: next });
+    } catch {
+      /* picker is best-effort; Settings has the full editor */
+    }
+  }
 
   async function submit() {
     const body = text.trim();
@@ -216,6 +241,22 @@ export function InputBar() {
             </Tooltip>
             <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
             <input ref={fileInput} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
+            {models.length > 0 && (
+              <Tooltip content="Model for this chat" relationship="label">
+                <select
+                  value={model}
+                  onChange={(e) => void changeModel(e.target.value)}
+                  aria-label="Model"
+                  className="ml-1 h-8 max-w-44 cursor-pointer truncate rounded bg-transparent px-2 text-caption text-neutral-500 outline-none transition-colors hover:bg-neutral-200 hover:text-black dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-white"
+                >
+                  {(models.includes(model) ? models : [model, ...models]).filter(Boolean).map((m) => (
+                    <option key={m} value={m} className="bg-surface text-fg">
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </Tooltip>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

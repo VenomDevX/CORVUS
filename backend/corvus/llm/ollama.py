@@ -6,9 +6,16 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
+import structlog
 
 from ..config import OLLAMA_URL
 from .base import Delta, Message, ToolCall
+
+log = structlog.get_logger("corvus")
+
+# Models Ollama rejected with "does not support tools" (400): remembered for
+# the process lifetime so later turns skip the doomed with-tools attempt.
+_no_tools_models: set[str] = set()
 
 
 def _parse_tool_calls(message: dict) -> list[ToolCall]:
@@ -138,10 +145,9 @@ class OllamaProvider:
     async def stream_chat_with_tools(
         self, messages: list[Message], model: str, tools: list[dict[str, Any]]
     ) -> AsyncIterator[Delta]:
-        payload = {
+        base_payload = {
             "model": model,
             "messages": _to_wire(messages),
-            "tools": tools,
             "stream": True,
             # Bound the context so the KV cache fits modest GPUs; the tool
             # schemas + short history stay well under this.
@@ -150,6 +156,12 @@ class OllamaProvider:
         valid_names = {
             t["function"]["name"] for t in tools if isinstance(t.get("function"), dict)
         }
+        # Ollama rejects the whole request with 400 when a model lacks tool
+        # support (e.g. deepseek-coder). Fall back to a plain request - the
+        # agent system prompt makes such models emit calls as JSON content,
+        # which the held-buffer recovery below still picks up.
+        attempts = ["plain"] if (model in _no_tools_models or not tools) else ["tools", "plain"]
+
         # Some models write a tool call as JSON content rather than using the
         # structured field, often after a sentence of narration. Stream prose
         # normally, but once a JSON-object region begins, hold from there to the
@@ -158,7 +170,24 @@ class OllamaProvider:
         emitted = 0
 
         async with self._client(timeout=300.0) as client:
-            async with client.stream("POST", "/api/chat", json=payload) as response:
+            response = None
+            for attempt in attempts:
+                payload = dict(base_payload)
+                if attempt == "tools":
+                    payload["tools"] = tools
+                stream_ctx = client.stream("POST", "/api/chat", json=payload)
+                response = await stream_ctx.__aenter__()
+                if attempt == "tools" and response.status_code == 400:
+                    body = (await response.aread()).decode("utf-8", errors="replace")
+                    await stream_ctx.__aexit__(None, None, None)
+                    if "tool" in body.lower():
+                        _no_tools_models.add(model)
+                        log.info("ollama_tools_unsupported", model=model)
+                        continue
+                    raise RuntimeError(f"Ollama error: {body}")
+                break
+
+            try:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     if not line.strip():
@@ -193,6 +222,8 @@ class OllamaProvider:
                         else:
                             yield Delta(content="", done=True)
                         return
+            finally:
+                await stream_ctx.__aexit__(None, None, None)
 
     async def complete(self, messages: list[Message], model: str) -> str:
         """Non-streaming convenience used by the memory extractor."""

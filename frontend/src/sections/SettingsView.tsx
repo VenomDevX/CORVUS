@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { useCorvus } from "../state/store";
 import { Orb } from "../components/Orb";
 import { ProviderSettings } from "../components/ProviderSettings";
+import { OllamaModels } from "../components/OllamaModels";
 import { AboutSettings } from "../components/AboutSettings";
 import { ORB_STATES, type OrbState } from "../lib/tokens";
 
@@ -62,6 +63,19 @@ export function SettingsView() {
             machine.
           </p>
           <ProviderSettings />
+        </section>
+
+        <section className="glass rounded-lg p-4">
+          <h2 className="mb-1 text-h4">Offline models</h2>
+          <p className="mb-3 text-body-sm text-fg-muted">
+            Download more local models right here — each is annotated with how well it fits this
+            device. Downloads are one-time and everything runs on your PC.
+          </p>
+          {backendOnline ? (
+            <OllamaModels />
+          ) : (
+            <p className="text-body-sm text-danger">Corvus core is offline.</p>
+          )}
         </section>
 
         <section className="glass rounded-lg p-4">

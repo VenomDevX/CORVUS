@@ -23,6 +23,7 @@ export function applyThemeVars(theme: Theme) {
           "--c-fg-faint": color.fg.faint,
           "--glass-fill": color.glass.fill,
           "--glass-border": color.glass.border,
+          "--c-accent": color.accent["electric-blue"],
         }
       : {
           "--c-bg": color.light.bg.base,
@@ -34,6 +35,7 @@ export function applyThemeVars(theme: Theme) {
           "--c-fg-faint": color.light.fg.faint,
           "--glass-fill": color.light.glass.fill,
           "--glass-border": color.light.glass.border,
+          "--c-accent": color.accent["electric-blue"],
         };
 
   for (const [key, value] of Object.entries(vars)) root.style.setProperty(key, value);

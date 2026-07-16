@@ -7,9 +7,22 @@
 :root {
   color-scheme: dark;
   --glass-blur: 16px;
+  /* Liquid-glass effect layers (white at low alpha reads as light catching
+     the surface, not a palette color; fills/borders still come from tokens). */
+  --liquid-blur: 28px;
+  --liquid-highlight: rgba(255, 255, 255, 0.22);
+  --liquid-sheen: rgba(255, 255, 255, 0.08);
+  --liquid-sheen-weak: rgba(255, 255, 255, 0.03);
+  --liquid-shade: rgba(0, 0, 0, 0.18);
+  --liquid-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
 }
 :root[data-theme="light"] {
   color-scheme: light;
+  --liquid-highlight: rgba(255, 255, 255, 0.85);
+  --liquid-sheen: rgba(255, 255, 255, 0.45);
+  --liquid-sheen-weak: rgba(255, 255, 255, 0.15);
+  --liquid-shade: rgba(0, 0, 0, 0.06);
+  --liquid-shadow: 0 8px 28px rgba(11, 18, 32, 0.12);
 }
 
 :root[data-theme="light"] img[src="./logo.png"] {
@@ -39,6 +52,51 @@ body {
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+/* Liquid glass: deeper blur with saturation so background color bleeds
+   through, a diagonal sheen, a specular top edge, and soft depth. */
+.liquid-glass {
+  background:
+    linear-gradient(
+      135deg,
+      var(--liquid-sheen) 0%,
+      var(--liquid-sheen-weak) 35%,
+      transparent 55%,
+      var(--liquid-sheen-weak) 100%
+    ),
+    var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 var(--liquid-highlight),
+    inset 0 -1px 0 var(--liquid-shade),
+    var(--liquid-shadow);
+}
+
+/* Accent-tinted liquid glass (user chat bubbles). */
+.liquid-glass-accent {
+  background:
+    linear-gradient(
+      135deg,
+      var(--liquid-sheen) 0%,
+      var(--liquid-sheen-weak) 35%,
+      transparent 55%,
+      var(--liquid-sheen-weak) 100%
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--c-accent) 22%, transparent),
+      color-mix(in srgb, var(--c-accent) 22%, transparent)
+    ),
+    var(--glass-fill);
+  border: 1px solid color-mix(in srgb, var(--c-accent) 35%, var(--glass-border));
+  backdrop-filter: blur(var(--liquid-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 var(--liquid-highlight),
+    inset 0 -1px 0 var(--liquid-shade),
+    var(--liquid-shadow);
 }
 
 .titlebar-drag {

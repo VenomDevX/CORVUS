@@ -141,7 +141,7 @@ export function InputBar() {
         </div>
       )}
       
-      <div className="relative glass rounded-xl shadow-glass-1">
+      <div className="relative liquid-glass rounded-xl">
         <Textarea
           ref={textareaRef}
           value={text}

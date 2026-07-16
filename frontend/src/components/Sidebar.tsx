@@ -35,7 +35,7 @@ export function Sidebar() {
   const backendOnline = useCorvus((s) => s.backendOnline);
 
   return (
-    <nav className="glass flex h-full w-56 flex-col rounded-lg p-3" aria-label="Corvus sections">
+    <nav className="liquid-glass flex h-full w-56 flex-col rounded-xl p-3" aria-label="Corvus sections">
       <div className="mb-4 flex items-center gap-2 px-2 pt-1">
         <img src="./logo.png" alt="" className="h-8 w-8" />
         <span className="text-h4 tracking-tight">Corvus</span>

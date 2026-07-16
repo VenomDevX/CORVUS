@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type ProviderInfo } from "../lib/api";
 import { useCorvus } from "../state/store";
+import { Select } from "./ui/Select";
 
 /** AI provider + model selection with encrypted per-provider API keys.
  * Providers other than local Ollama need a key, stored via Windows DPAPI. */
@@ -80,23 +81,19 @@ export function ProviderSettings() {
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-1 block text-body-sm text-fg-muted" htmlFor="provider">
-          Provider
-        </label>
-        <select
-          id="provider"
+        <label className="mb-1 block text-body-sm text-fg-muted">Provider</label>
+        <Select
+          className="w-72"
+          ariaLabel="Provider"
           value={active}
           disabled={busy}
-          onChange={(e) => void switchProvider(e.target.value)}
-          className="w-72 rounded border border-white/10 bg-surface px-3 py-2 text-body text-fg outline-none focus:border-accent"
-        >
-          {providers.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.label}
-              {p.needs_key && !p.has_key ? " — key needed" : ""}
-            </option>
-          ))}
-        </select>
+          onChange={(next) => void switchProvider(next)}
+          options={providers.map((p) => ({
+            value: p.name,
+            label: p.label,
+            hint: p.needs_key && !p.has_key ? "key needed" : undefined,
+          }))}
+        />
       </div>
 
       {current?.needs_key && (
@@ -159,18 +156,15 @@ export function ProviderSettings() {
         {needsKey ? (
           <p className="text-body-sm text-warning">Add an API key to load {current?.label} models.</p>
         ) : models.length > 0 ? (
-          <select
-            id="model"
+          <Select
+            className="w-72"
+            ariaLabel="Model"
             value={model}
-            onChange={(e) => void changeModel(e.target.value)}
-            className="w-72 rounded border border-white/10 bg-surface px-3 py-2 text-body text-fg outline-none focus:border-accent"
-          >
-            {(models.includes(model) ? models : [model, ...models]).filter(Boolean).map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+            onChange={(next) => void changeModel(next)}
+            options={(models.includes(model) ? models : [model, ...models])
+              .filter(Boolean)
+              .map((m) => ({ value: m }))}
+          />
         ) : (
           <input
             id="model"

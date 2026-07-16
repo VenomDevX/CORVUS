@@ -1,6 +1,7 @@
 import { useCorvus, type Section } from "../state/store";
 import {
   MessageSquare,
+  AudioLines,
   Clock,
   Brain,
   CheckSquare,
@@ -19,6 +20,7 @@ interface Item {
 
 const ITEMS: Item[] = [
   { key: "chat", label: "Chat", icon: <MessageSquare className="h-4 w-4" /> },
+  { key: "studio", label: "Voice Studio", icon: <AudioLines className="h-4 w-4" /> },
   { key: "history", label: "History", icon: <Clock className="h-4 w-4" /> },
   { key: "memory", label: "Memory", icon: <Brain className="h-4 w-4" /> },
   { key: "tasks", label: "Tasks", icon: <CheckSquare className="h-4 w-4" /> },

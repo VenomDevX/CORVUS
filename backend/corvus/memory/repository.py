@@ -123,6 +123,34 @@ class Repository:
             self.conn.execute("SELECT * FROM action_log ORDER BY id DESC LIMIT ?", (limit,))
         )
 
+    # -- voiceovers (Voice Studio) -------------------------------------------
+
+    def add_voiceover(
+        self, text: str, engine: str, voice: str,
+        rate: int, pitch: int, volume: int, filename: str,
+    ) -> dict[str, Any]:
+        cur = self.conn.execute(
+            "INSERT INTO voiceovers (text, engine, voice, rate, pitch, volume, filename)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *",
+            (text, engine, voice, rate, pitch, volume, filename),
+        )
+        row = dict(cur.fetchone())
+        self.conn.commit()
+        return row
+
+    def list_voiceovers(self) -> list[dict[str, Any]]:
+        return _rows(self.conn.execute("SELECT * FROM voiceovers ORDER BY id DESC"))
+
+    def get_voiceover(self, voiceover_id: int) -> dict[str, Any] | None:
+        cur = self.conn.execute("SELECT * FROM voiceovers WHERE id = ?", (voiceover_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+    def delete_voiceover(self, voiceover_id: int) -> bool:
+        cur = self.conn.execute("DELETE FROM voiceovers WHERE id = ?", (voiceover_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
     # -- reminders ---------------------------------------------------------
 
     def add_reminder(self, text: str, kind: str, fire_at: str) -> dict[str, Any]:

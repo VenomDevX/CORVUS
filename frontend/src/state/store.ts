@@ -13,6 +13,7 @@ import type { OrbState } from "../lib/tokens";
 
 export type Section =
   | "chat"
+  | "studio"
   | "history"
   | "memory"
   | "tasks"

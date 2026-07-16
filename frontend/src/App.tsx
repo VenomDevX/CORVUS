@@ -12,6 +12,7 @@ import { VoiceMode } from "./components/VoiceMode";
 import { NotificationsLayer } from "./components/NotificationsLayer";
 import { OnboardingSetup } from "./components/OnboardingSetup";
 import { HistoryView } from "./sections/HistoryView";
+import { StudioView } from "./sections/StudioView";
 import { MemoryView } from "./sections/MemoryView";
 import { SettingsView } from "./sections/SettingsView";
 import { LogsView } from "./sections/LogsView";
@@ -35,6 +36,7 @@ const lightTheme = createLightTheme(corvusBrand);
 
 const SECTIONS: Record<Section, () => JSX.Element> = {
   chat: ChatView,
+  studio: StudioView,
   history: HistoryView,
   memory: MemoryView,
   settings: SettingsView,

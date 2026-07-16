@@ -40,17 +40,17 @@ export function ChatView() {
               return (
                 <div key={"id" in m ? m.id : i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
                   {m.role === "user" ? (
-                    <div className="max-w-[80%] rounded-lg px-4 py-3 bg-accent/20 text-fg">
+                    <div className="liquid-glass-accent max-w-[80%] rounded-xl px-4 py-3 text-fg">
                       {m.content && <MarkdownContent content={m.content} />}
                     </div>
                   ) : (
                     <>
                       {m.content ? (
-                        <div className="max-w-[80%] rounded-lg px-4 py-3 glass text-fg shadow-glass-1">
+                        <div className="liquid-glass max-w-[80%] rounded-xl px-4 py-3 text-fg">
                           <MarkdownContent content={m.content} />
                         </div>
                       ) : actions && actions.length > 0 ? (
-                        <div className="max-w-[80%] rounded-lg px-4 py-3 glass text-fg shadow-glass-1">
+                        <div className="liquid-glass max-w-[80%] rounded-xl px-4 py-3 text-fg">
                           <span className="text-fg-muted">Corvus is working…</span>
                         </div>
                       ) : (

@@ -87,6 +87,11 @@ export function OllamaModels() {
         <div className="min-w-0">
           <span className="text-body-sm font-semibold text-fg">
             {label}
+            {isInstalled && (
+              <span className="ml-2 rounded-sm bg-success/15 px-1.5 py-0.5 text-caption text-success">
+                Installed ✓
+              </span>
+            )}
             {isActive && (
               <span className="ml-2 rounded-sm bg-accent/25 px-1.5 py-0.5 text-caption text-accent-bright">
                 In use

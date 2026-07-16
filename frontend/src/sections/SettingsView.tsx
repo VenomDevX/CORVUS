@@ -6,6 +6,7 @@ import { useCorvus } from "../state/store";
 import { Orb } from "../components/Orb";
 import { ProviderSettings } from "../components/ProviderSettings";
 import { OllamaModels } from "../components/OllamaModels";
+import { Select } from "../components/ui/Select";
 import { AboutSettings } from "../components/AboutSettings";
 import { ORB_STATES, type OrbState } from "../lib/tokens";
 
@@ -91,22 +92,15 @@ export function SettingsView() {
             label={`Always listening for “Hey Corvus”: ${voice.wakeEnabled ? "on" : "off"}`}
           />
           <div className="mt-3">
-            <label className="mb-1 block text-body-sm text-fg-muted" htmlFor="tts-voice">
-              Voice
-            </label>
-            <select
-              id="tts-voice"
+            <label className="mb-1 block text-body-sm text-fg-muted">Voice</label>
+            <Select
+              className="w-72"
+              ariaLabel="Assistant voice"
               value={ttsVoice}
               disabled={!backendOnline}
-              onChange={(e) => void changeTtsVoice(e.target.value)}
-              className="w-72 rounded border border-white/10 bg-surface px-3 py-2 text-body text-fg outline-none focus:border-accent"
-            >
-              {TTS_VOICES.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
+              onChange={(next) => void changeTtsVoice(next)}
+              options={TTS_VOICES.map((v) => ({ value: v }))}
+            />
           </div>
         </section>
 

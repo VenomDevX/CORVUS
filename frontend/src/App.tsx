@@ -57,7 +57,15 @@ export default function App() {
   const connectVoiceSocket = useCorvus((s) => s.connectVoiceSocket);
   const Body = SECTIONS[section];
 
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  // null = not yet known (don't flash the wizard); persisted in backend settings.
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!backendOnline || onboardingComplete !== null) return;
+    void api
+      .getSettings()
+      .then((s) => setOnboardingComplete(s.onboarding_complete))
+      .catch(() => undefined);
+  }, [backendOnline, onboardingComplete]);
 
   // Keep the voice socket up whenever the backend is reachable, so a wake
   // word can summon voice mode even while the user is typing.
@@ -112,7 +120,9 @@ export default function App() {
   return (
     <FluentProvider theme={theme === "dark" ? darkTheme : lightTheme} className="h-full !bg-transparent">
       <div className="app-bg relative flex h-full flex-col">
-        {!onboardingComplete && <OnboardingSetup onComplete={() => setOnboardingComplete(true)} />}
+        {onboardingComplete === false && (
+          <OnboardingSetup onComplete={() => setOnboardingComplete(true)} />
+        )}
         <NotificationsLayer />
         <AnimatePresence>{voiceMode && <VoiceMode />}</AnimatePresence>
         {/* Draggable titlebar strip (native window buttons overlay the right edge) */}

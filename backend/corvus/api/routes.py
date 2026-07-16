@@ -20,6 +20,7 @@ class SettingsPatch(BaseModel):
     provider: str | None = None
     model: str | None = None
     tts_voice: str | None = None
+    onboarding_complete: bool | None = None
 
 
 class ApiKeyBody(BaseModel):
@@ -103,6 +104,7 @@ def get_settings(request: Request) -> dict:
         "provider": provider,
         "model": model,
         "tts_voice": repo.get_setting("tts_voice"),
+        "onboarding_complete": repo.get_setting("onboarding_complete") == "true",
     }
 
 
@@ -124,9 +126,19 @@ def patch_settings(request: Request, body: SettingsPatch) -> dict:
         repo.set_setting("tts_voice", body.tts_voice)
         if request.app.state.voice is not None:
             request.app.state.voice.speaker.voice = body.tts_voice
+    if body.onboarding_complete is not None:
+        repo.set_setting("onboarding_complete", "true" if body.onboarding_complete else "false")
     if reload_provider and hasattr(request.app.state.provider, "reload"):
         request.app.state.provider.reload()
     return get_settings(request)
+
+
+@router.get("/system/specs")
+async def system_specs() -> dict:
+    """Device specs + local-model fit recommendations (first-run setup)."""
+    from ..system_info import specs
+
+    return await specs()
 
 
 @router.get("/providers")

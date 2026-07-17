@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
+  CheckCircle2,
+  Cpu,
   Download,
   Loader2,
+  X,
   Play,
   Square,
   Trash2,
@@ -15,6 +19,13 @@ import {
   type MediaProfile,
 } from "../lib/api";
 import { useCorvus } from "../state/store";
+import { Select } from "../components/ui/Select";
+
+const FIT_LABEL: Record<ImageModel["fit"], { text: string; className: string }> = {
+  recommended: { text: "Recommended", className: "bg-success/15 text-success" },
+  ok: { text: "Runs on this PC", className: "bg-accent/15 text-accent-bright" },
+  too_big: { text: "Too big for this device", className: "bg-warning/15 text-warning" },
+};
 
 /* Shared building blocks for the Image / Video / Sound Effects pages —
  * same skeleton as the Speech page: prompt area left, black sidebar right. */
@@ -74,6 +85,7 @@ function PromptPanel({
   canGenerate,
   percent,
   error,
+  hint,
   children,
 }: {
   placeholder: string;
@@ -84,6 +96,7 @@ function PromptPanel({
   canGenerate: boolean;
   percent: number | null;
   error: string | null;
+  hint?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   return (
@@ -96,7 +109,11 @@ function PromptPanel({
       />
       <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-3 text-xs font-medium uppercase tracking-wider text-fg-faint">
         <span>{prompt.length.toLocaleString()} / 2,000 characters</span>
-        {error && <span className="text-danger normal-case">{error}</span>}
+        {error ? (
+          <span className="text-danger normal-case">{error}</span>
+        ) : (
+          hint && <span className="normal-case text-fg-muted">{hint}</span>
+        )}
       </div>
       <div className="mt-4 flex items-center justify-end gap-4">
         {percent !== null && (
@@ -169,19 +186,15 @@ function ChoiceRow<T extends string | number>({
   );
 }
 
-function ModelCard({
-  models,
-  onInstalled,
-}: {
-  models: ImageModel[];
-  onInstalled: () => void;
-}) {
-  const [downloading, setDownloading] = useState(false);
+/** Shared download runner with live GB progress. */
+function useModelDownload(onInstalled: () => void) {
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
 
   async function install(id: string) {
-    setDownloading(true);
+    if (downloadingId) return;
+    setDownloadingId(id);
     setError("");
     const timer = setInterval(() => {
       void api
@@ -201,39 +214,193 @@ function ModelCard({
       setError(e instanceof Error ? e.message : "download failed");
     } finally {
       clearInterval(timer);
-      setDownloading(false);
+      setDownloadingId(null);
       setProgress("");
     }
   }
+  return { downloadingId, progress, error, install };
+}
+
+function DownloadButton({
+  model,
+  downloadingId,
+  progress,
+  onInstall,
+}: {
+  model: ImageModel;
+  downloadingId: string | null;
+  progress: string;
+  onInstall: (id: string) => void;
+}) {
+  if (model.installed)
+    return (
+      <span className="flex items-center gap-1 text-caption text-success">
+        <CheckCircle2 className="h-3.5 w-3.5" /> Installed
+      </span>
+    );
+  if (model.fit === "too_big")
+    return <span className="text-caption text-warning">Needs more memory</span>;
+  const busy = downloadingId === model.id;
+  return (
+    <button
+      onClick={() => onInstall(model.id)}
+      disabled={downloadingId !== null}
+      className="flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-50"
+    >
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+      {busy ? progress || "Downloading…" : `Download · ${model.download_gb} GB`}
+    </button>
+  );
+}
+
+/** Sidebar model chooser: dropdown of all catalog models with device-fit
+ * annotations plus a download button for the selected one. */
+function ModelPicker({
+  models,
+  value,
+  onChange,
+  onInstalled,
+}: {
+  models: ImageModel[];
+  value: string;
+  onChange: (id: string) => void;
+  onInstalled: () => void;
+}) {
+  const dl = useModelDownload(onInstalled);
+  const selected = models.find((m) => m.id === value);
 
   return (
-    <div className="space-y-2">
-      {models.map((m) => (
-        <div key={m.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] font-semibold text-white">{m.label}</span>
-            {m.installed ? (
-              <span className="text-caption text-success">Installed ✓</span>
-            ) : (
-              <button
-                onClick={() => void install(m.id)}
-                disabled={downloading}
-                className="flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-50"
-              >
-                {downloading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Download className="h-3.5 w-3.5" />
-                )}
-                {downloading ? progress || "Downloading…" : `${m.download_gb} GB`}
-              </button>
-            )}
+    <div className="space-y-2.5">
+      <Select
+        ariaLabel="Image model"
+        value={value}
+        onChange={onChange}
+        options={models.map((m) => ({
+          value: m.id,
+          label: `${m.label} — ${FIT_LABEL[m.fit].text}${m.installed ? " · Installed ✓" : ""}`,
+        }))}
+      />
+      {selected && (
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className={`rounded-sm px-1.5 py-0.5 text-caption ${FIT_LABEL[selected.fit].className}`}
+            >
+              {FIT_LABEL[selected.fit].text}
+            </span>
+            <DownloadButton
+              model={selected}
+              downloadingId={dl.downloadingId}
+              progress={dl.progress}
+              onInstall={(id) => void dl.install(id)}
+            />
           </div>
-          <p className="mt-1 text-caption text-gray-500">{m.blurb}</p>
-          {error && <p className="mt-1 text-caption text-danger">{error}</p>}
-        </div>
-      ))}
+          <p className="text-caption text-gray-500">{selected.blurb}</p>
+          {dl.error && <p className="text-caption text-danger">{dl.error}</p>}
+        </>
+      )}
     </div>
+  );
+}
+
+/** "Learn more" popup: what local generation is, this device's tier, and the
+ * full model catalog with compatibility + install actions. */
+function ModelInfoDialog({
+  open,
+  onClose,
+  models,
+  profile,
+  onInstalled,
+}: {
+  open: boolean;
+  onClose: () => void;
+  models: ImageModel[];
+  profile: MediaProfile | null;
+  onInstalled: () => void;
+}) {
+  const dl = useModelDownload(onInstalled);
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.12 }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
+        >
+          <motion.div
+            className="liquid-glass w-full max-w-lg rounded-2xl p-6"
+            initial={{ opacity: 0, scale: 0.97, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: 8 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            role="dialog"
+            aria-label="About local image models"
+          >
+            <div className="mb-1 flex items-start justify-between">
+              <h2 className="text-h3 tracking-tight text-fg">Local image models</h2>
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="rounded p-1 text-fg-muted transition-colors duration-fast hover:bg-white/10 hover:text-fg"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-3 text-body-sm text-fg-muted">
+              Images and video keyframes are generated entirely on this PC — nothing is uploaded.
+              A model is a one-time download; after that, generation works offline forever. Video
+              clips are built from image keyframes, so they use the same model.
+            </p>
+            {profile && (
+              <p className="mb-4 flex items-center gap-2 rounded bg-white/5 p-2.5 text-body-sm text-fg-muted">
+                <Cpu className="h-4 w-4 shrink-0 text-accent-bright" />
+                This device: {profile.tier === "high" ? "high-end" : profile.tier === "mid" ? "mid-range" : "compact"} tier ·
+                up to {profile.image_max_size}px · {profile.gpu_accelerated ? "GPU accelerated (DirectML)" : "CPU mode"}
+              </p>
+            )}
+            <div className="space-y-2">
+              {models.map((m) => (
+                <div key={m.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-body-sm font-semibold text-fg">{m.label}</span>
+                    <DownloadButton
+                      model={m}
+                      downloadingId={dl.downloadingId}
+                      progress={dl.progress}
+                      onInstall={(id) => void dl.install(id)}
+                    />
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className={`rounded-sm px-1.5 py-0.5 text-caption ${FIT_LABEL[m.fit].className}`}>
+                      {FIT_LABEL[m.fit].text}
+                    </span>
+                    <span className="text-caption text-fg-faint">{m.download_gb} GB download</span>
+                  </div>
+                  <p className="mt-1 text-caption text-fg-faint">{m.blurb}</p>
+                </div>
+              ))}
+            </div>
+            {dl.error && <p className="mt-2 text-caption text-danger">{dl.error}</p>}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function LearnMoreHint({ text, onOpen }: { text: string; onOpen: () => void }) {
+  return (
+    <span>
+      {text}{" "}
+      <button onClick={onOpen} className="underline decoration-dotted underline-offset-2 text-accent-bright hover:text-fg">
+        Learn more
+      </button>
+    </span>
   );
 }
 
@@ -284,8 +451,10 @@ function HistoryList({
 export function StudioImagePage() {
   const { backendOnline, profile, items, refresh } = useMediaData("image");
   const [models, setModels] = useState<ImageModel[]>([]);
+  const [model, setModel] = useState("");
   const [prompt, setPrompt] = useState("");
   const [size, setSize] = useState(512);
+  const [infoOpen, setInfoOpen] = useState(false);
   const job = useJob(() => void refresh());
 
   const loadModels = useCallback(() => void api.imageModels().then(setModels).catch(() => undefined), []);
@@ -293,16 +462,23 @@ export function StudioImagePage() {
     if (backendOnline) loadModels();
   }, [backendOnline, loadModels]);
 
+  // Default to the first installed model, else the recommended one.
+  useEffect(() => {
+    if (!model && models.length > 0)
+      setModel((models.find((m) => m.installed) ?? models[0]).id);
+  }, [models, model]);
+
   useEffect(() => {
     if (profile && size > profile.image_max_size) setSize(profile.image_max_size);
   }, [profile, size]);
 
-  const installed = models.some((m) => m.installed);
+  const selectedInstalled = models.find((m) => m.id === model)?.installed ?? false;
+  const anyInstalled = models.some((m) => m.installed);
 
   async function generate() {
     if (!prompt.trim()) return;
     try {
-      const { job_id } = await api.generateImage({ prompt: prompt.trim(), size });
+      const { job_id } = await api.generateImage({ prompt: prompt.trim(), size, model });
       job.track(job_id);
     } catch (e) {
       job.setError(e instanceof Error ? e.message : "failed to start");
@@ -311,15 +487,32 @@ export function StudioImagePage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col lg:flex-row">
+      <ModelInfoDialog
+        open={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        models={models}
+        profile={profile}
+        onInstalled={loadModels}
+      />
       <PromptPanel
         placeholder="Describe the image you want — subject, style, lighting…"
         prompt={prompt}
         setPrompt={setPrompt}
         onGenerate={() => void generate()}
         busy={job.busy}
-        canGenerate={backendOnline && installed && !job.busy && prompt.trim().length > 0}
+        canGenerate={backendOnline && selectedInstalled && !job.busy && prompt.trim().length > 0}
         percent={job.percent}
-        error={job.error ?? (!installed && backendOnline ? "Download the image model in Settings on the right to start." : null)}
+        error={job.error}
+        hint={
+          backendOnline && !anyInstalled ? (
+            <LearnMoreHint
+              text="Download an image model in the panel on the right to start."
+              onOpen={() => setInfoOpen(true)}
+            />
+          ) : backendOnline && !selectedInstalled ? (
+            <LearnMoreHint text="The selected model isn't downloaded yet." onOpen={() => setInfoOpen(true)} />
+          ) : undefined
+        }
       >
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           {items.map((item) => (
@@ -337,7 +530,13 @@ export function StudioImagePage() {
       <Sidebar>
         <div className="flex flex-col gap-6">
           <Setting label="Model">
-            <ModelCard models={models} onInstalled={loadModels} />
+            <ModelPicker models={models} value={model} onChange={setModel} onInstalled={loadModels} />
+            <button
+              onClick={() => setInfoOpen(true)}
+              className="text-caption text-fg-faint underline decoration-dotted underline-offset-2 hover:text-fg"
+            >
+              Which model fits my device?
+            </button>
           </Setting>
           <Setting label="Size">
             <ChoiceRow
@@ -376,9 +575,11 @@ export function StudioImagePage() {
 export function StudioVideoPage() {
   const { backendOnline, profile, items, refresh } = useMediaData("video");
   const [models, setModels] = useState<ImageModel[]>([]);
+  const [model, setModel] = useState("");
   const [prompt, setPrompt] = useState("");
   const [seconds, setSeconds] = useState(4);
   const [motion, setMotion] = useState("zoom");
+  const [infoOpen, setInfoOpen] = useState(false);
   const job = useJob(() => void refresh());
 
   const loadModels = useCallback(() => void api.imageModels().then(setModels).catch(() => undefined), []);
@@ -386,12 +587,18 @@ export function StudioVideoPage() {
     if (backendOnline) loadModels();
   }, [backendOnline, loadModels]);
 
-  const installed = models.some((m) => m.installed);
+  useEffect(() => {
+    if (!model && models.length > 0)
+      setModel((models.find((m) => m.installed) ?? models[0]).id);
+  }, [models, model]);
+
+  const selectedInstalled = models.find((m) => m.id === model)?.installed ?? false;
+  const anyInstalled = models.some((m) => m.installed);
 
   async function generate() {
     if (!prompt.trim()) return;
     try {
-      const { job_id } = await api.generateVideo({ prompt: prompt.trim(), seconds, motion });
+      const { job_id } = await api.generateVideo({ prompt: prompt.trim(), seconds, motion, model });
       job.track(job_id);
     } catch (e) {
       job.setError(e instanceof Error ? e.message : "failed to start");
@@ -400,15 +607,32 @@ export function StudioVideoPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col lg:flex-row">
+      <ModelInfoDialog
+        open={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        models={models}
+        profile={profile}
+        onInstalled={loadModels}
+      />
       <PromptPanel
         placeholder="Describe the scene for your motion clip…"
         prompt={prompt}
         setPrompt={setPrompt}
         onGenerate={() => void generate()}
         busy={job.busy}
-        canGenerate={backendOnline && installed && !job.busy && prompt.trim().length > 0}
+        canGenerate={backendOnline && selectedInstalled && !job.busy && prompt.trim().length > 0}
         percent={job.percent}
-        error={job.error ?? (!installed && backendOnline ? "Video uses the image model for keyframes — download it on the Image page first." : null)}
+        error={job.error}
+        hint={
+          backendOnline && !anyInstalled ? (
+            <LearnMoreHint
+              text="Video builds its keyframes with an image model — download one to start."
+              onOpen={() => setInfoOpen(true)}
+            />
+          ) : backendOnline && !selectedInstalled ? (
+            <LearnMoreHint text="The selected model isn't downloaded yet." onOpen={() => setInfoOpen(true)} />
+          ) : undefined
+        }
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {items.map((item) => (
@@ -425,6 +649,15 @@ export function StudioVideoPage() {
       </PromptPanel>
       <Sidebar>
         <div className="flex flex-col gap-6">
+          <Setting label="Model">
+            <ModelPicker models={models} value={model} onChange={setModel} onInstalled={loadModels} />
+            <button
+              onClick={() => setInfoOpen(true)}
+              className="text-caption text-fg-faint underline decoration-dotted underline-offset-2 hover:text-fg"
+            >
+              Which model fits my device?
+            </button>
+          </Setting>
           <Setting label="Duration">
             <ChoiceRow options={[3, 4, 6, 8]} value={seconds} onChange={setSeconds} format={(s) => `${s}s`} />
           </Setting>

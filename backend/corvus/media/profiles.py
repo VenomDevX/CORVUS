@@ -44,6 +44,7 @@ def profile_for(ram_gb: float, vram_gb: float | None, cpu_cores: int | None = No
 
     return {
         "tier": tier,
+        "ram_gb": ram_gb,
         "image_max_size": max_size,
         "image_sizes": [s for s in (384, 512, 768) if s <= max_size],
         "image_steps": steps,

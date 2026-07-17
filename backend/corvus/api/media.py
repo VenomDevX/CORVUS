@@ -90,6 +90,9 @@ async def download_image_model(request: Request, body: DownloadBody) -> dict:
     engine = request.app.state.image_engine
     if engine.download.active:
         raise HTTPException(409, "a model download is already in progress")
+    entry = next((m for m in engine.catalog() if m["id"] == body.model), None)
+    if entry is not None and entry["fit"] == "too_big":
+        raise HTTPException(400, "this model needs more memory than this device has")
     try:
         await asyncio.to_thread(engine.download_model, body.model)
     except ValueError as exc:

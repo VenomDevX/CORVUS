@@ -28,6 +28,31 @@ def test_profile_tiers():
     assert "CPUExecutionProvider" in low["ort_providers"]
 
 
+def test_model_fit_annotations():
+    from corvus.media.images import IMAGE_MODELS, ImageEngine, fit_for
+
+    default, base = IMAGE_MODELS[0], IMAGE_MODELS[1]
+    assert fit_for(default, 16.0) == "recommended"
+    assert fit_for(base, 16.0) == "ok"
+    assert fit_for(base, 8.0) == "too_big"
+    assert fit_for(default, 4.0) == "too_big"
+
+    engine = ImageEngine(profile_for(16.0, None, cpu_cores=8))
+    catalog = {m["id"]: m for m in engine.catalog()}
+    assert catalog["sdxs-512"]["fit"] == "recommended"
+    assert catalog["sdxs-base"]["fit"] == "ok"
+    assert all("installed" in m for m in catalog.values())
+
+
+def test_scheduler_defaults_without_config():
+    from corvus.media.images import _EulerScheduler
+
+    sched = _EulerScheduler({})
+    timesteps, sigmas = sched.plan(1)
+    assert list(timesteps) == [999]
+    assert sigmas[-1] == 0.0 and sigmas[0] > 10
+
+
 # -- sfx --------------------------------------------------------------------
 
 

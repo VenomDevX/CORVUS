@@ -30,6 +30,15 @@ log = structlog.get_logger("corvus")
 _HF = "https://huggingface.co"
 
 
+_CORE_FILES = (
+    "tokenizer/vocab.json",
+    "tokenizer/merges.txt",
+    "text_encoder/model.onnx",
+    "unet/model.onnx",
+    "vae_decoder/model.onnx",
+)
+
+
 @dataclass(frozen=True)
 class ImageModel:
     id: str
@@ -37,15 +46,11 @@ class ImageModel:
     repo: str
     download_gb: float
     steps_default: int
+    min_ram_gb: float
     blurb: str
-    files: tuple[str, ...] = (
-        "tokenizer/vocab.json",
-        "tokenizer/merges.txt",
-        "scheduler/scheduler_config.json",
-        "text_encoder/model.onnx",
-        "unet/model.onnx",
-        "vae_decoder/model.onnx",
-    )
+    # scheduler_config.json is optional — standard SD constants are the
+    # fallback, and every SD 1.x-family model uses the same ones.
+    files: tuple[str, ...] = (*_CORE_FILES, "scheduler/scheduler_config.json")
 
 
 IMAGE_MODELS: list[ImageModel] = [
@@ -55,9 +60,26 @@ IMAGE_MODELS: list[ImageModel] = [
         repo="kmpartner/sdxs-dreamshaper-onnx",
         download_gb=1.9,
         steps_default=1,
+        min_ram_gb=8,
         blurb="One-step distilled Stable Diffusion built for everyday PCs — quality 512px images in seconds, even on CPU.",
     ),
+    ImageModel(
+        id="sdxs-base",
+        label="SDXS 512 (Base)",
+        repo="lemonteaa/sdxs-onnx",
+        download_gb=2.7,
+        steps_default=1,
+        min_ram_gb=12,
+        blurb="The original SDXS one-step model — a different, more neutral style. Larger download, needs a bit more memory.",
+        files=_CORE_FILES,
+    ),
 ]
+
+
+def fit_for(model: ImageModel, ram_gb: float) -> str:
+    if ram_gb < model.min_ram_gb:
+        return "too_big"
+    return "recommended" if model.id == IMAGE_MODELS[0].id else "ok"
 
 
 def _model(model_id: str) -> ImageModel:
@@ -132,6 +154,7 @@ class ImageEngine:
         return all((base / f).exists() for f in m.files)
 
     def catalog(self) -> list[dict]:
+        ram_gb = float(self.profile.get("ram_gb", 8.0))
         return [
             {
                 "id": m.id,
@@ -140,6 +163,7 @@ class ImageEngine:
                 "steps_default": m.steps_default,
                 "blurb": m.blurb,
                 "installed": self.is_installed(m.id),
+                "fit": fit_for(m, ram_gb),
             }
             for m in IMAGE_MODELS
         ]
@@ -224,9 +248,9 @@ class ImageEngine:
         if not self.is_installed(model_id):
             raise RuntimeError("model not downloaded — install it from the Image page first")
         self._tokenizer = ClipTokenizer(base / "tokenizer")
-        self._scheduler = _EulerScheduler(
-            json.loads((base / "scheduler/scheduler_config.json").read_text())
-        )
+        scheduler_file = base / "scheduler/scheduler_config.json"
+        scheduler_config = json.loads(scheduler_file.read_text()) if scheduler_file.exists() else {}
+        self._scheduler = _EulerScheduler(scheduler_config)
         for part in ("text_encoder", "unet", "vae_decoder"):
             self._sessions[part] = self._session(base, part)
         self._loaded_model = model_id

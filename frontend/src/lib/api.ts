@@ -269,6 +269,7 @@ export interface ImageModel {
   steps_default: number;
   blurb: string;
   installed: boolean;
+  fit: "recommended" | "ok" | "too_big";
 }
 
 export interface MediaGeneration {

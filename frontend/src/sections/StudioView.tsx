@@ -31,6 +31,7 @@ import {
   type Voiceover,
 } from "../lib/api";
 import { useCorvus } from "../state/store";
+import { StudioCapabilityDialog } from "../components/StudioCapabilityDialog";
 
 const MAX_CHARS = 20_000;
 
@@ -394,6 +395,8 @@ export function StudioView() {
   const [sidebarTab, setSidebarTab] = useState<"settings" | "history">("settings");
   const [activeVoiceoverId, setActiveVoiceoverId] = useState<number | null>(null);
   const [isVoicePickerOpen, setIsVoicePickerOpen] = useState(false);
+  const [capabilityDialog, setCapabilityDialog] = useState<string | null>(null);
+  const [voiceTab, setVoiceTab] = useState<"explore" | "mine">("explore");
 
   const refresh = useCallback(async () => {
     const [v, list] = await Promise.all([api.studioVoices(), api.listVoiceovers()]);
@@ -554,16 +557,20 @@ export function StudioView() {
             <button className="text-body-sm font-medium text-white border-b-2 border-white pb-1">
               Speech
             </button>
-            <button className="text-body-sm font-medium text-fg-muted hover:text-fg pb-1">
-              Image
-            </button>
-            <button className="text-body-sm font-medium text-fg-muted hover:text-fg pb-1">
-              Video
-            </button>
-            <button className="text-body-sm font-medium text-fg-muted hover:text-fg pb-1">
-              Sound Effects
-            </button>
+            {["Image", "Video", "Sound Effects"].map((cap) => (
+              <button
+                key={cap}
+                onClick={() => setCapabilityDialog(cap)}
+                className="text-body-sm font-medium text-fg-muted hover:text-fg pb-1 transition-colors duration-fast"
+              >
+                {cap}
+              </button>
+            ))}
           </div>
+          <StudioCapabilityDialog
+            capability={capabilityDialog}
+            onClose={() => setCapabilityDialog(null)}
+          />
 
           <div className="flex-1 min-h-0 flex flex-col p-6 lg:p-10">
             <div className="flex-1 min-h-0 flex flex-col">
@@ -612,13 +619,101 @@ export function StudioView() {
               </div>
               
               <div className="flex items-center gap-8 px-6 mt-1">
-                <button className="flex items-center gap-2 py-3 text-sm font-semibold border-b-2 border-white text-white">
+                <button
+                  onClick={() => setVoiceTab("explore")}
+                  className={`flex items-center gap-2 py-3 text-sm transition-colors ${
+                    voiceTab === "explore"
+                      ? "font-semibold border-b-2 border-white text-white"
+                      : "font-medium border-b-2 border-transparent text-gray-400 hover:text-white"
+                  }`}
+                >
                   <Type className="h-4 w-4" /> Explore
                 </button>
-                <button className="flex items-center gap-2 py-3 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-white">
+                <button
+                  onClick={() => setVoiceTab("mine")}
+                  className={`flex items-center gap-2 py-3 text-sm transition-colors ${
+                    voiceTab === "mine"
+                      ? "font-semibold border-b-2 border-white text-white"
+                      : "font-medium border-b-2 border-transparent text-gray-400 hover:text-white"
+                  }`}
+                >
                   My Voices
                 </button>
               </div>
+
+              {voiceTab === "mine" ? (
+                <div className="flex-1 overflow-y-auto p-4">
+                  <p className="mb-3 text-caption text-gray-500">
+                    Voices installed on this PC — they work fully offline.
+                  </p>
+                  {voices.piper.filter((v) => v.installed).length === 0 ? (
+                    <div className="rounded-lg bg-white/5 p-4 text-sm text-gray-400">
+                      No offline voices installed yet. Switch to Explore, set Category to
+                      &ldquo;Offline · Local&rdquo;, and download one — it then lives here.
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {voices.piper
+                        .filter((v) => v.installed)
+                        .map((v) => (
+                          <div
+                            key={v.id}
+                            className={`group relative flex w-full items-center gap-3 rounded-lg p-2 transition-all duration-fast ${
+                              voice === v.id && engine === "piper" ? "bg-white/10" : "hover:bg-white/5"
+                            }`}
+                          >
+                            <button
+                              onClick={() => {
+                                setEngine("piper");
+                                setVoice(v.id);
+                              }}
+                              aria-pressed={voice === v.id && engine === "piper"}
+                              className="absolute inset-0 z-0 rounded-lg"
+                              aria-label={`Select ${v.name}`}
+                            />
+                            <div className="relative z-10 shrink-0">
+                              <VoiceAvatar name={v.name} />
+                              {voice === v.id && engine === "piper" && (
+                                <div className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-black border-2 border-black shadow-sm">
+                                  <span className="text-[10px]">✓</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="relative z-10 flex min-w-0 flex-1 flex-col pr-2">
+                              <span className="truncate text-sm font-semibold tracking-tight text-gray-300 group-hover:text-white">
+                                {v.name}
+                              </span>
+                              <span className="truncate text-[13px] text-gray-500 font-medium">
+                                {v.language} · {v.gender} · offline
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (previewing === v.id) {
+                                  previewRef.current?.pause();
+                                  setPreviewing(false);
+                                } else {
+                                  void preview("piper", v.id);
+                                }
+                              }}
+                              className="relative z-10 shrink-0 rounded p-1.5 text-white opacity-0 transition-opacity hover:bg-white/20 group-hover:opacity-100"
+                              title="Preview Voice"
+                            >
+                              {previewing === v.id ? (
+                                <Square className="h-4 w-4 fill-current" />
+                              ) : (
+                                <Play className="h-4 w-4 fill-current ml-0.5" />
+                              )}
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+
 
               <div className="p-4 flex flex-col gap-3">
                 <div className="flex items-center gap-2">
@@ -857,6 +952,8 @@ export function StudioView() {
                   </div>
                 )}
               </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="flex h-full flex-col bg-black text-white">

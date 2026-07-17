@@ -36,3 +36,4 @@ Thumbs.db
 
 # Electron-builder buildResources (icons come from design/exports)
 frontend/build/
+SECURITY.md

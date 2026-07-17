@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { SectionShell } from "./SectionShell";
 import { api, type Memory } from "../lib/api";
 import { useCorvus } from "../state/store";
+import { MemoryGraph } from "../components/MemoryGraph";
 
 const CATEGORY_LABEL: Record<Memory["category"], string> = {
   preference: "Preference",
@@ -12,6 +13,7 @@ const CATEGORY_LABEL: Record<Memory["category"], string> = {
 
 export function MemoryView() {
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [view, setView] = useState<"list" | "graph">("list");
   const backendOnline = useCorvus((s) => s.backendOnline);
 
   const refresh = useCallback(async () => setMemories(await api.listMemories()), []);
@@ -29,6 +31,20 @@ export function MemoryView() {
     <SectionShell
       title="Memory"
       actions={
+        <span className="flex items-center gap-2">
+          <span className="flex overflow-hidden rounded border border-white/10">
+            {(["list", "graph"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-3 py-1.5 text-body-sm capitalize transition-colors duration-fast ${
+                  view === v ? "bg-accent/20 text-accent-bright" : "text-fg-muted hover:bg-white/5"
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </span>
         <a
           href={api.exportMemoriesUrl()}
           download="corvus-memories.json"
@@ -36,13 +52,16 @@ export function MemoryView() {
         >
           Export JSON
         </a>
+        </span>
       }
     >
       <p className="mb-3 text-body-sm text-fg-muted">
         Everything Corvus remembers is listed here — nothing is stored silently. Delete anything you
         don&rsquo;t want kept.
       </p>
-      {memories.length === 0 ? (
+      {view === "graph" && memories.length > 0 ? (
+        <MemoryGraph memories={memories} onDelete={(id) => void remove(id)} />
+      ) : memories.length === 0 ? (
         <p className="text-body text-fg-muted">
           Corvus hasn&rsquo;t stored any memories yet. Durable facts from your chats (preferences,
           projects, people, favorite apps) will appear here.

@@ -1,7 +1,14 @@
 import { BrowserWindow, app, ipcMain, nativeTheme, shell } from "electron";
 
 /** IPC surface exposed to the renderer via preload — keep this minimal and typed. */
-export function registerIpc(getWindow: () => BrowserWindow | null, backendToken: string) {
+export function registerIpc(
+  getWindow: () => BrowserWindow | null,
+  backendToken: string,
+  windows?: { toggleWidget: () => void; showMain: () => void },
+) {
+  ipcMain.handle("corvus:toggle-widget", () => windows?.toggleWidget());
+  ipcMain.handle("corvus:show-main", () => windows?.showMain());
+
   ipcMain.handle("corvus:get-system-theme", () =>
     nativeTheme.shouldUseDarkColors ? "dark" : "light",
   );

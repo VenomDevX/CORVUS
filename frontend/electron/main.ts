@@ -1,5 +1,6 @@
-import { app, BrowserWindow, globalShortcut, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, globalShortcut, nativeTheme, screen, shell } from "electron";
 import { randomBytes } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createTray, destroyTray } from "./tray";
 import { registerIpc } from "./ipc";
@@ -10,6 +11,7 @@ const DEV_URL = "http://127.0.0.1:5173";
 const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
+let widgetWindow: BrowserWindow | null = null;
 let quitting = false;
 
 // Per-launch token every backend request must present (SECURITY.md item 1).
@@ -26,6 +28,65 @@ export function showMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+}
+
+const WIDGET_SIZE = { width: 400, height: 180 };
+const widgetPosFile = () => join(app.getPath("userData"), "widget.json");
+
+function savedWidgetPos(): { x: number; y: number } | null {
+  try {
+    const pos = JSON.parse(readFileSync(widgetPosFile(), "utf8")) as { x: number; y: number };
+    if (Number.isFinite(pos.x) && Number.isFinite(pos.y)) return pos;
+  } catch {
+    /* first run or corrupt file — use the default corner */
+  }
+  return null;
+}
+
+export function toggleWidgetWindow() {
+  if (widgetWindow) {
+    widgetWindow.close();
+    return;
+  }
+  const work = screen.getPrimaryDisplay().workArea;
+  const fallback = {
+    x: work.x + work.width - WIDGET_SIZE.width - 24,
+    y: work.y + work.height - WIDGET_SIZE.height - 24,
+  };
+  const pos = savedWidgetPos() ?? fallback;
+  widgetWindow = new BrowserWindow({
+    ...WIDGET_SIZE,
+    x: pos.x,
+    y: pos.y,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    icon: assetPath("corvus.ico"),
+    webPreferences: {
+      preload: join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  widgetWindow.setMenuBarVisibility(false);
+  if (isDev) void widgetWindow.loadURL(`${DEV_URL}/#/widget`);
+  else void widgetWindow.loadFile(join(__dirname, "..", "dist", "index.html"), { hash: "/widget" });
+  widgetWindow.on("moved", () => {
+    const [x, y] = widgetWindow?.getPosition() ?? [];
+    if (x !== undefined) {
+      try {
+        writeFileSync(widgetPosFile(), JSON.stringify({ x, y }));
+      } catch {
+        /* position just won't persist */
+      }
+    }
+  });
+  widgetWindow.on("closed", () => {
+    widgetWindow = null;
+  });
 }
 
 function createWindow() {
@@ -95,10 +156,14 @@ if (!gotLock) {
   app.on("second-instance", showMainWindow);
 
   app.whenReady().then(() => {
-    registerIpc(() => mainWindow, backendToken);
+    registerIpc(() => mainWindow, backendToken, {
+      toggleWidget: toggleWidgetWindow,
+      showMain: showMainWindow,
+    });
     createWindow();
     createTray({
       onShow: showMainWindow,
+      onToggleWidget: toggleWidgetWindow,
       onQuit: () => {
         quitting = true;
         app.quit();

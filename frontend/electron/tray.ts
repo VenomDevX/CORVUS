@@ -4,6 +4,7 @@ let tray: Tray | null = null;
 
 interface TrayOptions {
   onShow: () => void;
+  onToggleWidget: () => void;
   onQuit: () => void;
   iconPath: (variant: "light" | "dark", size: 16 | 32) => string;
 }
@@ -19,6 +20,7 @@ export function createTray(opts: TrayOptions) {
 
   const menu = Menu.buildFromTemplate([
     { label: "Show Corvus", click: opts.onShow },
+    { label: "Toggle desktop widget", click: opts.onToggleWidget },
     { type: "separator" },
     { label: "Quit Corvus", click: opts.onQuit },
   ]);

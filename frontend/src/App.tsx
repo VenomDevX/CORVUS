@@ -10,6 +10,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatView } from "./components/ChatView";
 import { VoiceMode } from "./components/VoiceMode";
 import { NotificationsLayer } from "./components/NotificationsLayer";
+import { CommandPalette } from "./components/CommandPalette";
 import { OnboardingSetup } from "./components/OnboardingSetup";
 import { ThinkingAnimation } from "./components/ThinkingAnimation";
 import { HistoryView } from "./sections/HistoryView";
@@ -130,6 +131,7 @@ export default function App() {
           <OnboardingSetup onComplete={() => setOnboardingComplete(true)} />
         )}
         <NotificationsLayer />
+        <CommandPalette />
         <AnimatePresence>{voiceMode && <VoiceMode />}</AnimatePresence>
         {/* Draggable titlebar strip (native window buttons overlay the right edge) */}
         <header className="titlebar-drag flex h-10 shrink-0 items-center gap-2 px-4">

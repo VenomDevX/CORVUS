@@ -19,7 +19,7 @@ interface Item {
   icon: React.ReactNode;
 }
 
-const ITEMS: Item[] = [
+export const NAV_ITEMS: Item[] = [
   { key: "chat", label: "Chat", icon: <MessageSquare className="h-4 w-4" /> },
   { key: "studio", label: "Voice Studio", icon: <AudioLines className="h-4 w-4" /> },
   { key: "history", label: "History", icon: <Clock className="h-4 w-4" /> },
@@ -44,7 +44,7 @@ export function Sidebar() {
         <span className="text-h4 tracking-tight">Corvus</span>
       </div>
       <ul className="flex flex-1 flex-col gap-1">
-        {ITEMS.map((item) => (
+        {NAV_ITEMS.map((item) => (
           <li key={item.key}>
             <button
               onClick={() => setSection(item.key)}

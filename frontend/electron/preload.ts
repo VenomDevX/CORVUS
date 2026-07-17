@@ -12,6 +12,8 @@ const corvusBridge = {
     ipcRenderer.invoke("corvus:set-titlebar-symbol-color", color),
   getVersion: (): Promise<string> => ipcRenderer.invoke("corvus:get-version"),
   getBackendToken: (): Promise<string> => ipcRenderer.invoke("corvus:get-backend-token"),
+  toggleWidget: (): Promise<void> => ipcRenderer.invoke("corvus:toggle-widget"),
+  showMain: (): Promise<void> => ipcRenderer.invoke("corvus:show-main"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("corvus:check-for-updates"),
   installUpdate: (): Promise<void> => ipcRenderer.invoke("corvus:install-update"),
   onUpdateStatus: (callback: (status: UpdateStatus) => void): (() => void) => {

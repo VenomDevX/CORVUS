@@ -84,6 +84,8 @@ interface CorvusStore {
   pendingConfirmation: PendingConfirmation | null;
   voiceMode: boolean;
   voice: VoiceState;
+  paletteOpen: boolean;
+  setPaletteOpen: (open: boolean) => void;
 
   setTheme: (theme: Theme) => void;
   setSection: (section: Section) => void;
@@ -116,6 +118,8 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
   stream: null,
   pendingConfirmation: null,
   voiceMode: false,
+  paletteOpen: false,
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   voice: {
     connected: false,
     available: false,

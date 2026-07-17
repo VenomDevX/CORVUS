@@ -68,6 +68,7 @@ export function InputBar() {
   const [uploading, setUploading] = useState(false);
   const [model, setModel] = useState("");
   const [models, setModels] = useState<string[]>([]);
+  const [dragging, setDragging] = useState(false);
 
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 48,
@@ -124,6 +125,45 @@ export function InputBar() {
     adjustHeight(true);
   }
 
+  // Full-window drag-and-drop: counter-based so child enter/leave events
+  // don't flicker the overlay; drop anywhere attaches like the buttons do.
+  useEffect(() => {
+    let depth = 0;
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const enter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth += 1;
+      setDragging(true);
+    };
+    const over = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const leave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragging(false);
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragging(false);
+      addFiles(e.dataTransfer?.files ?? null);
+    };
+    window.addEventListener("dragenter", enter);
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragenter", enter);
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function addFiles(list: FileList | null) {
     if (!list) return;
     const MAX_SIZE = 50 * 1024 * 1024; // 50MB
@@ -155,6 +195,15 @@ export function InputBar() {
 
   return (
     <div className="w-full max-w-3xl mx-auto pb-4">
+      {dragging && (
+        <div className="pointer-events-none fixed inset-0 z-[90] flex items-center justify-center bg-black/40">
+          <div className="liquid-glass rounded-xl px-8 py-6 text-center">
+            <Paperclip className="mx-auto mb-2 h-6 w-6 text-accent-bright" />
+            <div className="text-body font-semibold text-fg">Drop files to attach</div>
+            <div className="text-caption text-fg-muted">Images, PDF, text — up to 50 MB each</div>
+          </div>
+        </div>
+      )}
       {attachments.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-2">
           {attachments.map((a, i) => (
@@ -185,6 +234,7 @@ export function InputBar() {
           placeholder={backendOnline ? "Message Corvus..." : "Corvus core is offline — start the backend"}
           className={cn(
             "w-full px-4 py-3 resize-none border-none",
+            "transition-[height] duration-150 ease-out",
             "bg-transparent text-black dark:text-white text-sm",
             "focus-visible:ring-0 focus-visible:ring-offset-0",
             "placeholder:text-neutral-500 dark:placeholder:text-neutral-400 min-h-[48px]"
@@ -200,7 +250,7 @@ export function InputBar() {
                 variant="ghost"
                 size="icon"
                 onClick={() => imageInput.current?.click()}
-                className="text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 h-8 w-8"
+                className="text-fg-muted hover:text-fg hover:bg-surface-elevated h-8 w-8"
               >
                 <ImageIcon className="w-4 h-4" />
               </Button>
@@ -210,7 +260,7 @@ export function InputBar() {
                 variant="ghost"
                 size="icon"
                 onClick={() => fileInput.current?.click()}
-                className="text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 h-8 w-8"
+                className="text-fg-muted hover:text-fg hover:bg-surface-elevated h-8 w-8"
               >
                 <Paperclip className="w-4 h-4" />
               </Button>
@@ -221,7 +271,7 @@ export function InputBar() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setVoiceMode(true)}
-                className="text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 h-8 w-8 disabled:opacity-30"
+                className="text-fg-muted hover:text-fg hover:bg-surface-elevated h-8 w-8 disabled:opacity-30"
               >
                 <Volume2 className="w-4 h-4" />
               </Button>
@@ -235,7 +285,7 @@ export function InputBar() {
                   setVoiceMode(true);
                   pushToTalk();
                 }}
-                className="text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 h-8 w-8 disabled:opacity-30"
+                className="text-fg-muted hover:text-fg hover:bg-surface-elevated h-8 w-8 disabled:opacity-30"
               >
                 <Mic className="w-4 h-4" />
               </Button>

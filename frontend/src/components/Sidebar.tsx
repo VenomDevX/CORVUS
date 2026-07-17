@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { useCorvus, type Section } from "../state/store";
 import {
   MessageSquare,
@@ -39,7 +40,7 @@ export function Sidebar() {
   return (
     <nav className="liquid-glass flex h-full w-56 flex-col rounded-xl p-3" aria-label="Corvus sections">
       <div className="mb-4 flex items-center gap-2 px-2 pt-1">
-        <img src="./logo.png" alt="" className="h-8 w-8" />
+        <img src="./logo.png" alt="" className="h-6 w-6" />
         <span className="text-h4 tracking-tight">Corvus</span>
       </div>
       <ul className="flex flex-1 flex-col gap-1">
@@ -48,14 +49,20 @@ export function Sidebar() {
             <button
               onClick={() => setSection(item.key)}
               aria-current={section === item.key ? "page" : undefined}
-              className={`flex w-full items-center gap-3 rounded px-3 py-2 text-left text-body transition-colors duration-fast ${
-                section === item.key
-                  ? "bg-white/10 text-fg"
-                  : "text-fg-muted hover:bg-white/5 hover:text-fg"
+              className={`relative flex w-full items-center gap-3 rounded px-3 py-2 text-left text-body transition-colors duration-fast ${
+                section === item.key ? "text-fg" : "text-fg-muted hover:bg-white/5 hover:text-fg"
               }`}
             >
-              <span aria-hidden>{item.icon}</span>
-              {item.label}
+              {section === item.key && (
+                <motion.span
+                  layoutId="nav-pill"
+                  className="absolute inset-0 rounded bg-white/10"
+                  transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                  aria-hidden
+                />
+              )}
+              <span aria-hidden className="relative">{item.icon}</span>
+              <span className="relative">{item.label}</span>
             </button>
           </li>
         ))}

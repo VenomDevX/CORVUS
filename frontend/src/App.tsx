@@ -5,12 +5,13 @@ import {
   createLightTheme,
   type BrandVariants,
 } from "@fluentui/react-components";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Sidebar } from "./components/Sidebar";
 import { ChatView } from "./components/ChatView";
 import { VoiceMode } from "./components/VoiceMode";
 import { NotificationsLayer } from "./components/NotificationsLayer";
 import { OnboardingSetup } from "./components/OnboardingSetup";
+import { ThinkingAnimation } from "./components/ThinkingAnimation";
 import { HistoryView } from "./sections/HistoryView";
 import { StudioView } from "./sections/StudioView";
 import { MemoryView } from "./sections/MemoryView";
@@ -120,6 +121,11 @@ export default function App() {
   return (
     <FluentProvider theme={theme === "dark" ? darkTheme : lightTheme} className="h-full !bg-transparent">
       <div className="app-bg relative flex h-full flex-col">
+        {!backendOnline && (
+          <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-[#000000]">
+            <ThinkingAnimation text={null} className="h-16 w-20 text-white" containerClassName="" />
+          </div>
+        )}
         {onboardingComplete === false && (
           <OnboardingSetup onComplete={() => setOnboardingComplete(true)} />
         )}
@@ -127,7 +133,7 @@ export default function App() {
         <AnimatePresence>{voiceMode && <VoiceMode />}</AnimatePresence>
         {/* Draggable titlebar strip (native window buttons overlay the right edge) */}
         <header className="titlebar-drag flex h-10 shrink-0 items-center gap-2 px-4">
-          <img src="./logo.png" alt="" className="h-5 w-5" />
+          <img src="./logo.png" alt="" className="h-4 w-4" />
           <span className="text-caption text-fg-muted">Corvus</span>
           <button
             onClick={() => {
@@ -142,7 +148,18 @@ export default function App() {
         <div className="flex min-h-0 flex-1 gap-4 p-4 pt-1">
           <Sidebar />
           <main className="min-w-0 flex-1">
-            <Body />
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={section}
+                className="h-full"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.12, ease: "easeOut" }}
+              >
+                <Body />
+              </motion.div>
+            </AnimatePresence>
           </main>
         </div>
       </div>

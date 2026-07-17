@@ -107,6 +107,12 @@ if (!gotLock) {
         assetPath(`tray-${variant}-${size}.png`),
     });
     globalShortcut.register("Control+Shift+C", showMainWindow);
+    // Alt+Space summons Corvus over any app; pressing it again tucks it away.
+    const altSpaceOk = globalShortcut.register("Alt+Space", () => {
+      if (mainWindow?.isVisible() && mainWindow.isFocused()) mainWindow.hide();
+      else showMainWindow();
+    });
+    if (!altSpaceOk) console.warn("Alt+Space is taken by another app; Ctrl+Shift+C still works.");
     void startBackend(isDev, backendToken);
     void initAutoUpdate(() => mainWindow, isDev);
   });

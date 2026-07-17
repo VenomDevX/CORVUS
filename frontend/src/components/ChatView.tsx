@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { Orb } from "./Orb";
 import { MarkdownContent } from "./MarkdownContent";
 import { InputBar } from "./InputBar";
@@ -13,6 +14,9 @@ export function ChatView() {
   const level = useCorvus((s) => s.voice.level);
   const generating = useCorvus((s) => s.generating);
   const scroller = useRef<HTMLDivElement>(null);
+  // Stagger only the bubbles present on first render (history load); messages
+  // that arrive live should appear immediately.
+  const initialCount = useRef(messages.length);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
@@ -38,7 +42,17 @@ export function ChatView() {
             {messages.map((m, i) => {
               const actions = "actions" in m ? m.actions : undefined;
               return (
-                <div key={"id" in m ? m.id : i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
+                <motion.div
+                  key={"id" in m ? m.id : i}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.18,
+                    ease: "easeOut",
+                    delay: i < initialCount.current ? Math.min(i * 0.03, 0.3) : 0,
+                  }}
+                  className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
+                >
                   {m.role === "user" ? (
                     <div className="liquid-glass-accent max-w-[80%] rounded-xl px-4 py-3 text-fg">
                       {m.content && <MarkdownContent content={m.content} />}
@@ -67,7 +81,7 @@ export function ChatView() {
                       ))}
                     </div>
                   )}
-                </div>
+                </motion.div>
               );
             })}
             {generating && <div className="h-2" aria-live="polite" />}

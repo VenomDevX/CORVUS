@@ -43,6 +43,22 @@ function savedWidgetPos(): { x: number; y: number } | null {
   return null;
 }
 
+/** Navigation guards (SECURITY.md item 6): every Corvus window only ever
+ * shows local Corvus content; http(s) links open in the system browser. */
+function applyNavigationGuards(win: BrowserWindow) {
+  win.webContents.on("will-navigate", (event, url) => {
+    const allowed = isDev ? url.startsWith(DEV_URL) : url.startsWith("file://");
+    if (!allowed) {
+      event.preventDefault();
+      if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+    }
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+}
+
 export function toggleWidgetWindow() {
   if (widgetWindow) {
     widgetWindow.close();
@@ -72,6 +88,7 @@ export function toggleWidgetWindow() {
     },
   });
   widgetWindow.setMenuBarVisibility(false);
+  applyNavigationGuards(widgetWindow);
   if (isDev) void widgetWindow.loadURL(`${DEV_URL}/#/widget`);
   else void widgetWindow.loadFile(join(__dirname, "..", "dist", "index.html"), { hash: "/widget" });
   widgetWindow.on("moved", () => {
@@ -115,20 +132,7 @@ function createWindow() {
 
   mainWindow.setMenuBarVisibility(false);
 
-  // Navigation guards (SECURITY.md item 6): the window only ever shows local
-  // Corvus content. Any other navigation is denied; http(s) links open in the
-  // system browser instead of inside the app.
-  mainWindow.webContents.on("will-navigate", (event, url) => {
-    const allowed = isDev ? url.startsWith(DEV_URL) : url.startsWith("file://");
-    if (!allowed) {
-      event.preventDefault();
-      if (/^https?:\/\//.test(url)) void shell.openExternal(url);
-    }
-  });
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//.test(url)) void shell.openExternal(url);
-    return { action: "deny" };
-  });
+  applyNavigationGuards(mainWindow);
 
   if (isDev) {
     void mainWindow.loadURL(DEV_URL);

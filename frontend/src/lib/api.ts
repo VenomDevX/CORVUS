@@ -208,6 +208,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ voice }),
     }),
+  ragStatus: () => request<RagStatus>("/rag/status"),
+  ragIndex: (path: string) =>
+    request<{ ok: boolean; files: number; added: number; skipped: number; removed: number }>(
+      "/rag/index",
+      { method: "POST", body: JSON.stringify({ path }) },
+    ),
+  ragSearch: (query: string) =>
+    request<RagHit[]>("/rag/search", { method: "POST", body: JSON.stringify({ query }) }),
   listProviders: () => request<ProviderInfo[]>("/providers"),
   setProviderKey: (provider: string, key: string) =>
     request<{ ok: boolean; has_key: boolean }>("/providers/key", {
@@ -217,6 +225,22 @@ export const api = {
   clearProviderKey: (provider: string) =>
     request<{ ok: boolean }>(`/providers/key/${provider}`, { method: "DELETE" }),
 };
+
+export interface RagStatus {
+  folder: string;
+  files: number;
+  chunks: number;
+  indexing: boolean;
+  progress: { done: number; total: number };
+  embeddings: boolean;
+}
+
+export interface RagHit {
+  content: string;
+  path: string;
+  chunk_no: number;
+  score?: number;
+}
 
 export interface Reminder {
   id: number;

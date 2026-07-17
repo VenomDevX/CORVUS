@@ -15,6 +15,7 @@ from ..log import setup_logging
 from ..memory.repository import Repository
 from .notifications import notify_router
 from .plugins import plugin_router
+from .rag import rag_router
 from .routes import router
 from .studio import studio_router
 from .voice import voice_router
@@ -61,6 +62,7 @@ def create_app(
         if app.state.notifications is not None:
             await app.state.notifications.stop()
         app.state.session.end()
+        app.state.rag.close()
         app.state.repo.close()
 
     app = FastAPI(title="Corvus", version=__version__, lifespan=lifespan)
@@ -110,6 +112,15 @@ def create_app(
         get_model=active_model,
         notifications=app.state.notifications,
     )
+
+    # Local documents index (RAG): its own SQLite file next to the main DB so
+    # long index runs never contend with chat writes.
+    from ..rag import DocsIndex
+    from ..rag.indexer import register_rag_actions
+
+    rag_db = (database or db_path()).with_name("corvus-rag.db")
+    app.state.rag = DocsIndex(rag_db)
+    register_rag_actions(app.state.registry, app.state.rag)
 
     # Workflows reuse the assembled registry; their actions register back into it.
     from ..workflows.engine import WorkflowEngine
@@ -165,5 +176,6 @@ def create_app(
     app.include_router(notify_router)
     app.include_router(workflow_router)
     app.include_router(plugin_router)
+    app.include_router(rag_router)
 
     return app

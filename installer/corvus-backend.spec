@@ -32,7 +32,7 @@ for package in (
     hiddenimports += pkg_hidden
 
 hiddenimports += collect_submodules("uvicorn")
-hiddenimports += ["corvus.main", "pyautogui", "PIL.ImageGrab"]
+hiddenimports += ["corvus.main", "pyautogui", "PIL.ImageGrab", "pypdf"]
 
 
 a = Analysis(

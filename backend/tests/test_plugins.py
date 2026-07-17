@@ -162,6 +162,24 @@ def test_install_rejects_garbage(manager):
         manager.install_zip(b"not a zip")
 
 
+def test_install_rejects_traversal_id(manager):
+    manifest = json.dumps({
+        "id": "../evil", "name": "E", "version": "1", "description": "d", "author": "a",
+        "permissions": [],
+    })
+    with pytest.raises(PluginError, match="kebab-case"):
+        manager.install_zip(_zip_bytes({"manifest.json": manifest, "plugin.py": "x"}))
+
+
+def test_install_rejects_entry_escape(manager):
+    manifest = json.dumps({
+        "id": "sneaky", "name": "S", "version": "1", "description": "d", "author": "a",
+        "permissions": [], "entry": "../outside.py",
+    })
+    with pytest.raises(PluginError, match="entry file"):
+        manager.install_zip(_zip_bytes({"manifest.json": manifest, "plugin.py": "x"}))
+
+
 def test_upgrade_requires_reapproval(manager):
     manager.install_zip(_plugin_zip())
     assert manager.enable("zippy")["loaded"] is True

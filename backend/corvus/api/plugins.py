@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
+from ..plugins.manager import MAX_ZIP_BYTES
 from ..plugins.sdk import PluginError
 
 plugin_router = APIRouter()
@@ -30,7 +31,9 @@ async def install_plugin(request: Request, file: UploadFile) -> dict:
     """Install a plugin from an uploaded .zip; it lands disabled so the user
     still reviews permissions + code hash before enabling (consent moment)."""
     mgr = _manager(request)
-    data = await file.read()
+    # Read at most one byte past the cap so an oversized upload is rejected
+    # without buffering the whole thing in memory.
+    data = await file.read(MAX_ZIP_BYTES + 1)
     try:
         manifest = mgr.install_zip(data)
     except PluginError as exc:

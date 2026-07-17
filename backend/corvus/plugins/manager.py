@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import io
+import re
 import shutil
 import tempfile
 import zipfile
@@ -31,6 +32,10 @@ _BUNDLED = Path(__file__).parent / "samples"
 # this is not a plugin.
 MAX_ZIP_BYTES = 2 * 1024 * 1024
 MAX_UNPACKED_BYTES = 8 * 1024 * 1024
+
+# The plugin id becomes a folder name under user_dir(), so it must never be
+# able to express a path (traversal) or a Windows reserved name.
+_SAFE_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 
 
 def _enabled_key(pid: str) -> str:
@@ -220,10 +225,18 @@ class PluginManager:
                     continue  # file outside the plugin folder
                 dest = staging / Path(*rel.parts)
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_bytes(zf.read(info))
+                try:
+                    dest.write_bytes(zf.read(info))
+                except zipfile.BadZipFile as exc:
+                    raise PluginError(f"corrupt archive entry: {info.filename}") from exc
 
             manifest = PluginManifest.load(staging)
-            if not (staging / manifest.entry).exists():
+            if not _SAFE_ID.fullmatch(manifest.id):
+                raise PluginError(
+                    "plugin id must be lowercase kebab-case (letters, digits, dashes)"
+                )
+            entry_path = (staging / manifest.entry).resolve()
+            if staging.resolve() not in entry_path.parents or not entry_path.exists():
                 raise PluginError(f"entry file {manifest.entry} not found in archive")
             self.discover()
             bundled_ids = {

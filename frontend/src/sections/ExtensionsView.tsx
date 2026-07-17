@@ -3,6 +3,7 @@ import { SectionShell } from "./SectionShell";
 import { api, type Plugin } from "../lib/api";
 import { useCorvus } from "../state/store";
 import { PluginCard } from "../components/PluginCard";
+import { AddPluginButton } from "../components/AddPluginButton";
 
 /** Extensions marketplace: browse and enable plugins. New plugins are folders
  * with a manifest.json + plugin.py dropped into %LOCALAPPDATA%\Corvus\plugins. */
@@ -20,12 +21,15 @@ export function ExtensionsView() {
     <SectionShell
       title="Extensions"
       actions={
-        <button
-          onClick={() => void refresh()}
-          className="rounded bg-accent/20 px-3 py-1.5 text-body-sm text-accent-bright transition-colors duration-fast hover:bg-accent/30"
-        >
-          Refresh
-        </button>
+        <span className="flex items-center gap-2">
+          <button
+            onClick={() => void refresh()}
+            className="rounded bg-accent/20 px-3 py-1.5 text-body-sm text-accent-bright transition-colors duration-fast hover:bg-accent/30"
+          >
+            Refresh
+          </button>
+          <AddPluginButton onInstalled={() => void refresh()} />
+        </span>
       }
     >
       <p className="mb-4 text-body-sm text-fg-muted">

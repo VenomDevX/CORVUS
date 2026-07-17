@@ -151,6 +151,32 @@ export const api = {
   enablePlugin: (id: string) =>
     request<{ loaded: boolean; error: string | null }>(`/plugins/${id}/enable`, { method: "POST" }),
   disablePlugin: (id: string) => request<{ ok: boolean }>(`/plugins/${id}/disable`, { method: "POST" }),
+  installPlugin: async (file: File): Promise<Plugin> => {
+    const token = await ensureToken();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BACKEND_HTTP}/plugins/install`, {
+      method: "POST",
+      body: form,
+      headers: token ? { "X-Corvus-Token": token } : undefined,
+    });
+    if (!res.ok) {
+      let detail = `install failed (${res.status})`;
+      try {
+        const body = (await res.json()) as { detail?: string };
+        if (body.detail) detail = body.detail;
+      } catch {
+        /* keep generic message */
+      }
+      throw new Error(detail);
+    }
+    return res.json();
+  },
+  uninstallPlugin: (id: string) =>
+    request<{ ok: boolean }>(`/plugins/${id}`, { method: "DELETE" }),
+  listReminders: () => request<Reminder[]>("/reminders"),
+  cancelReminder: (id: number) =>
+    request<{ ok: boolean }>(`/reminders/${id}`, { method: "DELETE" }),
   setPluginPermissions: (id: string, permissions: string[]) =>
     request<{ ok: boolean; granted: string[] }>(`/plugins/${id}/permissions`, {
       method: "PUT",
@@ -191,6 +217,13 @@ export const api = {
   clearProviderKey: (provider: string) =>
     request<{ ok: boolean }>(`/providers/key/${provider}`, { method: "DELETE" }),
 };
+
+export interface Reminder {
+  id: number;
+  text: string;
+  kind: string;
+  fire_at: string;
+}
 
 export interface Plugin {
   id: string;

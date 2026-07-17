@@ -1,9 +1,22 @@
+import { useState } from "react";
 import { api, type Plugin } from "../lib/api";
 
 /** One plugin: enable/disable, and grant/revoke each declared permission.
  * A plugin only loads (its actions appear) once enabled with all permissions
  * granted — the card makes that state explicit. */
 export function PluginCard({ plugin, onChange }: { plugin: Plugin; onChange: () => void }) {
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  async function uninstall() {
+    if (!confirmRemove) {
+      setConfirmRemove(true);
+      setTimeout(() => setConfirmRemove(false), 4000);
+      return;
+    }
+    await api.uninstallPlugin(plugin.id);
+    onChange();
+  }
+
   async function toggleEnabled() {
     if (plugin.enabled) await api.disablePlugin(plugin.id);
     else await api.enablePlugin(plugin.id);
@@ -50,16 +63,30 @@ export function PluginCard({ plugin, onChange }: { plugin: Plugin; onChange: () 
             </p>
           )}
         </div>
-        <button
-          onClick={() => void toggleEnabled()}
-          className={`shrink-0 rounded px-3 py-1.5 text-body-sm transition-colors duration-fast ${
-            plugin.enabled
-              ? "bg-white/10 text-fg hover:bg-danger/20 hover:text-danger"
-              : "bg-accent text-white hover:bg-accent-bright"
-          }`}
-        >
-          {plugin.enabled ? "Disable" : "Enable"}
-        </button>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <button
+            onClick={() => void toggleEnabled()}
+            className={`rounded px-3 py-1.5 text-body-sm transition-colors duration-fast ${
+              plugin.enabled
+                ? "bg-white/10 text-fg hover:bg-danger/20 hover:text-danger"
+                : "bg-accent text-white hover:bg-accent-bright"
+            }`}
+          >
+            {plugin.enabled ? "Disable" : "Enable"}
+          </button>
+          {!plugin.bundled && (
+            <button
+              onClick={() => void uninstall()}
+              className={`rounded px-3 py-1 text-caption transition-colors duration-fast ${
+                confirmRemove
+                  ? "bg-danger text-white"
+                  : "bg-white/5 text-fg-muted hover:bg-danger/20 hover:text-danger"
+              }`}
+            >
+              {confirmRemove ? "Confirm uninstall?" : "Uninstall"}
+            </button>
+          )}
+        </div>
       </div>
 
       {plugin.permissions.length > 0 && (

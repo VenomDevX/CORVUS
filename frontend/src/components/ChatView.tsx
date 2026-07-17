@@ -54,7 +54,7 @@ export function ChatView() {
                   className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
                 >
                   {m.role === "user" ? (
-                    <div className="liquid-glass-accent max-w-[80%] rounded-xl px-4 py-3 text-fg">
+                    <div className="bg-white max-w-[80%] rounded-xl px-4 py-3 text-black">
                       {m.content && <MarkdownContent content={m.content} />}
                     </div>
                   ) : (

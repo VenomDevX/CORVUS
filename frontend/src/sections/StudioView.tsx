@@ -120,8 +120,8 @@ function FilterChip({
         onClick={() => setOpen((o) => !o)}
         className={
           value
-            ? "flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-black shadow-sm"
-            : "flex items-center gap-1.5 rounded-full border border-white/10 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-gray-300 shadow-sm transition-colors hover:bg-zinc-700/70"
+            ? "flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+            : "flex items-center gap-1.5 rounded-full border border-app-secondary bg-surface px-3 py-1.5 text-xs font-medium text-fg-muted shadow-sm transition-colors hover:bg-surface-raised hover:text-fg"
         }
       >
         {value && onClear ? (
@@ -131,16 +131,16 @@ function FilterChip({
               onClear();
               setOpen(false);
             }}
-            className="-mt-0.5 text-lg leading-none text-gray-500 hover:text-black"
+            className="-mt-0.5 text-lg leading-none text-white/70 hover:text-white"
           >
             ×
           </span>
         ) : !value ? (
-          <span className="-mt-0.5 text-lg leading-none text-gray-500">+</span>
+          <span className="-mt-0.5 text-lg leading-none text-fg-muted">+</span>
         ) : null}
         {value ? (
           <>
-            <span className="font-medium text-gray-600">{label}</span> {value}
+            <span className="font-medium text-white/70">{label}</span> {value}
           </>
         ) : (
           label
@@ -149,7 +149,7 @@ function FilterChip({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-50 mt-1.5 max-h-64 w-56 overflow-y-auto rounded-xl border border-white/10 bg-zinc-900 p-1.5 shadow-2xl">
+          <div className="absolute left-0 top-full z-50 mt-1.5 max-h-64 w-56 overflow-y-auto rounded-xl border border-app-secondary bg-surface-raised p-1.5 shadow-glass-3">
             {options.map((o) => (
               <button
                 key={o.value}
@@ -158,7 +158,7 @@ function FilterChip({
                   setOpen(false);
                 }}
                 className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm transition-colors ${
-                  selected === o.value ? "bg-white/10 font-medium text-white" : "text-gray-300 hover:bg-white/5"
+                  value === o.value ? "bg-accent/20 text-fg" : "text-fg-muted hover:bg-white/5 hover:text-fg"
                 }`}
               >
                 {o.label}
@@ -622,7 +622,7 @@ export function StudioView() {
 
               <div className="p-4 flex flex-col gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 bg-[#161B22] focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 transition-all">
+                  <div className="flex-1 flex items-center gap-2 rounded-lg border border-app-secondary px-3 py-2 bg-surface focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 transition-all">
                     <Search className="h-4 w-4 text-gray-400" />
                     <input
                       value={search}
@@ -690,14 +690,14 @@ export function StudioView() {
                     {isSortOpen && (
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setIsSortOpen(false)} />
-                        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-white/10 bg-[#161B22] p-2 shadow-xl flex flex-col gap-3">
+                        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-app-secondary bg-surface-raised p-2 shadow-xl flex flex-col gap-3">
                           <div>
                             <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Sort</div>
                             {(["A-Z", "Z-A", "Locale"] as const).map((opt) => (
                               <button
                                 key={opt}
                                 onClick={() => setSortOrder(opt)}
-                                className={`flex w-full items-center rounded-md px-2 py-1.5 text-sm transition-colors ${sortOrder === opt ? "bg-white/10 text-white font-medium" : "text-gray-400 hover:bg-white/5"}`}
+                                className={`flex w-full items-center rounded-md px-2 py-1.5 text-sm transition-colors ${sortOrder === opt ? "bg-accent/20 text-white font-medium" : "text-gray-400 hover:bg-white/5"}`}
                               >
                                 {opt === "Locale" ? "Region" : opt}
                               </button>
@@ -842,7 +842,7 @@ export function StudioView() {
                               void downloadPiper(v.id);
                             }}
                             disabled={downloading !== null}
-                            className="relative z-10 flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-[#161B22] px-2.5 py-1.5 text-xs font-semibold text-gray-300 transition-colors hover:bg-white/5 disabled:opacity-50 shadow-sm"
+                            className="relative z-10 flex shrink-0 items-center gap-1.5 rounded-lg border border-app-secondary bg-surface px-2.5 py-1.5 text-xs font-semibold text-gray-300 transition-colors hover:bg-surface-raised disabled:opacity-50 shadow-sm"
                           >
                             {downloading === v.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -887,10 +887,10 @@ export function StudioView() {
                 {sidebarTab === "settings" ? (
                   <div className="flex flex-col gap-6">
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold tracking-tight text-white">Voice</label>
-                      <button
+                      <label className="text-sm font-semibold tracking-tight text-fg">Voice</label>
+                      <button 
                         onClick={() => setIsVoicePickerOpen(true)}
-                        className="flex w-full items-center justify-between rounded-xl border border-white/10 p-3 bg-zinc-800 hover:bg-zinc-700/70 transition-all shadow-sm focus:ring-2 focus:ring-white/10 outline-none"
+                        className="flex w-full items-center justify-between rounded-xl border border-app-secondary bg-surface p-3 text-left transition-all hover:bg-surface-raised focus:ring-2 focus:ring-accent outline-none shadow-sm group"
                       >
                         <div className="flex items-center gap-3">
                           <VoiceAvatar name={selectedVoice?.name || "A"} className="h-6 w-6 text-[10px]" />
@@ -904,23 +904,23 @@ export function StudioView() {
                     </div>
                     
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold tracking-tight text-white">Model</label>
+                      <label className="text-sm font-semibold tracking-tight text-fg">Model</label>
                       <div className="relative">
                         <button
                           onClick={() => setIsModelOpen((o) => !o)}
-                          className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-zinc-800 p-3 text-[13px] font-semibold text-white shadow-sm transition-all hover:bg-zinc-700/70 focus:ring-2 focus:ring-white/10 outline-none"
+                          className="flex w-full items-center justify-between rounded-xl border border-app-secondary bg-surface p-3 text-[13px] font-semibold text-fg shadow-sm transition-all hover:bg-surface-raised focus:ring-2 focus:ring-accent outline-none"
                         >
                           {engine === "edge"
                             ? "Multilingual v1 (Online)"
                             : "Multilingual v2 (Offline)"}
                           <ChevronDown
-                            className={`h-4 w-4 text-gray-500 transition-transform duration-fast ${isModelOpen ? "rotate-180" : ""}`}
+                            className={`h-4 w-4 text-fg-muted transition-transform duration-fast ${isModelOpen ? "rotate-180" : ""}`}
                           />
                         </button>
                         {isModelOpen && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setIsModelOpen(false)} />
-                            <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-white/10 bg-zinc-900 p-1.5 shadow-2xl">
+                            <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-app-secondary bg-surface-raised p-1.5 shadow-glass-3">
                               {(
                                 [
                                   {
@@ -942,12 +942,12 @@ export function StudioView() {
                                     setIsModelOpen(false);
                                   }}
                                   className={`flex w-full items-start justify-between rounded-lg px-3 py-2.5 text-left transition-colors ${
-                                    engine === m.value ? "bg-white/10" : "hover:bg-white/5"
+                                    engine === m.value ? "bg-accent/20" : "hover:bg-white/5"
                                   }`}
                                 >
                                   <span className="flex flex-col">
-                                    <span className="text-[13px] font-semibold text-white">{m.title}</span>
-                                    <span className="text-xs text-gray-500">{m.sub}</span>
+                                    <span className="text-[13px] font-semibold text-fg">{m.title}</span>
+                                    <span className="text-xs text-fg-muted">{m.sub}</span>
                                   </span>
                                   {engine === m.value && <span className="mt-0.5 text-xs text-white">✓</span>}
                                 </button>

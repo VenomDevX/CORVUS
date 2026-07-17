@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 
 const FRAME_COUNT = 82; // frames 000 to 081
-const W = 40;
-const H = 32;
+const W = 400;
+const H = 320;
 const frameUrl = (i: number) =>
   `./crow_hovering/Animate_SVG_crow_hovering_202607160206_${String(i).padStart(3, "0")}.svg`;
 
@@ -12,7 +12,15 @@ const frameUrl = (i: number) =>
  * that hasn't finished (re)loading paints the element unmasked — a solid
  * box flash.
  */
-export function ThinkingAnimation() {
+export function ThinkingAnimation({ 
+  text = "Corvus is thinking…", 
+  className = "h-8 w-10", 
+  containerClassName = "flex flex-row items-center gap-3 py-1"
+}: { 
+  text?: React.ReactNode; 
+  className?: string;
+  containerClassName?: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -67,9 +75,9 @@ export function ThinkingAnimation() {
   }, []);
 
   return (
-    <div className="flex flex-row items-center gap-3 py-1">
-      <canvas ref={canvasRef} className="h-8 w-10 text-fg" />
-      <span className="text-sm font-medium text-fg-muted animate-pulse">Corvus is thinking…</span>
+    <div className={containerClassName}>
+      <canvas ref={canvasRef} className={`${className} text-fg shrink-0`} />
+      {text && <span className="text-sm font-medium text-fg-muted animate-pulse">{text}</span>}
     </div>
   );
 }

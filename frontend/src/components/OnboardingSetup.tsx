@@ -6,11 +6,12 @@ import {
   Gauge,
   HardDrive,
   KeyRound,
-  Loader2,
   MonitorSmartphone,
+  ChevronLeft,
 } from "lucide-react";
 import { api, type ProviderInfo, type SystemSpecs } from "../lib/api";
 import { pullOllamaModel } from "../lib/ollama";
+import { ThinkingAnimation } from "./ThinkingAnimation";
 
 /**
  * First-run setup wizard: welcome → offline model or own API key →
@@ -33,7 +34,7 @@ function StepDots({ index }: { index: number }) {
         <span
           key={i}
           className={`h-1.5 w-1.5 rounded-full transition-colors duration-base ${
-            i <= index ? "bg-accent" : "bg-white/15"
+            i <= index ? "bg-white" : "bg-white/15"
           }`}
         />
       ))}
@@ -134,12 +135,27 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xl">
-      <div className="liquid-glass flex w-[520px] flex-col items-center gap-5 rounded-2xl p-8">
-        <img src="./logo.png" alt="Corvus" className="h-14 w-14" />
+      <div className="liquid-glass relative flex w-[520px] flex-col items-center gap-5 rounded-2xl p-8">
+        {step !== "welcome" && step !== "done" && (
+          <button
+            onClick={() => {
+              if (step === "mode") setStep("welcome");
+              else if (step === "offline" || step === "apikey") setStep("mode");
+            }}
+            className="absolute left-6 top-6 text-fg-muted transition-colors hover:text-fg"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+        )}
+        <div className="flex items-center">
+          <img src="./logo.png" alt="Corvus" className="h-10 w-10" />
+          <span className="-ml-1 text-3xl font-bold tracking-wider" style={{ fontFamily: '"Agency FB", sans-serif' }}>
+            CORVUS
+          </span>
+        </div>
 
         {step === "welcome" && (
           <>
-            <h1 className="text-h2 tracking-tight text-fg">Corvus</h1>
             <p className="text-center text-body text-fg-muted">
               Your AI assistant that lives on this PC.
               <br />
@@ -147,7 +163,7 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
             </p>
             <button
               onClick={() => setStep("mode")}
-              className="mt-2 rounded-lg bg-accent px-6 py-2.5 text-body font-semibold text-white transition-colors duration-fast hover:bg-accent-bright"
+              className="mt-2 rounded-lg bg-white px-6 py-2.5 text-body font-semibold text-black transition-colors duration-fast hover:bg-white/90"
             >
               Get started
             </button>
@@ -165,7 +181,7 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
                 <div className="flex items-center gap-2 text-body font-semibold text-fg">
                   <MonitorSmartphone className="h-4 w-4 text-accent-bright" />
                   Offline model
-                  <span className="rounded-sm bg-accent/25 px-1.5 py-0.5 text-caption text-accent-bright">
+                  <span className="rounded-sm bg-white/20 px-1.5 py-0.5 text-caption text-white">
                     Recommended
                   </span>
                 </div>
@@ -195,7 +211,7 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
           <>
             <h2 className="text-h3 tracking-tight text-fg">Your device</h2>
             {!specs ? (
-              <Loader2 className="h-6 w-6 animate-spin text-fg-muted" />
+              <ThinkingAnimation text={null} containerClassName="flex items-center justify-center" className="h-8 w-10 text-fg-muted" />
             ) : (
               <>
                 <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-body-sm text-fg-muted">
@@ -219,19 +235,19 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
                     </p>
                     <button
                       onClick={() => void window.corvus?.openExternal("https://ollama.com/download")}
-                      className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-body-sm font-semibold text-white transition-colors duration-fast hover:bg-accent-bright"
+                      className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-body-sm font-semibold text-black transition-colors duration-fast hover:bg-white/90"
                     >
                       <Download className="h-4 w-4" /> Get Ollama
                     </button>
-                    <span className="flex items-center gap-2 text-caption text-fg-faint">
-                      <Loader2 className="h-3 w-3 animate-spin" /> waiting for Ollama…
+                    <span className="flex items-center text-caption text-fg-faint">
+                      <ThinkingAnimation text="waiting for Ollama…" containerClassName="flex flex-row items-center gap-2" className="h-4 w-5" />
                     </span>
                   </div>
                 ) : pull ? (
                   <div className="w-full space-y-2">
                     <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                       <div
-                        className="h-full rounded-full bg-accent transition-all duration-base"
+                        className="h-full rounded-full bg-white transition-all duration-base"
                         style={{ width: `${Math.round(pull.percent * 100)}%` }}
                       />
                     </div>
@@ -256,7 +272,7 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
                           disabled={disabled}
                           className={`w-full rounded-xl border p-3 text-left transition-colors duration-fast ${
                             model === m.id
-                              ? "border-accent/50 bg-accent/10"
+                              ? "border-white/50 bg-white/10"
                               : "border-white/10 bg-white/5 hover:bg-white/10"
                           } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
                         >
@@ -264,7 +280,7 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
                             <span className="text-body-sm font-semibold text-fg">
                               {m.label}
                               {m.id === specs.suggested && (
-                                <span className="ml-2 rounded-sm bg-accent/25 px-1.5 py-0.5 text-caption text-accent-bright">
+                                <span className="ml-2 rounded-sm bg-white/20 px-1.5 py-0.5 text-caption text-white">
                                   Suggested
                                 </span>
                               )}
@@ -303,7 +319,7 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
                     aria-pressed={provider === p.name}
                     className={`rounded px-3 py-1.5 text-body-sm transition-colors duration-fast ${
                       provider === p.name
-                        ? "bg-accent/25 text-accent-bright"
+                        ? "bg-white/20 text-white"
                         : "bg-white/5 text-fg-muted hover:bg-white/10"
                     }`}
                   >
@@ -324,9 +340,9 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
               <button
                 onClick={() => void saveApiKey()}
                 disabled={busy || !provider || !apiKey.trim()}
-                className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-body font-semibold text-white transition-colors duration-fast hover:bg-accent-bright disabled:opacity-40"
+                className="flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-body font-semibold text-black transition-colors duration-fast hover:bg-white/90 disabled:opacity-40"
               >
-                {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                {busy && <ThinkingAnimation text={null} containerClassName="flex items-center justify-center" className="h-5 w-6" />}
                 Save and continue
               </button>
             </div>
@@ -344,7 +360,7 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
             </p>
             <button
               onClick={() => void finish()}
-              className="mt-1 rounded-lg bg-accent px-6 py-2.5 text-body font-semibold text-white transition-colors duration-fast hover:bg-accent-bright"
+              className="mt-1 rounded-lg bg-white px-6 py-2.5 text-body font-semibold text-black transition-colors duration-fast hover:bg-white/90"
             >
               Start
             </button>

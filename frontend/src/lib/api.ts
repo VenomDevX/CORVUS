@@ -208,6 +208,32 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ voice }),
     }),
+  mediaProfile: () => request<MediaProfile>("/media/profile"),
+  imageModels: () => request<ImageModel[]>("/media/image/models"),
+  downloadImageModel: (model: string) =>
+    request<{ ok: boolean; installed: boolean }>("/media/image/models/download", {
+      method: "POST",
+      body: JSON.stringify({ model }),
+    }),
+  imageModelDownloadStatus: () =>
+    request<{ active: boolean; model_id: string; done_bytes: number; total_bytes: number; error: string | null }>(
+      "/media/image/models/download/status",
+    ),
+  generateImage: (body: { prompt: string; model?: string; size?: number; steps?: number | null; seed?: number | null }) =>
+    request<{ job_id: number }>("/media/image/generate", { method: "POST", body: JSON.stringify(body) }),
+  generateVideo: (body: { prompt: string; model?: string; seconds?: number; motion?: string; seed?: number | null }) =>
+    request<{ job_id: number }>("/media/video/generate", { method: "POST", body: JSON.stringify(body) }),
+  generateSfx: (body: { prompt: string; duration?: number; intensity?: number; seed?: number | null }) =>
+    request<MediaGeneration>("/media/sfx/generate", { method: "POST", body: JSON.stringify(body) }),
+  mediaJob: (id: number) =>
+    request<{ state: "running" | "done" | "error"; percent: number; error: string | null; generation_id: number | null }>(
+      `/media/jobs/${id}`,
+    ),
+  listMedia: (kind: "image" | "video" | "sfx") =>
+    request<MediaGeneration[]>(`/media/generations?kind=${kind}`),
+  deleteMedia: (id: number) =>
+    request<{ ok: boolean }>(`/media/generations/${id}`, { method: "DELETE" }),
+  mediaFileUrl: (id: number) => `${BACKEND_HTTP}/media/generations/${id}/file${tokenQuery()}`,
   ragStatus: () => request<RagStatus>("/rag/status"),
   ragIndex: (path: string) =>
     request<{ ok: boolean; files: number; added: number; skipped: number; removed: number }>(
@@ -225,6 +251,34 @@ export const api = {
   clearProviderKey: (provider: string) =>
     request<{ ok: boolean }>(`/providers/key/${provider}`, { method: "DELETE" }),
 };
+
+export interface MediaProfile {
+  tier: "low" | "mid" | "high";
+  image_max_size: number;
+  image_sizes: number[];
+  image_steps: number;
+  gpu_accelerated: boolean;
+  video_max_keyframes: number;
+  video_fps: number;
+}
+
+export interface ImageModel {
+  id: string;
+  label: string;
+  download_gb: number;
+  steps_default: number;
+  blurb: string;
+  installed: boolean;
+}
+
+export interface MediaGeneration {
+  id: number;
+  kind: "image" | "video" | "sfx";
+  prompt: string;
+  params: Record<string, unknown>;
+  filename: string;
+  created_at: string;
+}
 
 export interface RagStatus {
   folder: string;

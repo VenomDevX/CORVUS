@@ -23,6 +23,7 @@ dependencies = [
     "pyautogui>=0.9.54",
     "python-multipart>=0.0.9",
     "pypdf>=4.0",
+    "onnxruntime-directml>=1.17; sys_platform == 'win32'",
     "piper-tts>=1.2",
 ]
 

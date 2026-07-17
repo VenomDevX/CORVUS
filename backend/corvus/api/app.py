@@ -13,6 +13,7 @@ from ..config import DEFAULT_MODEL, data_dir, db_path
 from ..llm.ollama import OllamaProvider
 from ..log import setup_logging
 from ..memory.repository import Repository
+from .media import media_router
 from .notifications import notify_router
 from .plugins import plugin_router
 from .rag import rag_router
@@ -63,6 +64,8 @@ def create_app(
             await app.state.notifications.stop()
         app.state.session.end()
         app.state.rag.close()
+        app.state.image_engine.unload()
+        app.state.media_store.close()
         app.state.repo.close()
 
     app = FastAPI(title="Corvus", version=__version__, lifespan=lifespan)
@@ -122,6 +125,20 @@ def create_app(
     app.state.rag = DocsIndex(rag_db)
     register_rag_actions(app.state.registry, app.state.rag)
 
+    # Local media generation (Studio image/video/sfx), device-adaptive.
+    from ..media import ImageEngine, MediaStore, VideoEngine, profile_for
+    from ..system_info import _gpu, _ram_gb
+
+    try:
+        _gpu_info = _gpu()
+        _media_profile = profile_for(_ram_gb(), _gpu_info["vram_gb"] if _gpu_info else None)
+    except Exception:  # noqa: BLE001 - profile detection must never block startup
+        _media_profile = profile_for(8.0, None)
+    app.state.media_profile = _media_profile
+    app.state.media_store = MediaStore()
+    app.state.image_engine = ImageEngine(_media_profile)
+    app.state.video_engine = VideoEngine(app.state.image_engine, _media_profile)
+
     # Workflows reuse the assembled registry; their actions register back into it.
     from ..workflows.engine import WorkflowEngine
     from ..actions.workflow_handlers import register_workflow_actions
@@ -177,5 +194,6 @@ def create_app(
     app.include_router(workflow_router)
     app.include_router(plugin_router)
     app.include_router(rag_router)
+    app.include_router(media_router)
 
     return app

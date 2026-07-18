@@ -49,7 +49,8 @@ def create_app(
                 from ..voice.pipeline import VoicePipeline
 
                 app.state.voice = VoicePipeline(
-                    app.state.repo, app.state.provider, workflows=app.state.workflows
+                    app.state.repo, app.state.provider, workflows=app.state.workflows,
+                    registry=app.state.registry,
                 )
             else:
                 app.state.voice = voice

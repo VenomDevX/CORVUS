@@ -157,31 +157,49 @@ def register_all(reg: Registry) -> None:
             return handler
         reg.register(ActionSpec(name, desc, _NO_PARAMS, Risk.LOW, make(), category="media"))
 
-    def play_youtube(query: str) -> ActionResult:
+    def play_media(query: str, app: str = "youtube") -> ActionResult:
         from urllib.parse import quote_plus
-        win.open_url(f"https://www.youtube.com/results?search_query={quote_plus(query)}")
-        return ActionResult(True, f"Searching YouTube for “{query}”…")
+        app_lower = app.lower()
+        if "spotify" in app_lower:
+            win.open_url(f"spotify:search:{quote_plus(query)}")
+            return ActionResult(True, f"Searching Spotify for “{query}”…")
+        else:
+            win.open_url(f"https://www.youtube.com/results?search_query={quote_plus(query)}")
+            return ActionResult(True, f"Searching YouTube for “{query}”…")
 
     reg.register(ActionSpec(
-        "play_youtube", "Open YouTube search results for a query in the browser.",
-        _str_param("query", "What to search for on YouTube"),
-        Risk.LOW, play_youtube, category="media",
+        "play_media", "Search for music, videos or media to play on a specific app (like Spotify, YouTube).",
+        {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "What song, artist, or video to search for"},
+                "app": {"type": "string", "description": "App to search on (e.g. spotify, youtube)"}
+            },
+            "required": ["query"]
+        },
+        Risk.LOW, play_media, category="media",
     ))
 
     # -- Search ---------------------------------------------------------------
-    def web_search(query: str, engine: str = "google") -> ActionResult:
+    def web_search(query: str, engine: str = "google", browser: str = "") -> ActionResult:
         from urllib.parse import quote_plus
         base = {"google": "https://www.google.com/search?q=",
-                "bing": "https://www.bing.com/search?q="}.get(engine, "https://www.google.com/search?q=")
-        win.open_url(base + quote_plus(query))
-        return ActionResult(True, f"Searching {engine.capitalize()} for “{query}”…")
+                "bing": "https://www.bing.com/search?q="}.get(engine.lower(), "https://www.google.com/search?q=")
+        win.open_url(base + quote_plus(query), browser or None)
+        b_text = f" in {browser.title()}" if browser else ""
+        return ActionResult(True, f"Searching {engine.capitalize()} for “{query}”{b_text}…")
 
     reg.register(ActionSpec(
-        "web_search", "Search the web (Google or Bing) in the default browser.",
-        {"type": "object", "properties": {
-            "query": {"type": "string"},
-            "engine": {"type": "string", "enum": ["google", "bing"], "default": "google"},
-        }, "required": ["query"]},
+        "web_search", "Search the web (Google or Bing) optionally in a specific browser.",
+        {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "What to search for"},
+                "engine": {"type": "string", "description": "Search engine to use (google, bing)"},
+                "browser": {"type": "string", "description": "Specific browser to use (e.g. chrome, edge, firefox)."}
+            },
+            "required": ["query"]
+        },
         Risk.LOW, web_search, category="search",
     ))
 

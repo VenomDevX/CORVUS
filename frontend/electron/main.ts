@@ -12,6 +12,7 @@ const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
 let widgetWindow: BrowserWindow | null = null;
+let overlayWindow: BrowserWindow | null = null;
 let quitting = false;
 
 // Per-launch token every backend request must present (SECURITY.md item 1).
@@ -106,6 +107,43 @@ export function toggleWidgetWindow() {
   });
 }
 
+function createOverlayWindow() {
+  const display = screen.getPrimaryDisplay();
+  overlayWindow = new BrowserWindow({
+    width: display.bounds.width,
+    height: 60,
+    x: display.bounds.x,
+    y: display.bounds.y,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: false,
+    webPreferences: {
+      preload: join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  });
+  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+  overlayWindow.setMenuBarVisibility(false);
+  applyNavigationGuards(overlayWindow);
+
+  if (isDev) {
+    void overlayWindow.loadURL(`${DEV_URL}/#/overlay`);
+  } else {
+    void overlayWindow.loadFile(join(__dirname, "..", "dist", "index.html"), { hash: "/overlay" });
+  }
+
+  overlayWindow.on("closed", () => {
+    overlayWindow = null;
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: "Corvus",
@@ -127,6 +165,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
     },
   });
 
@@ -165,6 +204,7 @@ if (!gotLock) {
       showMain: showMainWindow,
     });
     createWindow();
+    createOverlayWindow();
     createTray({
       onShow: showMainWindow,
       onToggleWidget: toggleWidgetWindow,

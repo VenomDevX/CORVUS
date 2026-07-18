@@ -81,6 +81,7 @@ async def run_agent_turn(
     emit: EventSink | None = None,
     log_action: Callable[[str, dict, ActionResult, str], None] | None = None,
     should_stop: StopCheck | None = None,
+    max_rounds: int = MAX_TOOL_ROUNDS,
 ) -> AgentOutcome:
     """Run one user turn to completion, executing any requested actions."""
     tools = registry.tool_schemas()
@@ -95,7 +96,7 @@ async def run_agent_turn(
     def outcome() -> AgentOutcome:
         return AgentOutcome(text="".join(spoken).strip(), actions_run=actions_run)
 
-    for _round in range(MAX_TOOL_ROUNDS):
+    for _round in range(max_rounds):
         turn = await _stream_turn(provider, model, convo, tools, emit, should_stop)
         if turn.content:
             spoken.append(turn.content)

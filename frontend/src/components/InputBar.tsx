@@ -246,49 +246,45 @@ export function InputBar() {
         <div className="flex items-center justify-between p-3 pt-0">
           <div className="flex items-center gap-1">
             <Tooltip content="Attach image" relationship="label">
-              <Button
-                variant="ghost"
-                size="icon"
+              <button
+                type="button"
                 onClick={() => imageInput.current?.click()}
-                className="text-fg-muted hover:text-fg hover:bg-surface-elevated h-8 w-8"
+                className="flex items-center justify-center text-fg-muted hover:text-fg hover:bg-white/10 rounded h-8 w-8 transition-colors disabled:opacity-30 disabled:pointer-events-none"
               >
-                <ImageIcon className="w-4 h-4" />
-              </Button>
+                <ImageIcon className="w-4 h-4 pointer-events-none" />
+              </button>
             </Tooltip>
             <Tooltip content="Attach file" relationship="label">
-              <Button
-                variant="ghost"
-                size="icon"
+              <button
+                type="button"
                 onClick={() => fileInput.current?.click()}
-                className="text-fg-muted hover:text-fg hover:bg-surface-elevated h-8 w-8"
+                className="flex items-center justify-center text-fg-muted hover:text-fg hover:bg-white/10 rounded h-8 w-8 transition-colors disabled:opacity-30 disabled:pointer-events-none"
               >
-                <Paperclip className="w-4 h-4" />
-              </Button>
+                <Paperclip className="w-4 h-4 pointer-events-none" />
+              </button>
             </Tooltip>
             <Tooltip content="Voice mode" relationship="label">
-              <Button
+              <button
+                type="button"
                 disabled={!backendOnline}
-                variant="ghost"
-                size="icon"
                 onClick={() => setVoiceMode(true)}
-                className="text-fg-muted hover:text-fg hover:bg-surface-elevated h-8 w-8 disabled:opacity-30"
+                className="flex items-center justify-center text-fg-muted hover:text-fg hover:bg-white/10 rounded h-8 w-8 transition-colors disabled:opacity-30 disabled:pointer-events-none"
               >
-                <Volume2 className="w-4 h-4" />
-              </Button>
+                <Volume2 className="w-4 h-4 pointer-events-none" />
+              </button>
             </Tooltip>
             <Tooltip content="Push to talk" relationship="label">
-              <Button
+              <button
+                type="button"
                 disabled={!backendOnline}
-                variant="ghost"
-                size="icon"
                 onClick={() => {
                   setVoiceMode(true);
                   pushToTalk();
                 }}
-                className="text-fg-muted hover:text-fg hover:bg-surface-elevated h-8 w-8 disabled:opacity-30"
+                className="flex items-center justify-center text-fg-muted hover:text-fg hover:bg-white/10 rounded h-8 w-8 transition-colors disabled:opacity-30 disabled:pointer-events-none"
               >
-                <Mic className="w-4 h-4" />
-              </Button>
+                <Mic className="w-4 h-4 pointer-events-none" />
+              </button>
             </Tooltip>
             <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
             <input ref={fileInput} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />

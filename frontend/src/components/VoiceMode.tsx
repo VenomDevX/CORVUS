@@ -1,12 +1,63 @@
+import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Mic, Square, X } from "lucide-react";
 import { Orb } from "./Orb";
 import { useCorvus } from "../state/store";
 
+const FACTS = [
+  "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still edible.",
+  "Octopuses have three hearts. Two pump blood to the gills, while the third pumps it to the rest of the body.",
+  "Bananas are berries, but strawberries aren't.",
+  "Wombat poop is cube-shaped to stop it from rolling away.",
+  "A day on Venus is longer than a year on Venus.",
+  "There are more trees on Earth than stars in the Milky Way.",
+  "A single strand of spider silk is thinner than a human hair but five times stronger than steel of the same width.",
+  "The Eiffel Tower can be 15 cm taller during the summer due to thermal expansion.",
+  "Some fungi create 'zombie ants' by taking control of their bodies.",
+  "Water can boil and freeze at the same time, a state called the 'triple point'.",
+  "The shortest commercial flight in the world takes just 57 seconds in Scotland.",
+  "Sloths can hold their breath longer than dolphins can.",
+  "Sharks are older than trees. They have been around for over 400 million years.",
+  "The national animal of Scotland is the unicorn.",
+  "Apples, peaches, and raspberries are all members of the rose family.",
+  "A jiffy is an actual unit of time: 1/100th of a second.",
+  "Cats can't taste sweetness due to a genetic defect.",
+  "The tongue is the only muscle in the human body that is attached from only one end.",
+  "The first oranges weren't orange; they were green.",
+  "A flock of crows is known as a murder.",
+];
+
+function RandomFact() {
+  const [factIndex, setFactIndex] = useState(() => Math.floor(Math.random() * FACTS.length));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFactIndex((prev) => (prev + 1) % FACTS.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="h-16 flex items-center justify-center">
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={factIndex}
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -5 }}
+          transition={{ duration: 0.3 }}
+          className="text-body-sm text-fg-muted max-w-sm mx-auto"
+        >
+          {FACTS[factIndex]}
+        </motion.p>
+      </AnimatePresence>
+    </div>
+  );
+}
+
 const STATUS_TEXT: Record<string, string> = {
   idle: "Say “Hey Corvus” or tap the mic",
   listening: "Corvus is listening…",
-  thinking: "Corvus is thinking…",
   speaking: "Corvus is speaking",
 };
 
@@ -41,7 +92,13 @@ export function VoiceMode() {
       <div className="flex flex-col items-center gap-6">
         <Orb state={orbState} level={voice.level} size={280} />
         <div className="text-center">
-          <p className="text-h3 text-fg">{STATUS_TEXT[orbState] ?? orbState}</p>
+          {orbState === "thinking" ? (
+            <RandomFact />
+          ) : (
+            <p className="text-h3 text-fg h-16 flex items-center justify-center">
+              {STATUS_TEXT[orbState] ?? orbState}
+            </p>
+          )}
           {!voice.available && voice.error && (
             <p className="mt-2 max-w-md text-body-sm text-danger">
               Voice unavailable: {voice.error}

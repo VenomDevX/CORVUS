@@ -127,7 +127,7 @@ export function Select({
                 onPointerEnter={() => setHighlighted(i)}
                 onClick={() => pick(option)}
                 className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-body-sm transition-colors duration-fast ${
-                  i === highlighted ? "bg-accent/20 text-fg" : "text-fg-muted"
+                  i === highlighted ? "bg-white/10 text-fg" : "text-fg-muted hover:bg-white/5"
                 }`}
               >
                 <span className="min-w-0">
@@ -136,7 +136,7 @@ export function Select({
                     <span className="block truncate text-caption text-fg-faint">{option.hint}</span>
                   )}
                 </span>
-                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-accent-bright" />}
+                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-white" />}
               </li>
             );
           })}

@@ -12,6 +12,7 @@ machine is testable with fakes.
 
 import asyncio
 import contextlib
+import json
 import threading
 from collections.abc import Callable
 from typing import Protocol
@@ -19,7 +20,9 @@ from typing import Protocol
 import numpy as np
 import structlog
 
+from ..actions.registry import ActionResult, Registry
 from ..config import SYSTEM_PROMPT
+from ..llm.agent import agent_system_prompt, run_agent_turn
 from ..llm.base import Message
 from ..memory.extractor import extract_memory
 from .stt import Transcriber
@@ -79,10 +82,12 @@ class VoicePipeline:
         speaker: Speaker | None = None,
         wake: WakeDetector | None = None,
         workflows=None,
+        registry: Registry | None = None,
     ) -> None:
         self.repo = repo
         self.provider = provider
         self.workflows = workflows
+        self.registry = registry
         self.mic = mic if mic is not None else SoundDeviceMic()
         self.transcriber = transcriber or Transcriber(model_name="base.en")
         self.speaker = speaker or Speaker()
@@ -277,7 +282,10 @@ class VoicePipeline:
         self._set_state("thinking")
 
         history = self.repo.list_messages(self.conversation_id)[-MAX_HISTORY_MESSAGES:]
-        messages = [Message("system", SYSTEM_PROMPT + "\nYou are in voice mode: keep replies short and conversational - a few sentences, no markdown, no code blocks unless asked to dictate code.")]
+        voice_system = SYSTEM_PROMPT + "\nYou are in voice mode: keep replies short and conversational - a few sentences, no markdown, no code blocks unless asked to dictate code."
+        if self.registry is not None:
+            voice_system += "\n\n" + agent_system_prompt(self.registry)
+        messages = [Message("system", voice_system)]
         messages += [Message(m["role"], m["content"]) for m in history]
         model = self._model()
 
@@ -288,17 +296,41 @@ class VoicePipeline:
 
         parts: list[str] = []
         interrupted = False
+
+        # Voice auto-approves safe and low-risk actions; medium/high are
+        # declined because the user can't see a confirmation dialog.
+        async def voice_confirm(name: str, prompt: str, args: dict) -> bool:
+            return False
+
+        def voice_emit(event: dict) -> None:
+            if event.get("type") == "delta" and event.get("content"):
+                text = event["content"]
+                parts.append(text)
+                self.emit({"type": "assistant_delta", "text": text})
+                for sentence in chunker.feed(text):
+                    sentence_queue.put_nowait(sentence)
+
         try:
-            async for delta in self.provider.stream_chat(messages, model):
-                if self._interrupt.is_set():
-                    interrupted = True
-                    break
-                if delta.content:
-                    parts.append(delta.content)
-                    self.emit({"type": "assistant_delta", "text": delta.content})
-                    for sentence in chunker.feed(delta.content):
-                        sentence_queue.put_nowait(sentence)
-            if not interrupted:
+            if self.registry is not None:
+                outcome = await run_agent_turn(
+                    self.provider, model, messages, self.registry,
+                    voice_confirm, emit=voice_emit,
+                    should_stop=lambda: self._interrupt.is_set(),
+                    max_rounds=2,
+                )
+                # parts were already collected via voice_emit
+            else:
+                # Fallback: plain chat without tools
+                async for delta in self.provider.stream_chat(messages, model):
+                    if self._interrupt.is_set():
+                        interrupted = True
+                        break
+                    if delta.content:
+                        parts.append(delta.content)
+                        self.emit({"type": "assistant_delta", "text": delta.content})
+                        for sentence in chunker.feed(delta.content):
+                            sentence_queue.put_nowait(sentence)
+            if not self._interrupt.is_set():
                 tail = chunker.flush()
                 if tail:
                     sentence_queue.put_nowait(tail)
@@ -320,7 +352,7 @@ class VoicePipeline:
             return
 
         self._set_state("idle")
-        if assistant_text and not interrupted:
+        if assistant_text and not self._interrupt.is_set():
             await extract_memory(
                 self.provider, self._model(), self.repo,
                 user_text, assistant_text, self.conversation_id,
@@ -378,3 +410,4 @@ class VoicePipeline:
                 watcher.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await watcher
+

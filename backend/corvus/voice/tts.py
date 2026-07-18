@@ -31,7 +31,7 @@ _SENTENCE_END = re.compile(r"([.!?…]+[\"')\]]?)\s")
 class SentenceChunker:
     """Incrementally splits a token stream into speakable sentences."""
 
-    def __init__(self, min_chars: int = 12):
+    def __init__(self, min_chars: int = 80):
         self._buffer = ""
         self.min_chars = min_chars
 
@@ -116,6 +116,17 @@ class EdgeSpeaker:
                 stream.write(block.reshape(-1, 1))
                 on_level(float(np.sqrt(np.mean((block / 32768.0) ** 2))) if block.size else 0.0)
         return True
+
+    async def play_mp3(
+        self,
+        mp3: bytes,
+        on_level: Callable[[float], None],
+        interrupt: threading.Event,
+    ) -> bool:
+        """Play pre-synthesized mp3 audio."""
+        if interrupt.is_set():
+            return False
+        return await asyncio.to_thread(self._play_sync, mp3, on_level, interrupt)
 
     async def speak(
         self,

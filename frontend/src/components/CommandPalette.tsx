@@ -216,7 +216,7 @@ export function CommandPalette() {
                     onClick={() => execute(cmd)}
                     onMouseEnter={() => setSelected(i)}
                     className={`flex w-full items-center gap-3 rounded px-3 py-2 text-left text-body-sm transition-colors duration-fast ${
-                      i === selected ? "bg-accent/20 text-fg" : "text-fg-muted"
+                      i === selected ? "bg-white/10 text-fg" : "text-fg-muted hover:bg-white/5"
                     }`}
                   >
                     <span aria-hidden className="text-fg-faint">{cmd.icon}</span>

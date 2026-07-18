@@ -11,20 +11,79 @@ import subprocess
 from pathlib import Path
 
 # Friendly app name -> launch target. winget/Start handles resolution; we keep
-# a small curated map for the apps named in the product spec.
+# a curated map for commonly requested apps. Values can be:
+#   - A plain executable name (resolved via PATH / App Paths)
+#   - A shell: URI for UWP/Store apps
+#   - A full path for apps in non-standard locations
 APP_TARGETS: dict[str, str] = {
+    # Browsers
     "chrome": "chrome",
+    "google chrome": "chrome",
     "edge": "msedge",
+    "microsoft edge": "msedge",
+    "firefox": "firefox",
+    "brave": "brave",
+    "opera": "opera",
+    "vivaldi": "vivaldi",
+    # Dev tools
     "vscode": "code",
     "vs code": "code",
+    "visual studio code": "code",
+    "visual studio": "devenv",
+    "terminal": "wt",
+    "windows terminal": "wt",
+    "cmd": "cmd",
+    "powershell": "powershell",
+    "git bash": "git-bash",
+    "postman": "postman",
+    "docker": "docker",
+    "docker desktop": "docker",
+    # System
     "notepad": "notepad",
     "explorer": "explorer",
+    "file explorer": "explorer",
+    "calculator": "calc",
+    "task manager": "taskmgr",
+    "control panel": "control",
+    "settings": "ms-settings:",
+    "paint": "mspaint",
+    "snipping tool": "snippingtool",
+    "wordpad": "write",
+    "device manager": "devmgmt.msc",
+    "disk management": "diskmgmt.msc",
+    # Media / Creative
     "spotify": "spotify",
+    "vlc": "vlc",
+    "obs": "obs64",
+    "obs studio": "obs64",
+    "audacity": "audacity",
+    # Gaming
     "steam": "steam",
+    "epic games": "com.epicgames.launcher:",
+    "epic games launcher": "com.epicgames.launcher:",
+    "discord": "discord",
+    # Productivity
+    "word": "winword",
+    "excel": "excel",
+    "powerpoint": "powerpnt",
+    "outlook": "outlook",
+    "teams": "ms-teams:",
+    "microsoft teams": "ms-teams:",
+    "onenote": "onenote",
+    "notion": "notion",
+    "slack": "slack",
+    "zoom": "zoom",
+    "telegram": "telegram",
+    "whatsapp": "whatsapp:",
+    # Creative
     "photoshop": "photoshop",
     "blender": "blender",
-    "obs": "obs64",
-    "calculator": "calc",
+    "figma": "figma",
+    "gimp": "gimp",
+    # Utilities
+    "7-zip": "7zFM",
+    "7zip": "7zFM",
+    "winrar": "winrar",
 }
 
 KNOWN_FOLDERS = {
@@ -37,14 +96,52 @@ KNOWN_FOLDERS = {
 }
 
 
+def _find_start_menu_shortcut(name: str) -> Path | None:
+    """Search Start Menu folders for a .lnk matching the app name."""
+    search_dirs = [
+        Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+        Path(os.environ.get("PROGRAMDATA", "C:/ProgramData")) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+    ]
+    name_lower = name.lower()
+    for d in search_dirs:
+        if not d.exists():
+            continue
+        for lnk in d.rglob("*.lnk"):
+            if name_lower in lnk.stem.lower():
+                return lnk
+    return None
+
+
 def _run(args: list[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(args, capture_output=True, text=True, timeout=30, **kw)
 
 
 def launch_app(target: str) -> None:
-    """Start an app by executable/alias via the shell 'start' verb."""
-    # 'start' resolves PATH apps and registered App Paths without a full path.
-    subprocess.Popen(["cmd", "/c", "start", "", target], shell=False)
+    """Start an app by executable/alias, Start Menu shortcut, or URI scheme."""
+    # URI schemes (ms-settings:, com.epicgames.launcher:, etc.) use os.startfile
+    if ":" in target and not target.endswith(".exe"):
+        os.startfile(target)
+        return
+
+    # Try Start Menu shortcuts FIRST so we don't trigger Windows error dialogs for missing 'start' targets
+    shortcut = _find_start_menu_shortcut(target)
+    if shortcut:
+        os.startfile(str(shortcut))
+        return
+
+    # Try the simple 'start' command for PATH apps and App Paths
+    result = subprocess.run(
+        ["cmd", "/c", "start", "", target],
+        shell=False, capture_output=True, timeout=10,
+    )
+    if result.returncode == 0:
+        return
+
+    # Last resort: just try os.startfile directly
+    try:
+        os.startfile(target)
+    except FileNotFoundError:
+        pass
 
 
 def close_app(image: str) -> int:
@@ -135,7 +232,24 @@ def power_command(kind: str) -> None:
     subprocess.Popen(mapping[kind])
 
 
-def open_url(url: str) -> None:
+def open_url(url: str, browser: str | None = None) -> None:
+    if browser:
+        target = APP_TARGETS.get(browser.lower().strip(), browser)
+        
+        # Try simple start command for the browser executable
+        result = subprocess.run(
+            ["cmd", "/c", "start", "", target, url],
+            shell=False, capture_output=True, timeout=10,
+        )
+        if result.returncode == 0:
+            return
+            
+        # Fallback to finding the shortcut
+        shortcut = _find_start_menu_shortcut(target)
+        if shortcut:
+            subprocess.Popen([str(shortcut), url])
+            return
+
     os.startfile(url)  # noqa: S606
 
 

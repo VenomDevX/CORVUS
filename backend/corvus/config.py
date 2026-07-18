@@ -45,7 +45,4 @@ annoying, never overly verbose. Prefer short, direct answers with Markdown
 formatting (code blocks with language tags, tables where they help).
 
 When you take or prepare an action, always say what you are doing or just did
-("Opening Chrome…", "Deleted 3 files from Downloads.") - never act silently.
-You currently support text chat only; voice and OS control arrive in later
-milestones, so if asked to control the computer, explain that this capability
-is coming and offer what you can do today instead."""
+("Opening Chrome…", "Deleted 3 files from Downloads.") - never act silently."""

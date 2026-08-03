@@ -93,6 +93,38 @@ def _extract_text_tool_calls(content: str, valid_names: set[str]) -> list[ToolCa
     return calls
 
 
+def _is_any_tool_call(content: str) -> bool:
+    """Check if the text represents *any* tool call JSON, even an invalid one."""
+    content = content.strip()
+    if content.startswith("```"):
+        content = re.sub(r"^```[a-zA-Z]*\s*", "", content)
+        content = re.sub(r"\s*```$", "", content).strip()
+    
+    def check_parsed(parsed: Any) -> bool:
+        items = parsed if isinstance(parsed, list) else [parsed]
+        for item in items:
+            if isinstance(item, dict) and "name" in item:
+                return True
+        return False
+        
+    try:
+        if check_parsed(json.loads(content)):
+            return True
+    except json.JSONDecodeError:
+        pass
+        
+    start = content.find("{")
+    end = content.rfind("}")
+    if start != -1 and end > start:
+        try:
+            if check_parsed(json.loads(content[start : end + 1])):
+                return True
+        except json.JSONDecodeError:
+            pass
+            
+    return False
+
+
 def _to_wire(messages: list[Message]) -> list[dict]:
     """Serialize Corvus messages to Ollama's chat schema, including tools."""
     wire: list[dict] = []
@@ -218,7 +250,10 @@ class OllamaProvider:
                         if text_calls:
                             yield Delta(content="", done=True, tool_calls=text_calls)
                         elif held:
-                            yield Delta(content=held, done=True)
+                            if emitted_native_calls and _is_any_tool_call(held):
+                                yield Delta(content="", done=True)
+                            else:
+                                yield Delta(content=held, done=True)
                         else:
                             yield Delta(content="", done=True)
                         return

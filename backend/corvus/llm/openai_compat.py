@@ -37,7 +37,7 @@ class OpenAICompatProvider:
                  transport: httpx.AsyncBaseTransport | None = None):
         self.name = name
         self._base_url = base_url.rstrip("/")
-        self._api_key = api_key
+        self._api_key = api_key.strip() if api_key else ""
         self._transport = transport
 
     def _client(self, timeout: float) -> httpx.AsyncClient:

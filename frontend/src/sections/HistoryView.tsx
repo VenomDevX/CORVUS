@@ -137,28 +137,28 @@ export function HistoryView() {
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {conversations.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <MessageSquare className="h-12 w-12 text-gray-600 mb-4" />
-              <h2 className="text-lg font-semibold text-white">No history yet</h2>
-              <p className="mt-1 text-sm text-gray-400">Start a new conversation in the Chat tab.</p>
+              <MessageSquare className="h-12 w-12 text-fg-muted mb-4" />
+              <h2 className="text-lg font-semibold text-fg">No history yet</h2>
+              <p className="mt-1 text-sm text-fg-faint">Start a new conversation in the Chat tab.</p>
             </div>
           ) : filteredConversations.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <Search className="h-12 w-12 text-gray-600 mb-4" />
-              <h2 className="text-lg font-semibold text-white">No results found</h2>
-              <p className="mt-1 text-sm text-gray-400">Try adjusting your search query.</p>
+              <Search className="h-12 w-12 text-fg-muted mb-4" />
+              <h2 className="text-lg font-semibold text-fg">No results found</h2>
+              <p className="mt-1 text-sm text-fg-faint">Try adjusting your search query.</p>
             </div>
           ) : (
             <div className="space-y-6 max-w-4xl pb-10">
               {groupedConversations.map((group) => (
                 <div key={group.label} className="space-y-2">
-                  <div className="sticky top-0 z-10 flex items-center justify-between bg-black/95 py-2 backdrop-blur-md">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                  <div className="sticky top-0 z-10 flex items-center justify-between bg-app/95 py-2 backdrop-blur-md">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-fg-muted">
                       {group.label}
                     </h3>
                     {group.label === groupedConversations[0].label && (
                       <button
                         onClick={toggleAll}
-                        className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-white transition-colors"
+                        className="flex items-center gap-1.5 text-xs font-medium text-fg-faint hover:text-fg transition-colors"
                       >
                         {selectedIds.size === filteredConversations.length ? (
                           <CheckSquare className="h-3.5 w-3.5" />

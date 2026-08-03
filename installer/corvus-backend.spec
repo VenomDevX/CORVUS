@@ -24,12 +24,16 @@ for package in (
     "edge_tts",
     "sounddevice",
     "miniaudio",
-    "piper",  # Voice Studio offline engine (espeak-ng data ships inside the package)
+    "piper",
+    "piper_tts",
 ):
-    pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)
-    datas += pkg_datas
-    binaries += pkg_binaries
-    hiddenimports += pkg_hidden
+    try:
+        pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)
+        datas += pkg_datas
+        binaries += pkg_binaries
+        hiddenimports += pkg_hidden
+    except Exception:
+        pass
 
 hiddenimports += collect_submodules("uvicorn")
 hiddenimports += ["corvus.main", "pyautogui", "PIL.ImageGrab", "pypdf"]

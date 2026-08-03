@@ -13,7 +13,7 @@ describe("design tokens → Tailwind theme", () => {
 
   it("keeps the accent constant across themes in the Tailwind config", () => {
     const themeColors = (config.theme?.extend?.colors ?? {}) as Record<string, string>;
-    expect(themeColors.accent).toBe(tokens.color.accent["electric-blue"]);
+    expect(themeColors.accent).toContain("--c-accent");
     // Semantic neutrals must go through CSS variables so light mode can invert them.
     expect(themeColors.fg).toBe("var(--c-fg)");
     expect(themeColors.surface).toBe("var(--c-surface)");

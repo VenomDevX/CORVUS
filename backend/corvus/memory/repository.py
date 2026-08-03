@@ -72,6 +72,21 @@ class Repository:
             )
         )
 
+    def get_message(self, message_id: int) -> dict[str, Any] | None:
+        cur = self.conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+    def update_message(self, message_id: int, content: str) -> None:
+        self.conn.execute("UPDATE messages SET content = ? WHERE id = ?", (content, message_id))
+        self.conn.commit()
+
+    def delete_messages_after(self, conversation_id: int, message_id: int) -> None:
+        self.conn.execute(
+            "DELETE FROM messages WHERE conversation_id = ? AND id > ?", (conversation_id, message_id)
+        )
+        self.conn.commit()
+
     # -- memories ----------------------------------------------------------
 
     def add_memory(

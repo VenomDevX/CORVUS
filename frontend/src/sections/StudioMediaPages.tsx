@@ -107,7 +107,7 @@ function PromptPanel({
         placeholder={placeholder}
         className="h-36 shrink-0 resize-none bg-transparent p-0 text-xl font-light leading-relaxed text-fg outline-none placeholder:text-fg-muted/50"
       />
-      <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-3 text-xs font-medium uppercase tracking-wider text-fg-faint">
+      <div className="mt-2 flex items-center justify-between border-t border-black/10 dark:border-white/10 pt-3 text-xs font-medium uppercase tracking-wider text-fg-faint">
         <span>{prompt.length.toLocaleString()} / 2,000 characters</span>
         {error ? (
           <span className="text-danger normal-case">{error}</span>
@@ -118,7 +118,7 @@ function PromptPanel({
       <div className="mt-4 flex items-center justify-end gap-4">
         {percent !== null && (
           <div className="flex flex-1 items-center gap-3">
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
               <div
                 className="h-full rounded-full bg-white transition-all duration-base"
                 style={{ width: `${percent}%` }}
@@ -143,8 +143,8 @@ function PromptPanel({
 
 function Sidebar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex w-full min-h-0 flex-col border-t border-white/10 bg-black lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px]">
-      <div className="flex-1 overflow-y-auto p-6 text-white">{children}</div>
+    <div className="flex w-full min-h-0 flex-col border-t border-black/10 dark:border-white/10 bg-app-secondary lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px]">
+      <div className="flex-1 overflow-y-auto p-6 text-fg">{children}</div>
     </div>
   );
 }
@@ -176,7 +176,7 @@ function ChoiceRow<T extends string | number>({
           key={String(o)}
           onClick={() => onChange(o)}
           className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-            value === o ? "bg-white text-black" : "bg-white/5 text-gray-300 hover:bg-white/10"
+            value === o ? "bg-white text-black" : "bg-black/5 dark:bg-white/5 text-fg-muted hover:bg-black/10 dark:bg-white/10"
           }`}
         >
           {format ? format(o) : String(o)}
@@ -295,7 +295,7 @@ function ModelPicker({
               onInstall={(id) => void dl.install(id)}
             />
           </div>
-          <p className="text-caption text-gray-500">{selected.blurb}</p>
+          <p className="text-caption text-fg-faint">{selected.blurb}</p>
           {dl.error && <p className="text-caption text-danger">{dl.error}</p>}
         </>
       )}
@@ -323,7 +323,7 @@ function ModelInfoDialog({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-app-secondary/50"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -346,7 +346,7 @@ function ModelInfoDialog({
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded p-1 text-fg-muted transition-colors duration-fast hover:bg-white/10 hover:text-fg"
+                className="rounded p-1 text-fg-muted transition-colors duration-fast hover:bg-black/10 dark:bg-white/10 hover:text-fg"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -357,7 +357,7 @@ function ModelInfoDialog({
               clips are built from image keyframes, so they use the same model.
             </p>
             {profile && (
-              <p className="mb-4 flex items-center gap-2 rounded bg-white/5 p-2.5 text-body-sm text-fg-muted">
+              <p className="mb-4 flex items-center gap-2 rounded bg-black/5 dark:bg-white/5 p-2.5 text-body-sm text-fg-muted">
                 <Cpu className="h-4 w-4 shrink-0 text-accent-bright" />
                 This device: {profile.tier === "high" ? "high-end" : profile.tier === "mid" ? "mid-range" : "compact"} tier ·
                 up to {profile.image_max_size}px · {profile.gpu_accelerated ? "GPU accelerated (DirectML)" : "CPU mode"}
@@ -365,7 +365,7 @@ function ModelInfoDialog({
             )}
             <div className="space-y-2">
               {models.map((m) => (
-                <div key={m.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div key={m.id} className="rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-body-sm font-semibold text-fg">{m.label}</span>
                     <DownloadButton
@@ -414,26 +414,26 @@ function HistoryList({
   render: (item: MediaGeneration) => React.ReactNode;
 }) {
   if (items.length === 0)
-    return <p className="text-sm text-gray-500">Nothing generated yet.</p>;
+    return <p className="text-sm text-fg-faint">Nothing generated yet.</p>;
   return (
     <div className="space-y-2">
       {items.map((item) => (
-        <div key={item.id} className="group rounded-xl border border-white/10 bg-white/5 p-2.5">
+        <div key={item.id} className="group rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 p-2.5">
           {render(item)}
           <div className="mt-1.5 flex items-center justify-between gap-2">
-            <span className="truncate text-caption text-gray-500">{item.prompt}</span>
+            <span className="truncate text-caption text-fg-faint">{item.prompt}</span>
             <span className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
               <a
                 href={api.mediaFileUrl(item.id)}
                 download={item.filename}
-                className="rounded p-1 text-gray-400 hover:bg-white/10 hover:text-white"
+                className="rounded p-1 text-fg-muted hover:bg-black/10 dark:bg-white/10 hover:text-fg"
                 aria-label="Download"
               >
                 <Download className="h-3.5 w-3.5" />
               </a>
               <button
                 onClick={() => onDelete(item.id)}
-                className="rounded p-1 text-gray-400 hover:bg-danger/20 hover:text-danger"
+                className="rounded p-1 text-fg-muted hover:bg-danger/20 hover:text-danger"
                 aria-label="Delete"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -545,7 +545,7 @@ export function StudioImagePage() {
               onChange={setSize}
               format={(s) => `${s}×${s}`}
             />
-            <p className="text-caption text-gray-500">
+            <p className="text-caption text-fg-faint">
               Capped at {profile?.image_max_size ?? 512}px on this device
               {profile?.gpu_accelerated ? " · GPU accelerated" : " · CPU mode"}.
             </p>
@@ -663,7 +663,7 @@ export function StudioVideoPage() {
           </Setting>
           <Setting label="Motion">
             <ChoiceRow options={["zoom", "crossfade"]} value={motion} onChange={setMotion} />
-            <p className="text-caption text-gray-500">
+            <p className="text-caption text-fg-faint">
               Clips are built from {profile?.video_max_keyframes ?? 3} AI keyframes with smooth
               motion — rendered fully on this PC.
             </p>
@@ -740,7 +740,7 @@ export function StudioSfxPage() {
           {items.map((item) => (
             <div
               key={item.id}
-              className="group flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3"
+              className="group flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 p-3"
             >
               <button
                 onClick={() => play(item.id)}
@@ -765,14 +765,14 @@ export function StudioSfxPage() {
                 <a
                   href={api.mediaFileUrl(item.id)}
                   download={item.filename}
-                  className="rounded p-1.5 text-gray-400 hover:bg-white/10 hover:text-white"
+                  className="rounded p-1.5 text-fg-muted hover:bg-black/10 dark:bg-white/10 hover:text-fg"
                   aria-label="Download"
                 >
                   <Download className="h-4 w-4" />
                 </a>
                 <button
                   onClick={() => void api.deleteMedia(item.id).then(() => refresh())}
-                  className="rounded p-1.5 text-gray-400 hover:bg-danger/20 hover:text-danger"
+                  className="rounded p-1.5 text-fg-muted hover:bg-danger/20 hover:text-danger"
                   aria-label="Delete"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -781,7 +781,7 @@ export function StudioSfxPage() {
             </div>
           ))}
           {items.length === 0 && (
-            <div className="flex flex-col items-center gap-2 py-10 text-center text-gray-500">
+            <div className="flex flex-col items-center gap-2 py-10 text-center text-fg-faint">
               <Volume2 className="h-8 w-8 opacity-40" />
               <p className="text-sm">Describe a sound and hit Generate — it renders instantly, fully offline.</p>
             </div>
@@ -812,7 +812,7 @@ export function StudioSfxPage() {
               className="w-full accent-white"
             />
           </Setting>
-          <p className="text-caption text-gray-500">
+          <p className="text-caption text-fg-faint">
             Sounds are synthesized on-device from layered noise and tone generators — instant,
             deterministic with a seed, and always offline. Categories: rain, thunder, wind, ocean,
             fire, explosion, impact, whoosh, laser, UI beeps, footsteps, heartbeat, bells, birds,

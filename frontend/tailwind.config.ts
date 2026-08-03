@@ -29,8 +29,9 @@ export default {
         "fg-muted": "var(--c-fg-muted)",
         "fg-faint": "var(--c-fg-faint)",
         // Theme-constant brand + semantic colors (hex → opacity modifiers work).
-        accent: tokens.color.accent["electric-blue"],
-        "accent-bright": tokens.color.accent.bright,
+        accent: "rgb(var(--c-accent) / <alpha-value>)",
+        "accent-bright": "rgb(var(--c-accent) / <alpha-value>)",
+        "accent-fg": "rgb(var(--c-accent-fg) / <alpha-value>)",
         "accent-dim": tokens.color.accent.dim,
         "accent-deep": tokens.color.accent.deep,
         "bg-caviar": tokens.color.bg.caviar,

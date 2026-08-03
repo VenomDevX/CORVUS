@@ -55,7 +55,10 @@ class AnthropicProvider:
     def __init__(self, api_key: str, base_url: str = "https://api.anthropic.com/v1",
                  transport: httpx.AsyncBaseTransport | None = None):
         self._base_url = base_url.rstrip("/")
-        self._api_key = api_key
+        key = api_key.strip() if api_key else ""
+        if key.lower().startswith("bearer "):
+            key = key[7:].strip()
+        self._api_key = key
         self._transport = transport
 
     def _client(self, timeout: float) -> httpx.AsyncClient:

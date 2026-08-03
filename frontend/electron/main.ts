@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, nativeTheme, screen, shell } from "electron";
+import { app, BrowserWindow, globalShortcut, nativeTheme, screen, shell, session } from "electron";
 import { randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -199,6 +199,17 @@ if (!gotLock) {
   app.on("second-instance", showMainWindow);
 
   app.whenReady().then(() => {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          "Content-Security-Policy": [
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: http://127.0.0.1:8765; connect-src 'self' http://127.0.0.1:8765 ws://127.0.0.1:8765 ws://localhost:5173 http://localhost:5173 http://127.0.0.1:11434 http://localhost:11434",
+          ],
+        },
+      });
+    });
+
     registerIpc(() => mainWindow, backendToken, {
       toggleWidget: toggleWidgetWindow,
       showMain: showMainWindow,

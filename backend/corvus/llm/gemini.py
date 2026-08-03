@@ -45,7 +45,7 @@ class GeminiProvider:
                  base_url: str = "https://generativelanguage.googleapis.com/v1beta",
                  transport: httpx.AsyncBaseTransport | None = None):
         self._base_url = base_url.rstrip("/")
-        self._api_key = api_key
+        self._api_key = api_key.strip() if api_key else ""
         self._transport = transport
 
     def _client(self, timeout: float) -> httpx.AsyncClient:

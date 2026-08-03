@@ -54,6 +54,12 @@ async def extract_memory(
     conversation_id: int,
 ) -> dict | None:
     """Run one extraction pass; returns the stored memory row or None."""
+    clean_user = user_text.strip().lower()
+    if len(clean_user) < 12 or clean_user in {
+        "hi", "hello", "hey", "thanks", "thank you", "ok", "okay", "yes", "no", "bye", "cool", "great"
+    }:
+        return None
+
     exchange = f"User: {user_text}\nAssistant: {assistant_text[:1000]}"
     try:
         raw = await provider.complete(

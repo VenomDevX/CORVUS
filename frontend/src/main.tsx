@@ -7,7 +7,15 @@ import "./styles/index.css";
 import { applyThemeVars } from "./lib/theme";
 import { useCorvus } from "./state/store";
 
-applyThemeVars(useCorvus.getState().theme);
+applyThemeVars({
+  theme: useCorvus.getState().theme,
+  accentColor: useCorvus.getState().accentColor,
+  fontFamily: useCorvus.getState().fontFamily,
+  uiRoundness: useCorvus.getState().uiRoundness,
+  appOpacity: useCorvus.getState().appOpacity,
+  animationSpeed: useCorvus.getState().animationSpeed,
+  uiScale: useCorvus.getState().uiScale
+});
 
 const isWidget = window.location.hash.startsWith("#/widget");
 const isOverlay = window.location.hash.startsWith("#/overlay");

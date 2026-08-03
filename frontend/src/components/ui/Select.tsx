@@ -99,8 +99,8 @@ export function Select({
         aria-label={ariaLabel}
         className={
           compact
-            ? "flex h-8 max-w-44 items-center gap-1 rounded px-2 text-caption text-fg-muted transition-colors duration-fast hover:bg-white/10 hover:text-fg disabled:opacity-40"
-            : "flex w-full items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left text-body text-fg transition-colors duration-fast hover:bg-white/10 focus:border-accent/60 focus:outline-none disabled:opacity-40"
+            ? "flex h-8 max-w-44 items-center gap-1 rounded px-2 text-caption text-fg-muted transition-colors duration-fast hover:bg-black/5 dark:hover:bg-white/10 hover:text-fg disabled:opacity-40"
+            : "flex w-full items-center justify-between gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2 text-left text-body text-fg transition-colors duration-fast hover:bg-black/10 dark:hover:bg-white/10 focus:border-accent/60 focus:outline-none disabled:opacity-40"
         }
       >
         <span className="truncate">{selected?.label ?? selected?.value ?? placeholder}</span>
@@ -113,7 +113,7 @@ export function Select({
         <ul
           ref={menuRef}
           role="listbox"
-          className={`liquid-glass absolute z-50 max-h-64 w-full min-w-44 overflow-y-auto rounded-xl p-1 ${
+          className={`absolute z-50 max-h-64 w-full min-w-44 overflow-y-auto rounded-xl border border-black/10 dark:border-white/10 bg-app-secondary p-1 shadow-2xl ${
             openUp ? "bottom-full mb-1" : "top-full mt-1"
           }`}
         >
@@ -127,16 +127,16 @@ export function Select({
                 onPointerEnter={() => setHighlighted(i)}
                 onClick={() => pick(option)}
                 className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-body-sm transition-colors duration-fast ${
-                  i === highlighted ? "bg-white/10 text-fg" : "text-fg-muted hover:bg-white/5"
+                  i === highlighted ? "bg-black/5 dark:bg-white/10 text-fg" : "text-fg-muted hover:bg-black/5 dark:hover:bg-white/5"
                 }`}
               >
                 <span className="min-w-0">
                   <span className="block truncate">{option.label ?? option.value}</span>
                   {option.hint && (
-                    <span className="block truncate text-caption text-fg-faint">{option.hint}</span>
+                     <span className="block truncate text-caption text-fg-faint">{option.hint}</span>
                   )}
                 </span>
-                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-white" />}
+                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-accent-bright" />}
               </li>
             );
           })}

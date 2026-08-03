@@ -34,32 +34,63 @@ export function AboutSettings() {
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <img src="./logo.png" alt="" className="h-8 w-8" />
+    <div className="flex flex-col items-center text-center space-y-6 pt-12">
+      <div className="flex flex-col items-center gap-3">
+        <img src="./logo.png" alt="Corvus Logo" className="h-16 w-16 mb-2" />
         <div>
-          <div className="text-body font-semibold text-fg">Corvus</div>
-          <div className="text-caption text-fg-faint">Version {version || "—"}</div>
+          <h1 className="text-display font-semibold text-fg">Corvus</h1>
+          <div className="text-body text-fg-faint mt-1">Version {version || "—"}</div>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="max-w-md text-body text-fg-muted space-y-4">
+        <p>
+          Corvus is a highly capable, offline-first personal AI assistant. 
+          It runs entirely on your local machine, ensuring your data, memories, 
+          and documents never leave your device without your explicit permission.
+        </p>
+        <p>
+          By bridging lightweight local LLMs with optional cloud models, 
+          Corvus gives you the flexibility of infinite memory and blazing-fast 
+          voice interactions without sacrificing privacy.
+        </p>
+      </div>
+
+      <div className="flex flex-col items-center gap-3 pt-4">
         <button
           onClick={() => void check()}
           disabled={checking}
-          className="rounded bg-accent/20 px-3 py-1.5 text-body-sm text-accent-bright transition-colors duration-fast hover:bg-accent/30 disabled:opacity-50"
+          className="rounded-full bg-white/10 px-5 py-2 text-body-sm text-fg transition-colors duration-fast hover:bg-white/20 disabled:opacity-50"
         >
           {checking ? "Checking…" : "Check for updates"}
         </button>
         {status?.state === "downloaded" && (
           <button
             onClick={() => void window.corvus?.installUpdate()}
-            className="rounded bg-accent px-3 py-1.5 text-body-sm text-white transition-colors duration-fast hover:bg-accent-bright"
+            className="rounded-full bg-white/20 px-5 py-2 text-body-sm text-fg transition-colors duration-fast hover:bg-white/30 mt-2"
           >
             Restart &amp; install
           </button>
         )}
-        {statusText() && <span className="text-body-sm text-fg-muted">{statusText()}</span>}
+        {statusText() && <span className="text-caption text-fg-faint">{statusText()}</span>}
+      </div>
+
+      <div className="pt-8 border-t border-white/5 w-full max-w-sm flex flex-col items-center gap-2">
+        <div className="text-caption text-fg-faint">
+          Built with <span className="text-fg">React</span>, <span className="text-fg">Electron</span>, and <span className="text-fg">FastAPI</span>.
+        </div>
+        <div className="text-caption text-fg-faint">
+          <a 
+            href="#" 
+            onClick={(e) => {
+              e.preventDefault();
+              window.corvus?.openExternal("https://github.com/corvus-ai/corvus");
+            }}
+            className="text-fg hover:underline transition-all"
+          >
+            View on GitHub
+          </a>
+        </div>
       </div>
     </div>
   );

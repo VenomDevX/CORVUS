@@ -15,15 +15,19 @@ export type Section =
   | "chat"
   | "studio"
   | "history"
-  | "memory"
   | "tasks"
   | "settings"
   | "extensions"
   | "downloads"
-  | "logs"
   | "plugins";
 
-export type Theme = "dark" | "light";
+export type Theme = "dark" | "light" | "system" | "pink" | "green" | "blue" | "purple";
+export type AccentColor = "monochrome" | "blue" | "emerald" | "amethyst" | "amber" | "ruby" | "ocean" | "cyberpunk" | "forest" | "blush" | "neon" | "midnight" | "black";
+export type UiScale = "compact" | "default" | "large";
+export type FontFamily = "system" | "monospace" | "serif" | "comic";
+export type UiRoundness = "sharp" | "default" | "rounded" | "pill";
+export type AppOpacity = "solid" | "glassy" | "transparent";
+export type AnimationSpeed = "fast" | "default" | "slow";
 
 export interface ActionEvent {
   name: string;
@@ -51,6 +55,13 @@ export interface PendingConfirmation {
 }
 
 const THEME_KEY = "corvus.theme";
+const ACCENT_KEY = "corvus.accent";
+const SCALE_KEY = "corvus.scale";
+const FONT_KEY = "corvus.font";
+const ROUNDNESS_KEY = "corvus.roundness";
+const OPACITY_KEY = "corvus.opacity";
+const ANIMATION_KEY = "corvus.animation";
+const SIDEBAR_MIN_KEY = "corvus.sidebar_minimized";
 
 export function orbStateFor(opts: { generating: boolean; listening: boolean; speaking: boolean }): OrbState {
   // Voice states (listening/speaking) take over in Milestone 5; text-only
@@ -73,6 +84,13 @@ interface VoiceState {
 
 interface CorvusStore {
   theme: Theme;
+  accentColor: AccentColor;
+  uiScale: UiScale;
+  fontFamily: FontFamily;
+  uiRoundness: UiRoundness;
+  appOpacity: AppOpacity;
+  animationSpeed: AnimationSpeed;
+  sidebarMinimized: boolean;
   section: Section;
   backendOnline: boolean;
   conversationId: number | null;
@@ -88,12 +106,19 @@ interface CorvusStore {
   setPaletteOpen: (open: boolean) => void;
 
   setTheme: (theme: Theme) => void;
+  setAccentColor: (color: AccentColor) => void;
+  setUiScale: (scale: UiScale) => void;
+  setFontFamily: (font: FontFamily) => void;
+  setUiRoundness: (roundness: UiRoundness) => void;
+  setAppOpacity: (opacity: AppOpacity) => void;
+  setAnimationSpeed: (speed: AnimationSpeed) => void;
+  setSidebarMinimized: (minimized: boolean) => void;
   setSection: (section: Section) => void;
   setBackendOnline: (online: boolean) => void;
   refreshConversations: () => Promise<void>;
   openConversation: (id: number) => Promise<void>;
   newConversation: () => void;
-  send: (content: string) => void;
+  send: (content: string, editMessageId?: number) => void;
   stopGeneration: () => void;
   answerConfirmation: (approved: boolean) => void;
   setVoiceMode: (on: boolean) => void;
@@ -106,8 +131,15 @@ interface CorvusStore {
 let voiceSocket: VoiceSocket | null = null;
 let voiceReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-export const useCorvus = create<CorvusStore>((set, get) => ({
-  theme: (localStorage.getItem(THEME_KEY) as Theme) ?? "dark",
+export const useCorvus = create<CorvusStore>()((set, get) => ({
+  theme: (localStorage.getItem(THEME_KEY) as Theme) || "dark",
+  accentColor: (localStorage.getItem(ACCENT_KEY) as AccentColor) || "monochrome",
+  uiScale: (localStorage.getItem(SCALE_KEY) as UiScale) || "default",
+  fontFamily: (localStorage.getItem(FONT_KEY) as FontFamily) || "system",
+  uiRoundness: (localStorage.getItem(ROUNDNESS_KEY) as UiRoundness) || "default",
+  appOpacity: (localStorage.getItem(OPACITY_KEY) as AppOpacity) || "glassy",
+  animationSpeed: (localStorage.getItem(ANIMATION_KEY) as AnimationSpeed) || "default",
+  sidebarMinimized: localStorage.getItem(SIDEBAR_MIN_KEY) === "true",
   section: "chat",
   backendOnline: false,
   conversationId: null,
@@ -135,6 +167,40 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
     document.documentElement.dataset.theme = theme;
     set({ theme });
   },
+  setAccentColor: (accentColor) => {
+    localStorage.setItem(ACCENT_KEY, accentColor);
+    document.documentElement.dataset.accent = accentColor;
+    set({ accentColor });
+  },
+  setUiScale: (uiScale) => {
+    localStorage.setItem(SCALE_KEY, uiScale);
+    document.documentElement.dataset.scale = uiScale;
+    set({ uiScale });
+  },
+  setFontFamily: (fontFamily) => {
+    localStorage.setItem(FONT_KEY, fontFamily);
+    document.documentElement.dataset.font = fontFamily;
+    set({ fontFamily });
+  },
+  setUiRoundness: (uiRoundness) => {
+    localStorage.setItem(ROUNDNESS_KEY, uiRoundness);
+    document.documentElement.dataset.roundness = uiRoundness;
+    set({ uiRoundness });
+  },
+  setAppOpacity: (appOpacity) => {
+    localStorage.setItem(OPACITY_KEY, appOpacity);
+    document.documentElement.dataset.opacity = appOpacity;
+    set({ appOpacity });
+  },
+  setAnimationSpeed: (animationSpeed) => {
+    localStorage.setItem(ANIMATION_KEY, animationSpeed);
+    document.documentElement.dataset.animation = animationSpeed;
+    set({ animationSpeed });
+  },
+  setSidebarMinimized: (sidebarMinimized) => {
+    localStorage.setItem(SIDEBAR_MIN_KEY, String(sidebarMinimized));
+    set({ sidebarMinimized });
+  },
 
   setSection: (section) => set({ section }),
   setBackendOnline: (backendOnline) => set({ backendOnline }),
@@ -150,15 +216,29 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
 
   newConversation: () => set({ conversationId: null, messages: [] }),
 
-  send: (content) => {
+  send: (content, editMessageId) => {
     const { generating, conversationId } = get();
     if (generating || !content.trim()) return;
 
-    set((s) => ({
-      messages: [...s.messages, { id: crypto.randomUUID(), role: "user", content }, { id: crypto.randomUUID(), role: "assistant", content: "" }],
-      generating: true,
-      orbState: orbStateFor({ generating: true, listening: false, speaking: false }),
-    }));
+    if (editMessageId !== undefined) {
+      set((s) => {
+        const idx = s.messages.findIndex(m => m.id === editMessageId);
+        if (idx === -1) return s;
+        const messages = s.messages.slice(0, idx + 1);
+        messages[idx] = { ...messages[idx], content };
+        return {
+          messages: [...messages, { id: crypto.randomUUID(), role: "assistant", content: "" }],
+          generating: true,
+          orbState: orbStateFor({ generating: true, listening: false, speaking: false }),
+        };
+      });
+    } else {
+      set((s) => ({
+        messages: [...s.messages, { id: crypto.randomUUID(), role: "user", content }, { id: crypto.randomUUID(), role: "assistant", content: "" }],
+        generating: true,
+        orbState: orbStateFor({ generating: true, listening: false, speaking: false }),
+      }));
+    }
 
     const patchLast = (fn: (m: ChatMessage | DraftMessage) => ChatMessage | DraftMessage) =>
       set((s) => {
@@ -179,7 +259,7 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
         return { ...last, actions };
       });
 
-    const handle = streamChat({ conversationId, content }, (frame) => {
+    const handle = streamChat({ conversationId, content, editMessageId }, (frame) => {
       switch (frame.type) {
         case "start":
           set({ conversationId: frame.conversation_id });
@@ -314,3 +394,9 @@ export const useCorvus = create<CorvusStore>((set, get) => ({
 
 // Apply persisted theme on load.
 document.documentElement.dataset.theme = (localStorage.getItem(THEME_KEY) as Theme) ?? "dark";
+document.documentElement.dataset.accent = (localStorage.getItem(ACCENT_KEY) as AccentColor) ?? "monochrome";
+document.documentElement.dataset.scale = (localStorage.getItem(SCALE_KEY) as UiScale) ?? "default";
+document.documentElement.dataset.font = (localStorage.getItem(FONT_KEY) as FontFamily) ?? "system";
+document.documentElement.dataset.roundness = (localStorage.getItem(ROUNDNESS_KEY) as UiRoundness) ?? "default";
+document.documentElement.dataset.opacity = (localStorage.getItem(OPACITY_KEY) as AppOpacity) ?? "glassy";
+document.documentElement.dataset.animation = (localStorage.getItem(ANIMATION_KEY) as AnimationSpeed) ?? "default";

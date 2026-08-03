@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, Cpu } from "lucide-react";
 import { api, type SystemSpecs } from "../lib/api";
 import { pullOllamaModel, type PullProgress } from "../lib/ollama";
 import { useCorvus } from "../state/store";
@@ -82,7 +82,7 @@ export function OllamaModels() {
     return (
       <div
         key={id}
-        className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2"
+        className="flex items-center justify-between gap-3 py-3 border-b border-white/5 last:border-0"
       >
         <div className="min-w-0">
           <span className="text-body-sm font-semibold text-fg">
@@ -138,8 +138,21 @@ export function OllamaModels() {
     );
   }
 
+  const suggestedModel = specs.catalog.find(c => c.id === specs.suggested);
+  const hardwareDesc = specs.gpu 
+    ? `${specs.ram_gb}GB RAM and ${specs.gpu.name}`
+    : `${specs.ram_gb}GB RAM`;
+
   return (
-    <div className="space-y-1.5">
+    <div className="flex flex-col">
+      <div className="mb-4 flex flex-col gap-1 rounded-lg border border-accent/20 bg-accent/5 p-4 text-body-sm">
+        <div className="flex items-center gap-2 font-medium text-accent-bright">
+          <Cpu className="h-4 w-4" /> Top Suggestion for your Device
+        </div>
+        <p className="text-fg-muted">
+          Based on your <span className="font-medium text-fg">{hardwareDesc}</span>, we suggest <span className="font-medium text-fg">{suggestedModel?.label}</span> for the best balance of speed and capability.
+        </p>
+      </div>
       {specs.catalog.map((m) =>
         row(m.id, m.label, `${m.download_gb} GB · ${m.blurb}`, m.fit),
       )}

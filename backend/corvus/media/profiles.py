@@ -50,7 +50,7 @@ def profile_for(ram_gb: float, vram_gb: float | None, cpu_cores: int | None = No
         "image_steps": steps,
         "ort_providers": providers,
         "gpu_accelerated": gpu,
-        "intra_op_threads": max(1, cores - 2),
+        "intra_op_threads": min(4, max(1, cores - 2)),
         "unload_after_generate": ram_gb < 12,
         "video_max_keyframes": video_frames,
         "video_fps": 12 if tier == "high" else 10,

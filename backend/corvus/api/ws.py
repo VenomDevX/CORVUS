@@ -53,11 +53,24 @@ async def chat(ws: WebSocket) -> None:
 
     content = str(start["content"]).strip()
     conversation_id = start.get("conversation_id")
+    edit_message_id = start.get("edit_message_id")
+    
     if conversation_id is None or repo.get_conversation(conversation_id) is None:
         title = content[:60] + ("…" if len(content) > 60 else "")
         conversation_id = repo.create_conversation(title)["id"]
 
-    user_message = repo.add_message(conversation_id, "user", content)
+    if edit_message_id is not None:
+        msg = repo.get_message(edit_message_id)
+        if not msg or msg["conversation_id"] != conversation_id or msg["role"] != "user":
+            await ws.send_json({"type": "error", "message": "invalid edit message"})
+            await ws.close()
+            return
+        repo.update_message(edit_message_id, content)
+        repo.delete_messages_after(conversation_id, edit_message_id)
+        user_message = {"id": edit_message_id}
+    else:
+        user_message = repo.add_message(conversation_id, "user", content)
+
     # Remember where we are, so a crash mid-task restores this conversation.
     ws.app.state.session.set_active_conversation(conversation_id)
     await ws.send_json(
@@ -152,5 +165,8 @@ async def chat(ws: WebSocket) -> None:
     )
 
     if assistant_text and not cancelled.is_set():
-        # Background, bounded second pass; failures only log.
-        await extract_memory(provider, model, repo, content, assistant_text, conversation_id)
+        # Non-blocking background pass; failures only log.
+        asyncio.create_task(
+            extract_memory(provider, model, repo, content, assistant_text, conversation_id)
+        )
+

@@ -97,7 +97,7 @@ export function ProviderSettings() {
       </div>
 
       {current?.needs_key && (
-        <div className="rounded border border-white/10 bg-surface/50 p-3">
+        <div className="py-2">
           <div className="mb-2 flex items-center gap-2 text-body-sm">
             <span className={`h-2 w-2 rounded-full ${current.has_key ? "bg-success" : "bg-warning"}`} />
             <span className="text-fg-muted">
@@ -123,7 +123,7 @@ export function ProviderSettings() {
               onChange={(e) => setKeyInput(e.target.value)}
               placeholder={current.has_key ? "Replace key…" : "Paste API key"}
               aria-label={`${current.label} API key`}
-              className="flex-1 rounded border border-white/10 bg-surface px-3 py-2 text-body text-fg outline-none focus:border-accent"
+              className="flex-1 border-b border-white/20 bg-transparent px-1 py-2 text-body text-fg outline-none focus:border-accent transition-colors duration-fast"
             />
             <button
               onClick={() => void saveKey()}
@@ -172,7 +172,7 @@ export function ProviderSettings() {
             onChange={(e) => setModel(e.target.value)}
             onBlur={() => void changeModel(model)}
             placeholder="model id"
-            className="w-72 rounded border border-white/10 bg-surface px-3 py-2 text-body text-fg outline-none focus:border-accent"
+            className="w-72 border-b border-white/20 bg-transparent px-1 py-2 text-body text-fg outline-none focus:border-accent transition-colors duration-fast"
           />
         )}
       </div>

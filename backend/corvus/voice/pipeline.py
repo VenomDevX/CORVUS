@@ -353,9 +353,11 @@ class VoicePipeline:
 
         self._set_state("idle")
         if assistant_text and not self._interrupt.is_set():
-            await extract_memory(
-                self.provider, self._model(), self.repo,
-                user_text, assistant_text, self.conversation_id,
+            asyncio.create_task(
+                extract_memory(
+                    self.provider, self._model(), self.repo,
+                    user_text, assistant_text, self.conversation_id,
+                )
             )
 
     def _model(self) -> str:

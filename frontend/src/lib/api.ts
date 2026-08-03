@@ -495,7 +495,7 @@ export interface ActionLogEntry {
  * (partial output is kept and persisted server-side).
  */
 export function streamChat(
-  params: { conversationId: number | null; content: string },
+  params: { conversationId: number | null; content: string; editMessageId?: number },
   onFrame: (frame: StreamFrame) => void,
   onClose: () => void,
 ): StreamHandle {
@@ -506,6 +506,7 @@ export function streamChat(
         type: "start",
         conversation_id: params.conversationId,
         content: params.content,
+        edit_message_id: params.editMessageId,
       }),
     );
   ws.onmessage = (event) => onFrame(JSON.parse(event.data) as StreamFrame);

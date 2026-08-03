@@ -13,14 +13,16 @@ import numpy as np
 
 from .stt import Transcriber
 
-# Common Whisper mishearings of "corvus" on short windows.
 WAKE_PATTERNS = [
-    r"\bcorvus\b",
-    r"\bcorvis\b",
-    r"\bcorpus\b",
-    r"\bcorvos\b",
-    r"\bkorvus\b",
-    r"\bcore\s?vu?s\b",
+    r"\b[ck][oaue]r[vb][ouaie]?s\b", # corvus, carvus, kurvus, corvis, corbus, corbes, etc.
+    r"\bcore\s?[vb]u?s\b",          # core vus, core bus
+    r"\bcorpus\b",                  # corpus
+    r"\bcorvids\b",                 # corvids
+    r"\bcurve\s?us\b",              # curve us
+    r"\bcurves\b",                  # curves
+    r"\bchorus\b",                  # chorus
+    r"\bcovus\b",                   # covus (dropped r)
+    r"\bgorgeous\b",                # sometimes "hey gorgeous" instead of "hey corvus"
 ]
 _WAKE_RE = re.compile("|".join(WAKE_PATTERNS), re.IGNORECASE)
 

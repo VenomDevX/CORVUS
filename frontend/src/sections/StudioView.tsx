@@ -99,7 +99,7 @@ function VoiceAvatar({ name, className = "h-10 w-10 text-sm" }: { name: string; 
   const initials = (parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 1)).toUpperCase();
   return (
     <div
-      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br ${grad} font-bold text-white shadow-md ring-1 ring-white/20 ${className}`}
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br ${grad} font-bold text-fg shadow-md ring-1 ring-white/20 ${className}`}
     >
       <div className="absolute -left-1 -top-1 h-2/3 w-2/3 rounded-full bg-white/30 blur-[6px]" />
       <span className="relative drop-shadow-sm">{initials}</span>
@@ -130,7 +130,7 @@ function FilterChip({
         className={
           value
             ? "flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-black shadow-sm"
-            : "flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-300 shadow-sm transition-colors hover:bg-white/10 hover:text-white"
+            : "flex items-center gap-1.5 rounded-full border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-1.5 text-xs font-medium text-fg-muted shadow-sm transition-colors hover:bg-black/10 dark:bg-white/10 hover:text-fg"
         }
       >
         {value && onClear ? (
@@ -145,7 +145,7 @@ function FilterChip({
             ×
           </span>
         ) : !value ? (
-          <span className="-mt-0.5 text-lg leading-none text-gray-400">+</span>
+          <span className="-mt-0.5 text-lg leading-none text-fg-muted">+</span>
         ) : null}
         {value ? (
           <>
@@ -158,7 +158,7 @@ function FilterChip({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-50 mt-1.5 max-h-64 w-56 overflow-y-auto rounded-xl border border-white/10 bg-[#161B22] p-1.5 shadow-2xl">
+          <div className="absolute left-0 top-full z-50 mt-1.5 max-h-64 w-56 overflow-y-auto rounded-xl border border-black/10 dark:border-white/10 bg-app-secondary p-1.5 shadow-2xl">
             {options.map((o) => (
               <button
                 key={o.value}
@@ -167,14 +167,14 @@ function FilterChip({
                   setOpen(false);
                 }}
                 className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm transition-colors ${
-                  value === o.value ? "bg-white/10 text-white font-medium" : "text-gray-400 hover:bg-white/5 hover:text-white"
+                  value === o.value ? "bg-black/10 dark:bg-white/10 text-fg font-medium" : "text-fg-muted hover:bg-black/5 dark:bg-white/5 hover:text-fg"
                 }`}
               >
                 {o.label}
                 {selected === o.value && <span className="text-xs">✓</span>}
               </button>
             ))}
-            {options.length === 0 && <div className="px-2.5 py-2 text-xs text-gray-500">No options</div>}
+            {options.length === 0 && <div className="px-2.5 py-2 text-xs text-fg-faint">No options</div>}
           </div>
         </>
       )}
@@ -195,7 +195,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
 
   if (!item) {
     return (
-      <div className="flex h-24 items-center justify-center gap-4 border-t border-white/10 bg-black px-6 py-2 text-gray-500">
+      <div className="flex h-24 items-center justify-center gap-4 border-t border-black/10 dark:border-white/10 bg-app-secondary px-6 py-2 text-fg-faint">
         <Volume2 className="h-5 w-5 opacity-50" />
         <span className="text-sm">No audio selected</span>
       </div>
@@ -216,14 +216,14 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
   };
 
   return (
-    <div className="flex h-24 items-center justify-between border-t border-white/10 bg-black px-6 shadow-sm">
+    <div className="flex h-24 items-center justify-between border-t border-black/10 dark:border-white/10 bg-app-secondary px-6 shadow-sm">
       {/* Left section: Info */}
       <div className="flex items-center gap-4 w-1/4 min-w-0">
         <VoiceAvatar name={item.voice} />
         <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium text-white">{item.voice}</span>
-            <span className="truncate text-xs text-gray-500">· Created recently</span>
+            <span className="truncate text-sm font-medium text-fg">{item.voice}</span>
+            <span className="truncate text-xs text-fg-faint">· Created recently</span>
           </div>
         </div>
       </div>
@@ -231,7 +231,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
       {/* Middle section: Controls & Timeline */}
       <div className="flex flex-1 flex-col items-center justify-center max-w-2xl px-8">
         <div className="flex items-center gap-6 mb-1">
-          <button onClick={() => seek(-10)} className="text-gray-400 hover:text-white transition-colors" aria-label="Rewind 10 seconds">
+          <button onClick={() => seek(-10)} className="text-fg-muted hover:text-fg transition-colors" aria-label="Rewind 10 seconds">
             <RotateCcw className="h-5 w-5" />
           </button>
           <button
@@ -241,12 +241,12 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
           >
             {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current ml-0.5" />}
           </button>
-          <button onClick={() => seek(10)} className="text-gray-400 hover:text-white transition-colors" aria-label="Forward 10 seconds">
+          <button onClick={() => seek(10)} className="text-fg-muted hover:text-fg transition-colors" aria-label="Forward 10 seconds">
             <RotateCw className="h-5 w-5" />
           </button>
         </div>
         <div className="flex w-full items-center gap-3">
-          <span className="w-10 text-right text-xs text-gray-500 font-mono">
+          <span className="w-10 text-right text-xs text-fg-faint font-mono">
             {fmtTime(progress)}
           </span>
           <input
@@ -261,9 +261,9 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
               setProgress(t);
             }}
             aria-label="Seek"
-            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-[#161B22] accent-white transition-all hover:bg-white/10"
+            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-app-secondary accent-white transition-all hover:bg-black/10 dark:bg-white/10"
           />
-          <span className="w-10 text-xs text-gray-500 font-mono">
+          <span className="w-10 text-xs text-fg-faint font-mono">
             {fmtTime(duration)}
           </span>
         </div>
@@ -271,16 +271,16 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
 
       {/* Right section: Actions */}
       <div className="flex items-center gap-3 w-1/4 justify-end">
-        <div className="flex items-center border border-white/10 rounded-md p-1 mr-2 bg-[#161B22]">
-          <button className="rounded p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
+        <div className="flex items-center border border-black/10 dark:border-white/10 rounded-md p-1 mr-2 bg-app-secondary">
+          <button className="rounded p-1.5 text-fg-muted hover:bg-black/10 dark:bg-white/10 hover:text-fg transition-colors">
             <ThumbsUp className="h-4 w-4" />
           </button>
-          <div className="w-px h-4 bg-white/10 mx-1" />
-          <button className="rounded p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
+          <div className="w-px h-4 bg-black/10 dark:bg-white/10 mx-1" />
+          <button className="rounded p-1.5 text-fg-muted hover:bg-black/10 dark:bg-white/10 hover:text-fg transition-colors">
             <ThumbsDown className="h-4 w-4" />
           </button>
         </div>
-        <button className="flex items-center gap-1.5 rounded-md border border-white/10 bg-[#161B22] px-3 py-1.5 text-sm font-medium text-gray-300 hover:bg-white/5 transition-colors">
+        <button className="flex items-center gap-1.5 rounded-md border border-black/10 dark:border-white/10 bg-app-secondary px-3 py-1.5 text-sm font-medium text-fg-muted hover:bg-black/5 dark:bg-white/5 transition-colors">
           <Share2 className="h-4 w-4" />
           Share
         </button>
@@ -288,11 +288,11 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
           href={api.voiceoverAudioUrl(item.id)}
           download={item.filename}
           aria-label="Download audio"
-          className="flex items-center justify-center rounded-md border border-white/10 bg-[#161B22] p-2 text-gray-300 hover:bg-white/5 transition-colors"
+          className="flex items-center justify-center rounded-md border border-black/10 dark:border-white/10 bg-app-secondary p-2 text-fg-muted hover:bg-black/5 dark:bg-white/5 transition-colors"
         >
           <Download className="h-4 w-4" />
         </a>
-        <button className="rounded-md p-2 text-gray-400 hover:bg-white/10 transition-colors">
+        <button className="rounded-md p-2 text-fg-muted hover:bg-black/10 dark:bg-white/10 transition-colors">
           <ChevronDown className="h-5 w-5" />
         </button>
       </div>
@@ -328,8 +328,8 @@ function HistoryCard({
   return (
     <div
       onClick={onClick}
-      className={`group relative cursor-pointer border-b border-white/5 px-6 py-4 transition-all hover:bg-white/5 ${
-        active ? "bg-white/10" : ""
+      className={`group relative cursor-pointer border-b border-black/5 dark:border-white/5 px-6 py-4 transition-all hover:bg-black/5 dark:bg-white/5 ${
+        active ? "bg-black/10 dark:bg-white/10" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-4">
@@ -338,9 +338,9 @@ function HistoryCard({
             {item.text}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-white">{item.voice}</span>
-            <span className="text-xs text-gray-500">·</span>
-            <span className="text-xs text-gray-400">
+            <span className="text-xs font-semibold text-fg">{item.voice}</span>
+            <span className="text-xs text-fg-faint">·</span>
+            <span className="text-xs text-fg-muted">
               {new Date(`${item.created_at}Z`).toLocaleDateString(undefined, {
                 month: "short",
                 day: "numeric",
@@ -355,7 +355,7 @@ function HistoryCard({
               e.stopPropagation();
               onReuse();
             }}
-            className="rounded p-1.5 text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded p-1.5 text-fg-muted transition-colors hover:bg-black/10 dark:bg-white/10 hover:text-fg"
             title="Reuse settings"
           >
             <History className="h-4 w-4" />
@@ -558,14 +558,14 @@ export function StudioView() {
   return (
     <SectionShell title="Voice Studio">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="flex items-center gap-6 border-b border-white/5 px-6 py-4">
+        <div className="flex items-center gap-6 border-b border-black/5 dark:border-white/5 px-6 py-4">
           {STUDIO_TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`text-body-sm font-medium pb-1 transition-colors duration-fast ${
                 activeTab === tab.key
-                  ? "text-white border-b-2 border-white"
+                  ? "text-fg border-b-2 border-fg"
                   : "text-fg-muted hover:text-fg"
               }`}
             >
@@ -592,7 +592,7 @@ export function StudioView() {
                 placeholder="Type or paste the script for your voiceover…"
                 className="flex-1 resize-none bg-transparent p-0 text-xl font-light leading-relaxed text-fg outline-none placeholder:text-fg-muted/50"
               />
-              <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4 text-xs font-medium uppercase tracking-wider text-fg-faint">
+              <div className="mt-4 flex items-center justify-between border-t border-black/10 dark:border-white/10 pt-4 text-xs font-medium uppercase tracking-wider text-fg-faint">
                 <span>
                   {text.length.toLocaleString()} / {MAX_CHARS.toLocaleString()} characters
                 </span>
@@ -604,7 +604,7 @@ export function StudioView() {
               <button
                 onClick={() => void generate()}
                 disabled={!canGenerate}
-                className="flex items-center justify-center gap-2 rounded-xl bg-white px-8 py-3 text-body font-semibold text-black shadow-lg shadow-white/10 transition-all duration-fast hover:bg-white/90 hover:shadow-white/20 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+                className="flex items-center justify-center gap-2 rounded-xl bg-accent px-8 py-3 text-body font-semibold text-accent-fg shadow-lg shadow-accent/20 transition-all duration-fast hover:bg-accent-bright hover:shadow-accent/40 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
               >
                 {generating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Volume2 className="h-5 w-5" />}
                 {generating ? "Synthesizing…" : "Generate"}
@@ -617,13 +617,13 @@ export function StudioView() {
         </div>
 
         {/* Right Sidebar */}
-        <div className="flex w-full min-h-0 flex-col border-t border-white/10 bg-black lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px]">
+        <div className="flex w-full min-h-0 flex-col border-t border-black/10 dark:border-white/10 bg-app-secondary lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px]">
           {isVoicePickerOpen ? (
-            <div className="flex flex-col h-full text-white bg-black">
+            <div className="flex flex-col h-full text-fg bg-app-secondary">
               <div className="flex items-center gap-3 p-4 py-3">
                 <button 
                   onClick={() => setIsVoicePickerOpen(false)} 
-                  className="rounded-md border border-white/10 p-1.5 text-gray-300 hover:bg-white/5 transition-colors shadow-sm"
+                  className="rounded-md border border-black/10 dark:border-white/10 p-1.5 text-fg-muted hover:bg-black/5 dark:bg-white/5 transition-colors shadow-sm"
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
@@ -635,8 +635,8 @@ export function StudioView() {
                   onClick={() => setVoiceTab("explore")}
                   className={`flex items-center gap-2 py-3 text-sm transition-colors ${
                     voiceTab === "explore"
-                      ? "font-semibold border-b-2 border-white text-white"
-                      : "font-medium border-b-2 border-transparent text-gray-400 hover:text-white"
+                      ? "font-semibold border-b-2 border-fg text-fg"
+                      : "font-medium border-b-2 border-transparent text-fg-muted hover:text-fg"
                   }`}
                 >
                   <Type className="h-4 w-4" /> Explore
@@ -645,8 +645,8 @@ export function StudioView() {
                   onClick={() => setVoiceTab("mine")}
                   className={`flex items-center gap-2 py-3 text-sm transition-colors ${
                     voiceTab === "mine"
-                      ? "font-semibold border-b-2 border-white text-white"
-                      : "font-medium border-b-2 border-transparent text-gray-400 hover:text-white"
+                      ? "font-semibold border-b-2 border-fg text-fg"
+                      : "font-medium border-b-2 border-transparent text-fg-muted hover:text-fg"
                   }`}
                 >
                   My Voices
@@ -655,11 +655,11 @@ export function StudioView() {
 
               {voiceTab === "mine" ? (
                 <div className="flex-1 overflow-y-auto p-4">
-                  <p className="mb-3 text-caption text-gray-500">
+                  <p className="mb-3 text-caption text-fg-faint">
                     Voices installed on this PC — they work fully offline.
                   </p>
                   {voices.piper.filter((v) => v.installed).length === 0 ? (
-                    <div className="rounded-lg bg-white/5 p-4 text-sm text-gray-400">
+                    <div className="rounded-lg bg-black/5 dark:bg-white/5 p-4 text-sm text-fg-muted">
                       No offline voices installed yet. Switch to Explore, set Category to
                       &ldquo;Offline · Local&rdquo;, and download one — it then lives here.
                     </div>
@@ -671,7 +671,7 @@ export function StudioView() {
                           <div
                             key={v.id}
                             className={`group relative flex w-full items-center gap-3 rounded-lg p-2 transition-all duration-fast ${
-                              voice === v.id && engine === "piper" ? "bg-white/10" : "hover:bg-white/5"
+                              voice === v.id && engine === "piper" ? "bg-black/10 dark:bg-white/10" : "hover:bg-black/5 dark:bg-white/5"
                             }`}
                           >
                             <button
@@ -692,10 +692,10 @@ export function StudioView() {
                               )}
                             </div>
                             <div className="relative z-10 flex min-w-0 flex-1 flex-col pr-2">
-                              <span className="truncate text-sm font-semibold tracking-tight text-gray-300 group-hover:text-white">
+                              <span className="truncate text-sm font-semibold tracking-tight text-fg-muted group-hover:text-fg">
                                 {v.name}
                               </span>
-                              <span className="truncate text-[13px] text-gray-500 font-medium">
+                              <span className="truncate text-[13px] text-fg-faint font-medium">
                                 {v.language} · {v.gender} · offline
                               </span>
                             </div>
@@ -709,7 +709,7 @@ export function StudioView() {
                                   void preview("piper", v.id);
                                 }
                               }}
-                              className="relative z-10 shrink-0 rounded p-1.5 text-white opacity-0 transition-opacity hover:bg-white/20 group-hover:opacity-100"
+                              className="relative z-10 shrink-0 rounded p-1.5 text-fg opacity-0 transition-opacity hover:bg-black/20 dark:bg-white/20 group-hover:opacity-100"
                               title="Preview Voice"
                             >
                               {previewing === v.id ? (
@@ -729,18 +729,18 @@ export function StudioView() {
 
               <div className="p-4 flex flex-col gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 bg-white/5 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 focus-within:bg-white/10 transition-all">
-                    <Search className="h-4 w-4 text-gray-400" />
+                  <div className="flex-1 flex items-center gap-2 rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 bg-black/5 dark:bg-white/5 focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 focus-within:bg-black/10 dark:bg-white/10 transition-all">
+                    <Search className="h-4 w-4 text-fg-muted" />
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="Start typing to search..."
-                      className="flex-1 bg-transparent text-sm font-medium outline-none text-white placeholder:text-gray-500 placeholder:font-normal"
+                      className="flex-1 bg-transparent text-sm font-medium outline-none text-fg placeholder:text-fg-faint placeholder:font-normal"
                     />
                   </div>
                   <button 
                     onClick={() => setIsSortOpen(!isSortOpen)}
-                    className="rounded-lg border border-white/10 p-2 text-gray-300 hover:bg-white/5 shadow-sm transition-colors"
+                    className="rounded-lg border border-black/10 dark:border-white/10 p-2 text-fg-muted hover:bg-black/5 dark:bg-white/5 shadow-sm transition-colors"
                   >
                     <ListFilter className="h-4 w-4" />
                   </button>
@@ -797,14 +797,14 @@ export function StudioView() {
                     {isSortOpen && (
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setIsSortOpen(false)} />
-                        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-white/10 bg-[#161B22] p-2 shadow-xl flex flex-col gap-3">
+                        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-black/10 dark:border-white/10 bg-app-secondary p-2 shadow-xl flex flex-col gap-3">
                           <div>
-                            <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Sort</div>
+                            <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-fg-faint">Sort</div>
                             {(["A-Z", "Z-A", "Locale"] as const).map((opt) => (
                               <button
                                 key={opt}
                                 onClick={() => setSortOrder(opt)}
-                                className={`flex w-full items-center rounded-md px-2 py-1.5 text-sm transition-colors ${sortOrder === opt ? "bg-white/10 text-white font-medium" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
+                                className={`flex w-full items-center rounded-md px-2 py-1.5 text-sm transition-colors ${sortOrder === opt ? "bg-black/10 dark:bg-white/10 text-fg font-medium" : "text-fg-muted hover:bg-black/5 dark:bg-white/5 hover:text-fg"}`}
                               >
                                 {opt === "Locale" ? "Region" : opt}
                               </button>
@@ -820,14 +820,14 @@ export function StudioView() {
               <div className="flex-1 overflow-y-auto px-4 pb-10">
                 {engine === "edge" ? (
                   voices.edge.length === 0 ? (
-                    <div className="flex h-full items-center justify-center p-4 text-center text-sm text-gray-400">
+                    <div className="flex h-full items-center justify-center p-4 text-center text-sm text-fg-muted">
                       Neural voice catalog unavailable.<br />
                       Check connection or use offline voices.
                     </div>
                   ) : (
                     edgeGroups.map(([group, groupVoices]) => (
                       <div key={group} className="mb-2 last:mb-0">
-                        <div className="sticky top-0 z-10 bg-black/95 px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 backdrop-blur-md">
+                        <div className="sticky top-0 z-10 bg-app-secondary/95 px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-fg-faint backdrop-blur-md">
                           {group}
                         </div>
                         <div className="space-y-1">
@@ -836,8 +836,8 @@ export function StudioView() {
                               key={v.id}
                               className={`group relative flex w-full items-center gap-3 rounded-lg p-2 transition-all duration-fast ${
                                 voice === v.id
-                                  ? "bg-white/10"
-                                  : "hover:bg-white/5"
+                                  ? "bg-black/10 dark:bg-white/10"
+                                  : "hover:bg-black/5 dark:bg-white/5"
                               }`}
                             >
                               <button
@@ -855,10 +855,10 @@ export function StudioView() {
                                 )}
                               </div>
                               <div className="relative z-10 flex min-w-0 flex-1 flex-col pr-2">
-                                <span className={`truncate text-sm font-semibold tracking-tight ${voice === v.id ? 'text-white' : 'text-gray-300 group-hover:text-white'}`}>
+                                <span className={`truncate text-sm font-semibold tracking-tight ${voice === v.id ? 'text-fg' : 'text-fg-muted group-hover:text-fg'}`}>
                                   {v.name}
                                 </span>
-                                <span className="truncate text-[13px] text-gray-500 font-medium">
+                                <span className="truncate text-[13px] text-fg-faint font-medium">
                                   {v.gender}
                                 </span>
                               </div>
@@ -873,12 +873,12 @@ export function StudioView() {
                                       void preview("edge", v.id);
                                     }
                                   }}
-                                  className="shrink-0 rounded p-1.5 hover:bg-white/20 transition-colors text-white"
+                                  className="shrink-0 rounded p-1.5 hover:bg-black/20 dark:bg-white/20 transition-colors text-fg"
                                   title="Preview Voice"
                                 >
                                   {previewing === v.id ? <Square className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
                                 </button>
-                                <button className="shrink-0 rounded p-1.5 text-gray-400 hover:bg-white/20 transition-colors">
+                                <button className="shrink-0 rounded p-1.5 text-fg-muted hover:bg-black/20 dark:bg-white/20 transition-colors">
                                   <MoreVertical className="h-4 w-4" />
                                 </button>
                               </div>
@@ -895,8 +895,8 @@ export function StudioView() {
                         key={v.id}
                         className={`group relative flex w-full items-center gap-3 rounded-lg p-2 transition-all duration-fast ${
                           voice === v.id
-                            ? "bg-white/10"
-                            : "hover:bg-white/5"
+                            ? "bg-black/10 dark:bg-white/10"
+                            : "hover:bg-black/5 dark:bg-white/5"
                         } ${!v.installed ? "opacity-75 grayscale-[0.5]" : ""}`}
                       >
                         <button
@@ -914,10 +914,10 @@ export function StudioView() {
                           )}
                         </div>
                         <div className="relative z-10 flex min-w-0 flex-1 flex-col pr-2">
-                          <span className={`truncate text-sm font-semibold tracking-tight ${voice === v.id ? 'text-white' : 'text-gray-300 group-hover:text-white'}`}>
+                          <span className={`truncate text-sm font-semibold tracking-tight ${voice === v.id ? 'text-fg' : 'text-fg-muted group-hover:text-fg'}`}>
                             {v.name}
                           </span>
-                          <span className="truncate text-[13px] text-gray-500 font-medium">
+                          <span className="truncate text-[13px] text-fg-faint font-medium">
                             {v.gender} · {v.language}
                           </span>
                         </div>
@@ -933,12 +933,12 @@ export function StudioView() {
                                   void preview("piper", v.id);
                                 }
                               }}
-                              className="shrink-0 rounded p-1.5 hover:bg-white/20 transition-colors text-white"
+                              className="shrink-0 rounded p-1.5 hover:bg-black/20 dark:bg-white/20 transition-colors text-fg"
                               title="Preview Voice"
                             >
                               {previewing === v.id ? <Square className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
                             </button>
-                            <button className="shrink-0 rounded p-1.5 text-gray-400 hover:bg-white/20 transition-colors">
+                            <button className="shrink-0 rounded p-1.5 text-fg-muted hover:bg-black/20 dark:bg-white/20 transition-colors">
                               <MoreVertical className="h-4 w-4" />
                             </button>
                           </div>
@@ -949,7 +949,7 @@ export function StudioView() {
                               void downloadPiper(v.id);
                             }}
                             disabled={downloading !== null}
-                            className="relative z-10 flex shrink-0 items-center gap-1.5 rounded-lg border border-app-secondary bg-surface px-2.5 py-1.5 text-xs font-semibold text-gray-300 transition-colors hover:bg-surface-raised disabled:opacity-50 shadow-sm"
+                            className="relative z-10 flex shrink-0 items-center gap-1.5 rounded-lg border border-app-secondary bg-surface px-2.5 py-1.5 text-xs font-semibold text-fg-muted transition-colors hover:bg-surface-raised disabled:opacity-50 shadow-sm"
                           >
                             {downloading === v.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -968,14 +968,14 @@ export function StudioView() {
               )}
             </div>
           ) : (
-            <div className="flex h-full flex-col bg-black text-white">
-              <div className="flex items-center gap-8 px-6 mt-4 border-b border-white/10">
+            <div className="flex h-full flex-col bg-app-secondary text-fg">
+              <div className="flex items-center gap-8 px-6 mt-4 border-b border-black/10 dark:border-white/10">
                 <button
                   onClick={() => setSidebarTab("settings")}
                   className={`flex items-center gap-2 py-3 text-[13px] font-semibold transition-colors ${
                     sidebarTab === "settings"
-                      ? "border-b-2 border-white text-white"
-                      : "border-b-2 border-transparent text-gray-500 hover:text-white"
+                      ? "border-b-2 border-fg text-fg"
+                      : "border-b-2 border-transparent text-fg-faint hover:text-fg"
                   }`}
                 >
                   Settings
@@ -984,8 +984,8 @@ export function StudioView() {
                   onClick={() => setSidebarTab("history")}
                   className={`flex items-center gap-2 py-3 text-[13px] font-semibold transition-colors ${
                     sidebarTab === "history"
-                      ? "border-b-2 border-white text-white"
-                      : "border-b-2 border-transparent text-gray-500 hover:text-white"
+                      ? "border-b-2 border-fg text-fg"
+                      : "border-b-2 border-transparent text-fg-faint hover:text-fg"
                   }`}
                 >
                   History
@@ -999,16 +999,16 @@ export function StudioView() {
                       <label className="text-sm font-semibold tracking-tight text-fg">Voice</label>
                       <button 
                         onClick={() => setIsVoicePickerOpen(true)}
-                        className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3 text-left transition-all hover:bg-white/10 focus:ring-2 focus:ring-white/20 outline-none shadow-sm group"
+                        className="flex w-full items-center justify-between rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 p-3 text-left transition-all hover:bg-black/10 dark:bg-white/10 focus:ring-2 focus:ring-white/20 outline-none shadow-sm group"
                       >
                         <div className="flex items-center gap-3">
                           <VoiceAvatar name={selectedVoice?.name || "A"} className="h-6 w-6 text-[10px]" />
-                          <span className="text-[13px] font-semibold text-white">
+                          <span className="text-[13px] font-semibold text-fg">
                             {selectedVoice?.name || "Select Voice"}
                             {selectedVoice?.gender ? ` - ${selectedVoice.gender}` : ""}
                           </span>
                         </div>
-                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                        <ChevronRight className="h-4 w-4 text-fg-faint" />
                       </button>
                     </div>
                     
@@ -1017,19 +1017,19 @@ export function StudioView() {
                       <div className="relative">
                         <button
                           onClick={() => setIsModelOpen((o) => !o)}
-                          className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3 text-[13px] font-semibold text-white shadow-sm transition-all hover:bg-white/10 focus:ring-2 focus:ring-white/20 outline-none"
+                          className="flex w-full items-center justify-between rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 p-3 text-[13px] font-semibold text-fg shadow-sm transition-all hover:bg-black/10 dark:bg-white/10 focus:ring-2 focus:ring-white/20 outline-none"
                         >
                           {engine === "edge"
                             ? "Multilingual v1 (Online)"
                             : "Multilingual v2 (Offline)"}
                           <ChevronDown
-                            className={`h-4 w-4 text-gray-500 transition-transform duration-fast ${isModelOpen ? "rotate-180" : ""}`}
+                            className={`h-4 w-4 text-fg-faint transition-transform duration-fast ${isModelOpen ? "rotate-180" : ""}`}
                           />
                         </button>
                         {isModelOpen && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setIsModelOpen(false)} />
-                            <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-white/10 bg-[#161B22] p-1.5 shadow-2xl">
+                            <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-black/10 dark:border-white/10 bg-app-secondary p-1.5 shadow-2xl">
                               {(
                                 [
                                   {
@@ -1051,14 +1051,14 @@ export function StudioView() {
                                     setIsModelOpen(false);
                                   }}
                                   className={`flex w-full items-start justify-between rounded-lg px-3 py-2.5 text-left transition-colors ${
-                                    engine === m.value ? "bg-white/10" : "hover:bg-white/5"
+                                    engine === m.value ? "bg-black/10 dark:bg-white/10" : "hover:bg-black/5 dark:bg-white/5"
                                   }`}
                                 >
                                   <span className="flex flex-col">
-                                    <span className="text-[13px] font-semibold text-white">{m.title}</span>
-                                    <span className="text-xs text-gray-400">{m.sub}</span>
+                                    <span className="text-[13px] font-semibold text-fg">{m.title}</span>
+                                    <span className="text-xs text-fg-muted">{m.sub}</span>
                                   </span>
-                                  {engine === m.value && <span className="mt-0.5 text-xs text-white">✓</span>}
+                                  {engine === m.value && <span className="mt-0.5 text-xs text-fg">✓</span>}
                                 </button>
                               ))}
                             </div>
@@ -1067,7 +1067,7 @@ export function StudioView() {
                       </div>
                     </div>
                     
-                    <h3 className="text-sm font-semibold tracking-tight text-white mb-4 mt-6">Voice Settings</h3>
+                    <h3 className="text-sm font-semibold tracking-tight text-fg mb-4 mt-6">Voice Settings</h3>
                     <div className="space-y-6 pt-2">
                       {(
                         [
@@ -1078,16 +1078,16 @@ export function StudioView() {
                       ).map(([label, value, set, min, max, minLabel, maxLabel]) => (
                         <label key={label} className="block group">
                           <div className="mb-0.5 flex justify-between items-end">
-                            <span className="text-sm font-semibold tracking-tight text-white border-b border-white/20 border-dashed">{label}</span>
-                            <span className="text-xs text-white/50">{value}</span>
+                            <span className="text-sm font-semibold tracking-tight text-fg border-b border-black/20 dark:border-white/20 border-dashed">{label}</span>
+                            <span className="text-xs text-fg/50">{value}</span>
                           </div>
-                          <div className="flex justify-between text-xs text-gray-500 font-medium mb-2">
+                          <div className="flex justify-between text-xs text-fg-faint font-medium mb-2">
                             <span>{minLabel}</span>
                             <span>{maxLabel}</span>
                           </div>
                           <div className="relative flex items-center h-4">
                             {/* Track background */}
-                            <div className="absolute w-full h-1 bg-[#161B22] rounded-full border border-white/5" />
+                            <div className="absolute w-full h-1 bg-app-secondary rounded-full border border-black/5 dark:border-white/5" />
                             {/* Filled track */}
                             <div 
                               className="absolute h-1 bg-white rounded-full" 
@@ -1119,18 +1119,18 @@ export function StudioView() {
                             setPitch(0);
                             setVolume(0);
                           }}
-                          className="flex items-center gap-1.5 text-xs font-medium text-gray-500 transition-colors hover:text-white"
+                          className="flex items-center gap-1.5 text-xs font-medium text-fg-faint transition-colors hover:text-fg"
                         >
                           <RotateCcw className="h-3.5 w-3.5" /> Reset to defaults
                         </button>
                       </div>
                     </div>
 
-                    <h3 className="text-sm font-semibold tracking-tight text-white mt-2">Playback</h3>
+                    <h3 className="text-sm font-semibold tracking-tight text-fg mt-2">Playback</h3>
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-gray-200">Autoplay</span>
-                        <span className="text-xs text-gray-500">Play new voiceovers automatically</span>
+                        <span className="text-xs text-fg-faint">Play new voiceovers automatically</span>
                       </div>
                       <button
                         role="switch"
@@ -1142,7 +1142,7 @@ export function StudioView() {
                       >
                         <span
                           className={`absolute top-0.5 h-4 w-4 rounded-full shadow-sm transition-transform ${
-                            autoplay ? "translate-x-[18px] bg-black" : "translate-x-0.5 bg-gray-400"
+                            autoplay ? "translate-x-[18px] bg-app-secondary" : "translate-x-0.5 bg-gray-400"
                           }`}
                         />
                       </button>
@@ -1152,7 +1152,7 @@ export function StudioView() {
               <div className="flex h-full flex-col">
                 {items.length === 0 ? (
                   <div className="flex h-full flex-col items-center justify-center p-8 text-center text-fg-muted">
-                    <div className="mb-4 rounded-full bg-white/5 p-4">
+                    <div className="mb-4 rounded-full bg-black/5 dark:bg-white/5 p-4">
                       <History className="h-8 w-8 opacity-50" />
                     </div>
                     <p className="text-body font-medium text-fg">No history yet</p>

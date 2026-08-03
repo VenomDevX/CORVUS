@@ -7,6 +7,8 @@ import tokens from "../../../design/tokens.json";
 
 export const color = tokens.color;
 export const motion = tokens.motion;
+export const typography = tokens.typography;
+export const radius = tokens.radius;
 
 /** Flattened color map for the Tailwind theme (dot keys → nested config). */
 export function tailwindColors() {

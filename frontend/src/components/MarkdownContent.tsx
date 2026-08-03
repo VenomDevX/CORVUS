@@ -3,36 +3,109 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Copy, Check, Download, Share2, GitBranch } from "lucide-react";
+import ReactDOM from "react-dom";
 
-function CodeBlock({ language, value }: { language: string; value: string }) {
+function CodeBlock({ language, value, actionsContainer }: { language: string; value: string; actionsContainer?: HTMLElement | null }) {
   const [copied, setCopied] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [branched, setBranched] = useState(false);
 
-  async function copy() {
+  async function copyCode() {
     await navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
 
-  return (
-    <div className="group relative my-2 overflow-hidden rounded">
-      <div className="flex items-center justify-between bg-bg-rein px-3 py-1.5">
-        <span className="text-caption text-fg-faint">{language || "code"}</span>
-        <button
-          onClick={copy}
-          aria-label="Copy code"
-          className="rounded-sm px-2 py-0.5 text-caption text-fg-muted transition-colors duration-fast hover:bg-accent/20 hover:text-fg"
-        >
-          {copied ? "✓ Copied" : "Copy"}
-        </button>
-      </div>
+  function downloadCode() {
+    const blob = new Blob([value], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `snippet.${language || "txt"}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setDownloaded(true);
+    setTimeout(() => setDownloaded(false), 1500);
+  }
+
+  async function shareCode() {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Code Snippet', text: value });
+      } catch {}
+    } else {
+      await navigator.clipboard.writeText(value);
+    }
+    setShared(true);
+    setTimeout(() => setShared(false), 1500);
+  }
+
+  function branchCode() {
+    navigator.clipboard.writeText(value);
+    setBranched(true);
+    setTimeout(() => setBranched(false), 1500);
+  }
+
+  const codeBlock = (
+    <div className="group relative my-2 flex flex-col">
+      {language && (
+        <span className="text-xs text-fg-muted font-mono mb-1 select-none">{language}</span>
+      )}
       <SyntaxHighlighter
         language={language || "text"}
         style={oneDark}
-        customStyle={{ margin: 0, borderRadius: 0, fontSize: "13px", lineHeight: "20px" }}
+        customStyle={{ margin: 0, backgroundColor: 'transparent', background: 'transparent', padding: 0, fontSize: "13px", lineHeight: "20px" }}
+        codeTagProps={{ style: { backgroundColor: 'transparent', background: 'transparent' } }}
       >
         {value}
       </SyntaxHighlighter>
     </div>
+  );
+
+  const actionButtons = (
+    <div className="flex flex-row items-center justify-start gap-1 text-fg-muted mt-1 ml-2">
+      <button
+        onClick={branchCode}
+        aria-label="Branch"
+        title="Branch"
+        className="rounded p-1 transition-colors duration-fast hover:bg-white/5 hover:text-fg"
+      >
+        {branched ? <Check className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
+      </button>
+      <button
+        onClick={shareCode}
+        aria-label="Share"
+        title="Share"
+        className="rounded p-1 transition-colors duration-fast hover:bg-white/5 hover:text-fg"
+      >
+        {shared ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+      </button>
+      <button
+        onClick={downloadCode}
+        aria-label="Download"
+        title="Download"
+        className="rounded p-1 transition-colors duration-fast hover:bg-white/5 hover:text-fg"
+      >
+        {downloaded ? <Check className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+      </button>
+      <button
+        onClick={copyCode}
+        aria-label="Copy code"
+        title="Copy code"
+        className="rounded p-1 transition-colors duration-fast hover:bg-white/5 hover:text-fg"
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+
+  return (
+    <>
+      {codeBlock}
+      {actionsContainer ? ReactDOM.createPortal(actionButtons, actionsContainer) : actionButtons}
+    </>
   );
 }
 
@@ -49,7 +122,7 @@ function isSafeUrl(url: string | undefined): boolean {
   }
 }
 
-export function MarkdownContent({ content }: { content: string }) {
+export function MarkdownContent({ content, actionsContainer }: { content: string; actionsContainer?: HTMLElement | null }) {
   return (
     <div className="markdown space-y-2 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-white/10 [&_th]:bg-white/5 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5">
       <ReactMarkdown
@@ -86,7 +159,7 @@ export function MarkdownContent({ content }: { content: string }) {
                 </code>
               );
             }
-            return <CodeBlock language={match?.[1] ?? ""} value={value} />;
+            return <CodeBlock language={match?.[1] ?? ""} value={value} actionsContainer={actionsContainer} />;
           },
         }}
       >

@@ -1,13 +1,27 @@
 import type { ReactNode } from "react";
 
-export function SectionShell({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex h-full flex-col gap-4 overflow-hidden">
-      <div className="flex items-center justify-between">
-        <h1 className="text-h2 tracking-tight">{title}</h1>
-        {actions}
+export function SectionShell({ title, actions, children, fullWidth }: { title: string; actions?: ReactNode; children: ReactNode; fullWidth?: boolean }) {
+  if (fullWidth) {
+    return (
+      <div className="flex h-full flex-col gap-4 overflow-hidden">
+        <div className="flex items-center justify-between">
+          <h1 className="text-h2 tracking-tight">{title}</h1>
+          {actions}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">{children}</div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">{children}</div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full justify-center">
+      <div className="flex h-full w-full max-w-5xl flex-col gap-4 overflow-hidden px-4 md:px-8">
+        <div className="flex items-center justify-between">
+          <h1 className="text-h2 tracking-tight">{title}</h1>
+          {actions}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">{children}</div>
+      </div>
     </div>
   );
 }

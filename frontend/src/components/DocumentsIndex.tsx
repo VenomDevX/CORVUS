@@ -69,7 +69,7 @@ export function DocumentsIndex() {
           value={folder}
           onChange={(e) => setFolder(e.target.value)}
           placeholder="C:\Users\you\Documents\notes"
-          className="glass min-w-0 flex-1 rounded px-3 py-2 text-body-sm text-fg placeholder:text-fg-faint focus:outline-none"
+          className="min-w-0 flex-1 border-b border-white/20 bg-transparent px-1 py-2 text-body-sm text-fg placeholder:text-fg-faint focus:border-accent focus:outline-none transition-colors duration-fast"
         />
         <button
           onClick={() => void runIndex()}
@@ -104,7 +104,7 @@ export function DocumentsIndex() {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && void trySearch()}
               placeholder="Try a search…"
-              className="glass min-w-0 flex-1 rounded px-3 py-2 text-body-sm text-fg placeholder:text-fg-faint focus:outline-none"
+              className="min-w-0 flex-1 border-b border-white/20 bg-transparent px-1 py-2 text-body-sm text-fg placeholder:text-fg-faint focus:border-accent focus:outline-none transition-colors duration-fast"
             />
             <button
               onClick={() => void trySearch()}
@@ -119,7 +119,7 @@ export function DocumentsIndex() {
             ) : (
               <ul className="space-y-1.5">
                 {hits.map((h, i) => (
-                  <li key={i} className="glass rounded p-2.5 text-body-sm">
+                  <li key={i} className="border-l-2 border-white/10 pl-3 py-1 text-body-sm">
                     <div className="mb-1 font-mono text-caption text-accent-bright">
                       {h.path.split(/[\\/]/).pop()}
                     </div>

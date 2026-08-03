@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 import structlog
 
-from ..config import OLLAMA_URL
+from ..config import DEFAULT_NUM_CTX, OLLAMA_URL
 from .base import Delta, Message, ToolCall
 
 log = structlog.get_logger("corvus")
@@ -35,9 +35,11 @@ def _parse_tool_calls(message: dict) -> list[ToolCall]:
 
 
 # Start of a JSON tool-call region: `{"`, `{}`, `[{`, `["`, or a ```json fence.
+# Also matches prefixes at the end of the buffer (`{\s*$`, `\[\s*$`, ```[json]*$) 
+# to hold incomplete chunks until they resolve.
 # Deliberately does NOT match prose braces ("{x}") or ```python code fences, so
 # ordinary answers and code blocks keep streaming untouched.
-_JSON_START = re.compile(r'\{\s*["}]|\[\s*[\[{"]|```json', re.IGNORECASE)
+_JSON_START = re.compile(r'\{\s*["}]|\[\s*[\[{"]|```json|```(?:j(?:s(?:o(?:n)?)?)?)?$|\{\s*$|\[\s*$', re.IGNORECASE)
 
 
 def _json_start(text: str) -> int:
@@ -140,6 +142,16 @@ def _to_wire(messages: list[Message]) -> list[dict]:
     return wire
 
 
+def _format_ollama_error(msg: str) -> str:
+    lower = msg.lower()
+    if any(k in lower for k in ("cudamalloc", "unable to allocate", "cpu_repack", "out of memory", "commit limit")):
+        return (
+            "System ran out of memory (Windows commit limit). Try closing background apps or browser tabs, "
+            f"or switch to a smaller model (e.g. llama3.2:1b or qwen2.5-coder:1.5b). Details: {msg}"
+        )
+    return f"Ollama error: {msg}"
+
+
 class OllamaProvider:
     name = "ollama"
 
@@ -157,6 +169,7 @@ class OllamaProvider:
             "model": model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "stream": True,
+            "options": {"num_ctx": DEFAULT_NUM_CTX},
         }
         async with self._client(timeout=300.0) as client:
             async with client.stream("POST", "/api/chat", json=payload) as response:
@@ -166,7 +179,7 @@ class OllamaProvider:
                         continue
                     chunk = json.loads(line)
                     if "error" in chunk:
-                        raise RuntimeError(f"Ollama error: {chunk['error']}")
+                        raise RuntimeError(_format_ollama_error(str(chunk["error"])))
                     content = chunk.get("message", {}).get("content", "")
                     done = bool(chunk.get("done", False))
                     if content or done:
@@ -183,7 +196,7 @@ class OllamaProvider:
             "stream": True,
             # Bound the context so the KV cache fits modest GPUs; the tool
             # schemas + short history stay well under this.
-            "options": {"num_ctx": 8192},
+            "options": {"num_ctx": DEFAULT_NUM_CTX},
         }
         valid_names = {
             t["function"]["name"] for t in tools if isinstance(t.get("function"), dict)
@@ -200,6 +213,7 @@ class OllamaProvider:
         # end of the turn and then decide: real tool call, or text to release.
         buffer = ""
         emitted = 0
+        emitted_native_calls = False
 
         async with self._client(timeout=300.0) as client:
             response = None
@@ -216,7 +230,7 @@ class OllamaProvider:
                         _no_tools_models.add(model)
                         log.info("ollama_tools_unsupported", model=model)
                         continue
-                    raise RuntimeError(f"Ollama error: {body}")
+                    raise RuntimeError(_format_ollama_error(body))
                 break
 
             try:
@@ -226,13 +240,14 @@ class OllamaProvider:
                         continue
                     chunk = json.loads(line)
                     if "error" in chunk:
-                        raise RuntimeError(f"Ollama error: {chunk['error']}")
+                        raise RuntimeError(_format_ollama_error(str(chunk["error"])))
                     message = chunk.get("message", {})
                     content = message.get("content", "") or ""
                     calls = _parse_tool_calls(message)
                     done = bool(chunk.get("done", False))
 
                     if calls:
+                        emitted_native_calls = True
                         yield Delta(content="", done=False, tool_calls=calls)
 
                     if content:
@@ -248,7 +263,10 @@ class OllamaProvider:
                         held = buffer[emitted:]
                         text_calls = _extract_text_tool_calls(held, valid_names) if held.strip() else []
                         if text_calls:
-                            yield Delta(content="", done=True, tool_calls=text_calls)
+                            if not emitted_native_calls:
+                                yield Delta(content="", done=True, tool_calls=text_calls)
+                            else:
+                                yield Delta(content="", done=True)
                         elif held:
                             if emitted_native_calls and _is_any_tool_call(held):
                                 yield Delta(content="", done=True)

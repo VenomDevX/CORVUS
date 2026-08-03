@@ -30,7 +30,7 @@ export function AddPluginButton({ onInstalled }: { onInstalled: () => void }) {
       <button
         onClick={() => input.current?.click()}
         disabled={busy}
-        className="rounded bg-accent px-3 py-1.5 text-body-sm text-white transition-colors duration-fast hover:bg-accent-bright disabled:opacity-50"
+        className="rounded bg-accent px-3 py-1.5 text-body-sm text-accent-fg transition-colors duration-fast hover:bg-accent-bright disabled:opacity-50"
       >
         {busy ? "Installing…" : "Add plugin"}
       </button>

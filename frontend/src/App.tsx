@@ -9,15 +9,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Sidebar } from "./components/Sidebar";
 import { ChatView } from "./components/ChatView";
 import { VoiceMode } from "./components/VoiceMode";
+import { Menu } from "lucide-react";
 import { NotificationsLayer } from "./components/NotificationsLayer";
 import { CommandPalette } from "./components/CommandPalette";
 import { OnboardingSetup } from "./components/OnboardingSetup";
 import { ThinkingAnimation } from "./components/ThinkingAnimation";
 import { HistoryView } from "./sections/HistoryView";
 import { StudioView } from "./sections/StudioView";
-import { MemoryView } from "./sections/MemoryView";
 import { SettingsView } from "./sections/SettingsView";
-import { LogsView } from "./sections/LogsView";
 import { TasksView } from "./sections/TasksView";
 import { DownloadsView } from "./sections/DownloadsView";
 import { ExtensionsView } from "./sections/ExtensionsView";
@@ -28,10 +27,10 @@ import { api } from "./lib/api";
 
 // Fluent brand ramp anchored on the electric-blue accent token.
 const corvusBrand: BrandVariants = {
-  10: "#020308", 20: "#0B1220", 30: "#12224A", 40: "#1B3A80",
-  50: "#234A9E", 60: "#2E5FC7", 70: "#3B72E3", 80: "#4F8CFF",
-  90: "#639AFF", 100: "#7AAAFF", 110: "#8FB8FF", 120: "#A5C6FF",
-  130: "#BBD4FF", 140: "#D1E2FF", 150: "#E7F0FF", 160: "#F3F8FF",
+  10: "#050505", 20: "#111111", 30: "#222222", 40: "#333333",
+  50: "#444444", 60: "#555555", 70: "#777777", 80: "#999999",
+  90: "#BBBBBB", 100: "#DDDDDD", 110: "#EEEEEE", 120: "#F5F5F5",
+  130: "#FAFAFA", 140: "#FCFCFC", 150: "#FEFEFE", 160: "#FFFFFF",
 };
 const darkTheme = createDarkTheme(corvusBrand);
 const lightTheme = createLightTheme(corvusBrand);
@@ -40,9 +39,7 @@ const SECTIONS: Record<Section, () => JSX.Element> = {
   chat: ChatView,
   studio: StudioView,
   history: HistoryView,
-  memory: MemoryView,
   settings: SettingsView,
-  logs: LogsView,
   tasks: TasksView,
   extensions: ExtensionsView,
   downloads: DownloadsView,
@@ -55,9 +52,17 @@ export default function App() {
   const setBackendOnline = useCorvus((s) => s.setBackendOnline);
   const newConversation = useCorvus((s) => s.newConversation);
   const voiceMode = useCorvus((s) => s.voiceMode);
+  const accentColor = useCorvus((s) => s.accentColor);
+  const fontFamily = useCorvus((s) => s.fontFamily);
+  const uiRoundness = useCorvus((s) => s.uiRoundness);
+  const appOpacity = useCorvus((s) => s.appOpacity);
+  const animationSpeed = useCorvus((s) => s.animationSpeed);
   const backendOnline = useCorvus((s) => s.backendOnline);
+  const uiScale = useCorvus((s) => s.uiScale);
   const connectVoiceSocket = useCorvus((s) => s.connectVoiceSocket);
   const Body = SECTIONS[section];
+  
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // null = not yet known (don't flash the wizard); persisted in backend settings.
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
@@ -98,7 +103,34 @@ export default function App() {
     })();
   }, [backendOnline]);
 
-  useEffect(() => applyThemeVars(theme), [theme]);
+  useEffect(() => {
+    // Automatically check for updates in the background and show a Toast.
+    const off = window.corvus?.onUpdateStatus?.((status) => {
+      if (status.state === "available") {
+        try {
+          if ("Notification" in window) {
+            new Notification("Corvus Update Available", {
+              body: `Version ${status.version} is ready. Go to Settings > About to download and install.`,
+            });
+          }
+        } catch {
+          // ignore if no native notification support
+        }
+      }
+    });
+    
+    // Trigger a silent check 5 seconds after startup.
+    const timer = setTimeout(() => {
+      void window.corvus?.checkForUpdates?.();
+    }, 5000);
+
+    return () => {
+      off?.();
+      clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => applyThemeVars({ theme, accentColor, fontFamily, uiRoundness, appOpacity, animationSpeed, uiScale }), [theme, accentColor, fontFamily, uiRoundness, appOpacity, animationSpeed, uiScale]);
 
   // Backend liveness poll — drives the offline banner and input state.
   useEffect(() => {
@@ -135,8 +167,14 @@ export default function App() {
         <AnimatePresence>{voiceMode && <VoiceMode />}</AnimatePresence>
         {/* Draggable titlebar strip (native window buttons overlay the right edge) */}
         <header className="titlebar-drag flex h-10 shrink-0 items-center gap-2 px-4">
-          <img src="./logo.png" alt="" className="h-4 w-4" />
-          <span className="text-caption text-fg-muted">Corvus</span>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="titlebar-no-drag rounded p-1 text-fg-muted hover:bg-white/5 hover:text-fg md:hidden"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+          <img src="./logo.png" alt="" className="h-4 w-4 hidden md:block" />
+          <span className="text-caption text-fg-muted hidden md:inline">Corvus</span>
           <button
             onClick={() => {
               newConversation();
@@ -148,8 +186,16 @@ export default function App() {
           </button>
         </header>
         <div className="flex min-h-0 flex-1 gap-4 p-4 pt-1">
-          <Sidebar />
-          <main className="min-w-0 flex-1">
+          <div className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+            <Sidebar />
+          </div>
+          {sidebarOpen && (
+            <div 
+              className="fixed inset-0 z-40 bg-black/20 md:hidden" 
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+          <main className="min-w-0 flex-1 max-w-full">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={section}

@@ -175,9 +175,10 @@ def agent_system_prompt(registry: Registry) -> str:
     lines = [
         "You can control this Windows PC through tools. When the user asks you to do "
         "something an action below covers, you MUST actually invoke it - do not just "
-        "say you are doing it. Use the tool-calling mechanism, or if that is "
-        "unavailable, emit the call as a JSON object on its own line and nothing else "
-        'after it: {"name": "<action>", "arguments": {<params>}}. A sentence of '
+        "say you are doing it. Use the native tool-calling mechanism if available. "
+        "ONLY if your platform completely lacks native tool support, you may emit the call "
+        'as a JSON object on its own line and nothing else after it: '
+        '{"name": "<action>", "arguments": {<params>}}. A sentence of '
         'narration first is fine ("Opening Chrome…"), but it must be followed by the '
         "actual call. Never describe how the user could do it themselves.",
         "",

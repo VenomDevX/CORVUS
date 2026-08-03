@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Copy, Check, Edit2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Orb } from "./Orb";
 import { MarkdownContent } from "./MarkdownContent";
@@ -7,6 +8,119 @@ import { ActionChip } from "./ActionChip";
 import { ConfirmationCard } from "./ConfirmationCard";
 import { ThinkingAnimation } from "./ThinkingAnimation";
 import { useCorvus } from "../state/store";
+import { Textarea } from "./ui/textarea";
+import { Button } from "./ui/button";
+
+function MessageActionButtons({ content, onEdit, className = "" }: { content: string; onEdit?: () => void; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  
+  function copy() {
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <div className={`flex items-center gap-1 ${className}`}>
+      {onEdit && (
+        <button
+          onClick={onEdit}
+          title="Edit message"
+          aria-label="Edit message"
+          className="rounded p-1 transition-colors duration-fast text-fg-muted hover:text-fg hover:bg-white/5"
+        >
+          <Edit2 className="h-4 w-4" />
+        </button>
+      )}
+      <button
+        onClick={copy}
+        title="Copy message"
+        aria-label="Copy message"
+        className="rounded p-1 transition-colors duration-fast text-fg-muted hover:text-fg hover:bg-white/5"
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
+
+function MessageItem({ m, index, initialCount }: { m: any, index: number, initialCount: React.MutableRefObject<number> }) {
+  const actions = "actions" in m ? m.actions : undefined;
+  const [actionsContainer, setActionsContainer] = useState<HTMLElement | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(m.content ?? "");
+  const send = useCorvus((s) => s.send);
+
+  return (
+    <motion.div
+      key={"id" in m ? m.id : index}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.18,
+        ease: "easeOut",
+        delay: index < initialCount.current ? Math.min(index * 0.03, 0.3) : 0,
+      }}
+      className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
+    >
+      {m.role === "user" ? (
+        <div className={`flex flex-col items-end gap-1 group max-w-[80%] ${isEditing ? "w-full" : ""}`}>
+          {isEditing ? (
+            <div className="liquid-glass rounded-xl px-4 py-3 text-fg w-full flex flex-col gap-2">
+              <Textarea 
+                value={editContent} 
+                onChange={(e) => setEditContent(e.target.value)} 
+                className="min-h-[100px] text-fg bg-transparent border-white/20 focus-visible:ring-0" 
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setIsEditing(false); setEditContent(m.content ?? ""); }} className="text-fg border-white/20 hover:bg-white/5">Cancel</Button>
+                <Button size="sm" onClick={() => { send(editContent, m.id); setIsEditing(false); }}>Save & Submit</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="liquid-glass rounded-xl px-4 py-3 text-fg">
+              {m.content && <MarkdownContent content={m.content} />}
+            </div>
+          )}
+          {!isEditing && (
+            <MessageActionButtons content={m.content ?? ""} onEdit={() => setIsEditing(true)} className="text-fg-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+          )}
+        </div>
+      ) : (
+        <>
+          {m.content ? (
+            <div className="flex flex-col items-start gap-1 max-w-[80%] group">
+              <div className="liquid-glass rounded-xl px-4 py-3 text-fg">
+                <MarkdownContent content={m.content} actionsContainer={actionsContainer} />
+              </div>
+              <div className="flex w-full justify-start items-start gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div ref={setActionsContainer} className="flex flex-col items-start" />
+                {!m.content?.includes("```") && (
+                  <MessageActionButtons content={m.content ?? ""} className="text-fg-muted" />
+                )}
+              </div>
+            </div>
+          ) : actions && actions.length > 0 ? (
+            <div className="liquid-glass max-w-[80%] rounded-xl px-4 py-3 text-fg">
+              <span className="text-fg-muted">Corvus is working…</span>
+            </div>
+          ) : (
+            <div className="max-w-[80%] py-2 text-fg">
+              <ThinkingAnimation />
+            </div>
+          )}
+        </>
+      )}
+      {actions && actions.length > 0 && (
+        <div className="mt-2 flex max-w-[80%] flex-col gap-1.5">
+          {actions.map((a: any, j: number) => (
+            <ActionChip key={`${a.name}-${j}`} action={a} />
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
 
 export function ChatView() {
   const messages = useCorvus((s) => s.messages);
@@ -25,72 +139,35 @@ export function ChatView() {
   const empty = messages.length === 0;
 
   return (
-    <div className="flex h-full flex-col gap-3">
-      {empty ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-6">
-          <Orb state={orbState} level={level} />
+    <div className="relative flex h-full flex-col gap-3">
+      <div className={`pointer-events-none ${empty ? "flex flex-1 flex-col items-center justify-center gap-6" : "absolute inset-0 z-0 overflow-hidden"}`}>
+        <Orb state={orbState} level={level} backgroundMode={!empty} />
+        {empty && (
           <div className="text-center">
             <h1 className="text-h1 tracking-tight">Corvus</h1>
             <p className="mt-1 text-body text-fg-muted">
               Ask anything, or just say &ldquo;Hey Corvus&rdquo;.
             </p>
           </div>
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 gap-4">
-          <div ref={scroller} className="min-w-0 flex-1 space-y-4 overflow-y-auto px-8 pt-2 pb-4">
-            {messages.map((m, i) => {
-              const actions = "actions" in m ? m.actions : undefined;
-              return (
-                <motion.div
-                  key={"id" in m ? m.id : i}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    duration: 0.18,
-                    ease: "easeOut",
-                    delay: i < initialCount.current ? Math.min(i * 0.03, 0.3) : 0,
-                  }}
-                  className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
-                >
-                  {m.role === "user" ? (
-                    <div className="bg-white max-w-[80%] rounded-xl px-4 py-3 text-black">
-                      {m.content && <MarkdownContent content={m.content} />}
-                    </div>
-                  ) : (
-                    <>
-                      {m.content ? (
-                        <div className="liquid-glass max-w-[80%] rounded-xl px-4 py-3 text-fg">
-                          <MarkdownContent content={m.content} />
-                        </div>
-                      ) : actions && actions.length > 0 ? (
-                        <div className="liquid-glass max-w-[80%] rounded-xl px-4 py-3 text-fg">
-                          <span className="text-fg-muted">Corvus is working…</span>
-                        </div>
-                      ) : (
-                        <div className="max-w-[80%] py-2 text-fg">
-                          <ThinkingAnimation />
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {actions && actions.length > 0 && (
-                    <div className="mt-2 flex max-w-[80%] flex-col gap-1.5">
-                      {actions.map((a, j) => (
-                        <ActionChip key={`${a.name}-${j}`} action={a} />
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })}
+        )}
+      </div>
+
+      {!empty && (
+        <div className="relative z-10 flex min-h-0 flex-1 justify-center gap-4">
+          <div ref={scroller} className="min-w-0 w-full max-w-4xl space-y-8 overflow-y-auto px-8 pt-2 pb-4">
+            {messages.map((m, i) => (
+              <MessageItem key={"id" in m ? m.id : i} m={m} index={i} initialCount={initialCount} />
+            ))}
             {generating && <div className="h-2" aria-live="polite" />}
           </div>
-
         </div>
       )}
-      <ConfirmationCard />
-      <InputBar />
+      <div className="relative z-10 flex w-full justify-center pb-2">
+        <div className="w-full max-w-4xl px-4 md:px-8">
+          <ConfirmationCard />
+          <InputBar />
+        </div>
+      </div>
     </div>
   );
 }

@@ -158,7 +158,7 @@ function FilterChip({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-50 mt-1.5 max-h-64 w-56 overflow-y-auto rounded-xl border border-black/10 dark:border-white/10 bg-app-secondary p-1.5 shadow-2xl">
+          <div className="absolute left-0 top-full z-50 mt-1.5 max-h-64 w-56 overflow-y-auto rounded-xl border border-black/10 dark:border-white/10 bg-black p-1.5 shadow-2xl">
             {options.map((o) => (
               <button
                 key={o.value}
@@ -261,7 +261,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
               setProgress(t);
             }}
             aria-label="Seek"
-            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-app-secondary accent-white transition-all hover:bg-black/10 dark:bg-white/10"
+            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-black accent-white transition-all hover:bg-black/10 dark:bg-white/10"
           />
           <span className="w-10 text-xs text-fg-faint font-mono">
             {fmtTime(duration)}
@@ -271,7 +271,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
 
       {/* Right section: Actions */}
       <div className="flex items-center gap-3 w-1/4 justify-end">
-        <div className="flex items-center border border-black/10 dark:border-white/10 rounded-md p-1 mr-2 bg-app-secondary">
+        <div className="flex items-center border border-black/10 dark:border-white/10 rounded-md p-1 mr-2 bg-black">
           <button className="rounded p-1.5 text-fg-muted hover:bg-black/10 dark:bg-white/10 hover:text-fg transition-colors">
             <ThumbsUp className="h-4 w-4" />
           </button>
@@ -280,7 +280,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
             <ThumbsDown className="h-4 w-4" />
           </button>
         </div>
-        <button className="flex items-center gap-1.5 rounded-md border border-black/10 dark:border-white/10 bg-app-secondary px-3 py-1.5 text-sm font-medium text-fg-muted hover:bg-black/5 dark:bg-white/5 transition-colors">
+        <button className="flex items-center gap-1.5 rounded-md border border-black/10 dark:border-white/10 bg-black px-3 py-1.5 text-sm font-medium text-fg-muted hover:bg-black/5 dark:bg-white/5 transition-colors">
           <Share2 className="h-4 w-4" />
           Share
         </button>
@@ -288,7 +288,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
           href={api.voiceoverAudioUrl(item.id)}
           download={item.filename}
           aria-label="Download audio"
-          className="flex items-center justify-center rounded-md border border-black/10 dark:border-white/10 bg-app-secondary p-2 text-fg-muted hover:bg-black/5 dark:bg-white/5 transition-colors"
+          className="flex items-center justify-center rounded-md border border-black/10 dark:border-white/10 bg-black p-2 text-fg-muted hover:bg-black/5 dark:bg-white/5 transition-colors"
         >
           <Download className="h-4 w-4" />
         </a>
@@ -797,7 +797,7 @@ export function StudioView() {
                     {isSortOpen && (
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setIsSortOpen(false)} />
-                        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-black/10 dark:border-white/10 bg-app-secondary p-2 shadow-xl flex flex-col gap-3">
+                        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-black/10 dark:border-white/10 bg-black p-2 shadow-xl flex flex-col gap-3">
                           <div>
                             <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-fg-faint">Sort</div>
                             {(["A-Z", "Z-A", "Locale"] as const).map((opt) => (
@@ -1029,7 +1029,7 @@ export function StudioView() {
                         {isModelOpen && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setIsModelOpen(false)} />
-                            <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-black/10 dark:border-white/10 bg-app-secondary p-1.5 shadow-2xl">
+                            <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-black/10 dark:border-white/10 bg-black p-1.5 shadow-2xl">
                               {(
                                 [
                                   {
@@ -1087,7 +1087,7 @@ export function StudioView() {
                           </div>
                           <div className="relative flex items-center h-4">
                             {/* Track background */}
-                            <div className="absolute w-full h-1 bg-app-secondary rounded-full border border-black/5 dark:border-white/5" />
+                            <div className="absolute w-full h-1 bg-black rounded-full border border-black/5 dark:border-white/5" />
                             {/* Filled track */}
                             <div 
                               className="absolute h-1 bg-white rounded-full" 

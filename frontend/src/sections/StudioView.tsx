@@ -556,7 +556,7 @@ export function StudioView() {
   const activeVoiceover = items.find((i) => i.id === activeVoiceoverId);
 
   return (
-    <SectionShell title="Voice Studio">
+    <SectionShell title="Voice Studio" fullWidth>
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex items-center gap-6 border-b border-black/5 dark:border-white/5 px-6 py-4">
           {STUDIO_TABS.map((tab) => (
@@ -584,7 +584,7 @@ export function StudioView() {
         {/* Main Content Area (Left) */}
         <div className="flex flex-1 min-h-0 flex-col">
 
-          <div className="flex-1 min-h-0 flex flex-col p-6 lg:p-10">
+          <div className="flex-1 min-h-0 flex flex-col p-4 lg:p-6">
             <div className="flex-1 min-h-0 flex flex-col">
               <textarea
                 value={text}
@@ -617,9 +617,9 @@ export function StudioView() {
         </div>
 
         {/* Right Sidebar */}
-        <div className="flex w-full min-h-0 flex-col border-t border-black/10 dark:border-white/10 bg-app-secondary lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px]">
+        <div className="flex w-full min-h-0 flex-col border-t border-white/5 bg-black lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px]">
           {isVoicePickerOpen ? (
-            <div className="flex flex-col h-full text-fg bg-app-secondary">
+            <div className="flex flex-col h-full text-fg bg-black">
               <div className="flex items-center gap-3 p-4 py-3">
                 <button 
                   onClick={() => setIsVoicePickerOpen(false)} 

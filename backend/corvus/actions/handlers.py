@@ -363,7 +363,10 @@ def register_all(reg: Registry) -> None:
         return ActionResult(True, f"Clipboard has {len(text)} characters.", {"text": text})
 
     reg.register(ActionSpec(
-        "read_clipboard", "Read the current text on the clipboard.",
+        "read_clipboard", (
+            "Read the current text on the clipboard. ONLY use when the user EXPLICITLY asks "
+            "you to read or paste what they copied. NEVER use for greetings or general questions."
+        ),
         _NO_PARAMS, Risk.SAFE, get_clipboard, category="clipboard",
     ))
 
@@ -372,7 +375,10 @@ def register_all(reg: Registry) -> None:
         return ActionResult(True, "Copied text to the clipboard.")
 
     reg.register(ActionSpec(
-        "write_clipboard", "Copy text to the clipboard.",
+        "write_clipboard", (
+            "Copy text to the clipboard. ONLY use when the user EXPLICITLY asks you to copy "
+            "something. NEVER use for greetings or general questions."
+        ),
         _str_param("text", "Text to copy"),
         Risk.LOW, set_clipboard, category="clipboard",
     ))
@@ -395,6 +401,9 @@ def register_all(reg: Registry) -> None:
         return ActionResult(True, summary, data)
 
     reg.register(ActionSpec(
-        "system_status", "Report CPU, RAM, disk, battery, and GPU status.",
+        "system_status", (
+            "Report CPU, RAM, disk, battery, and GPU status. ONLY use when the user EXPLICITLY "
+            "asks about system performance, battery, or specs. NEVER use for greetings."
+        ),
         _NO_PARAMS, Risk.SAFE, system_status, category="monitoring",
     ))

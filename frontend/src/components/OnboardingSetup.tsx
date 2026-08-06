@@ -149,8 +149,8 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
         )}
         <div className="flex items-center">
           <img src="./logo.png" alt="Corvus" className="h-10 w-10" />
-          <span className="-ml-1 text-3xl font-bold tracking-wider" style={{ fontFamily: '"Agency FB", sans-serif' }}>
-            CORVUS
+          <span className="-ml-1 text-4xl font-semibold tracking-tight">
+            Corvus
           </span>
         </div>
 

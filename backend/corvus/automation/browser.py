@@ -84,10 +84,55 @@ class BrowserEngine:
     async def _ensure_page(self):
         async with self._lock:
             if self._page is None:
+                import os
+                import subprocess
+                import sys
+
                 from playwright.async_api import async_playwright
 
+                # Redirect Playwright's browser cache to a persistent,
+                # user-writable location so the bundled (PyInstaller) app
+                # doesn't try to find Chromium inside its read-only _internal/
+                # tree.  This must be set *before* launching the browser.
+                from ..config import data_dir
+
+                browsers_dir = data_dir() / "playwright-browsers"
+                browsers_dir.mkdir(parents=True, exist_ok=True)
+                os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(browsers_dir)
+
                 self._pw = await async_playwright().start()
-                self._browser = await self._pw.chromium.launch(headless=self.headless)
+
+                try:
+                    self._browser = await self._pw.chromium.launch(
+                        headless=self.headless,
+                    )
+                except Exception as first_err:
+                    # Chromium binary is missing — install it automatically.
+                    log.info("browser_install_start",
+                             reason=str(first_err),
+                             dest=str(browsers_dir))
+                    try:
+                        subprocess.run(
+                            [sys.executable, "-m", "playwright", "install",
+                             "chromium"],
+                            check=True,
+                            env={**os.environ,
+                                 "PLAYWRIGHT_BROWSERS_PATH": str(browsers_dir)},
+                            timeout=300,
+                        )
+                        log.info("browser_install_done")
+                    except Exception as install_err:
+                        await self._pw.stop()
+                        self._pw = None
+                        raise RuntimeError(
+                            f"Failed to install Chromium: {install_err}"
+                        ) from first_err
+
+                    # Retry the launch after install.
+                    self._browser = await self._pw.chromium.launch(
+                        headless=self.headless,
+                    )
+
                 self._context = await self._browser.new_context(accept_downloads=True)
                 self._page = await self._context.new_page()
                 self._page.on("download", self._handle_download)

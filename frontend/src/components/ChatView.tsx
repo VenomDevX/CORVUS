@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Orb } from "./Orb";
 import { MarkdownContent } from "./MarkdownContent";
 import { InputBar } from "./InputBar";
-import { ActionChip } from "./ActionChip";
+
 import { ConfirmationCard } from "./ConfirmationCard";
 import { ThinkingAnimation } from "./ThinkingAnimation";
 import { useCorvus } from "../state/store";
@@ -90,7 +90,7 @@ function MessageItem({ m, index, initialCount }: { m: any, index: number, initia
         <>
           {m.content ? (
             <div className="flex flex-col items-start gap-1 max-w-[80%] group">
-              <div className="liquid-glass rounded-xl px-4 py-3 text-fg">
+              <div className="px-4 py-3 text-fg">
                 <MarkdownContent content={m.content} actionsContainer={actionsContainer} />
               </div>
               <div className="flex w-full justify-start items-start gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -111,13 +111,7 @@ function MessageItem({ m, index, initialCount }: { m: any, index: number, initia
           )}
         </>
       )}
-      {actions && actions.length > 0 && (
-        <div className="mt-2 flex max-w-[80%] flex-col gap-1.5">
-          {actions.map((a: any, j: number) => (
-            <ActionChip key={`${a.name}-${j}`} action={a} />
-          ))}
-        </div>
-      )}
+      {/* Action chips hidden — tool execution is internal, not user-facing */}
     </motion.div>
   );
 }

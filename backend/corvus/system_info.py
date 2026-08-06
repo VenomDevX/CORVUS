@@ -1,12 +1,6 @@
-"""Device spec detection and local-model fit recommendations (first-run setup).
-
-Everything here is dependency-free: RAM via the Win32 API, GPU via nvidia-smi
-when present (AMD/Intel systems simply get CPU-based recommendations), and the
-Ollama probe over the existing httpx dependency.
-"""
-
 from __future__ import annotations
 
+import asyncio
 import ctypes
 import os
 import platform
@@ -15,9 +9,9 @@ from dataclasses import dataclass
 
 import structlog
 
-log = structlog.get_logger("corvus")
+from .config import OLLAMA_URL
 
-OLLAMA_URL = "http://127.0.0.1:11434"
+log = structlog.get_logger("corvus")
 
 
 @dataclass(frozen=True)
@@ -109,7 +103,7 @@ def _fit(model: CatalogModel, ram_gb: float, vram_gb: float | None) -> str:
 
 async def specs() -> dict:
     ram_gb = _ram_gb()
-    gpu = _gpu()
+    gpu = await asyncio.to_thread(_gpu)
     vram_gb = gpu["vram_gb"] if gpu else None
 
     catalog = [

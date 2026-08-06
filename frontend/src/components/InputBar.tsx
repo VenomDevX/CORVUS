@@ -7,9 +7,8 @@ import {
   Mic, 
   Image as ImageIcon, 
   Paperclip, 
-  Square, 
   Volume2, 
-  ArrowUpIcon
+  ArrowUp
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Textarea } from "./ui/textarea";
@@ -305,28 +304,32 @@ export function InputBar() {
           <div className="flex items-center gap-2">
             {generating ? (
               <Button
+                variant={null}
+                size={null}
                 onClick={stopGeneration}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 h-8 rounded-lg transition-colors",
-                  "bg-danger/20 text-danger hover:bg-danger/30"
+                  "flex items-center justify-center h-8 w-8 rounded-lg transition-colors",
+                  "bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
                 )}
+                title="Stop generation"
               >
-                <Square className="w-4 h-4 fill-current" />
-                <span className="text-sm">Stop</span>
+                <div className="w-3 h-3 rounded-sm bg-current" />
               </Button>
             ) : (
               <Button
+                variant={null}
+                size={null}
                 onClick={submit}
                 disabled={(!text.trim() && attachments.length === 0) || !backendOnline || uploading}
                 className={cn(
-                  "flex items-center gap-1 px-3 py-1.5 h-8 rounded-lg transition-colors",
+                  "flex items-center justify-center h-8 w-8 rounded-lg transition-colors",
                   ((!text.trim() && attachments.length === 0) || !backendOnline || uploading)
                     ? "bg-neutral-200 text-neutral-400 dark:bg-neutral-700 dark:text-neutral-400 cursor-not-allowed"
                     : "bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
                 )}
+                title={uploading ? "Uploading..." : "Send message"}
               >
-                <ArrowUpIcon className="w-4 h-4" />
-                <span className="text-sm">{uploading ? "Uploading..." : "Send"}</span>
+                <ArrowUp className="w-4 h-4" />
               </Button>
             )}
           </div>

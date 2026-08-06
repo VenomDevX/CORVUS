@@ -34,12 +34,12 @@ def _parse_tool_calls(message: dict) -> list[ToolCall]:
     return calls
 
 
-# Start of a JSON tool-call region: `{"`, `{}`, `[{`, `["`, or a ```json fence.
-# Also matches prefixes at the end of the buffer (`{\s*$`, `\[\s*$`, ```[json]*$) 
+# Start of a JSON tool-call region: '{"', '{}', '[{', '["', or a 'json' block fence.
+# Also matches prefixes at the end of the buffer ('{\s*$', '\[\s*$', '[json]*$') 
 # to hold incomplete chunks until they resolve.
-# Deliberately does NOT match prose braces ("{x}") or ```python code fences, so
+# Deliberately does NOT match prose braces ("{x}") or 'python' code fences, so
 # ordinary answers and code blocks keep streaming untouched.
-_JSON_START = re.compile(r'\{\s*["}]|\[\s*[\[{"]|```json|```(?:j(?:s(?:o(?:n)?)?)?)?$|\{\s*$|\[\s*$', re.IGNORECASE)
+_JSON_START = re.compile(r'\{\s*["}]|\[\s*[\[{"]|`{3}json|`{3}(?:j(?:s(?:o(?:n)?)?)?)?$|\{\s*$|\[\s*$', re.IGNORECASE)
 
 
 def _json_start(text: str) -> int:
@@ -49,9 +49,9 @@ def _json_start(text: str) -> int:
 
 def _parse_tool_objects(text: str, valid_names: set[str]) -> list[ToolCall]:
     text = text.strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
-        text = re.sub(r"\s*```$", "", text).strip()
+    if text.startswith("`" * 3):
+        text = re.sub(r"^`{3}[a-zA-Z]*\s*", "", text)
+        text = re.sub(r"\s*`{3}$", "", text).strip()
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError:
@@ -78,7 +78,7 @@ def _extract_text_tool_calls(content: str, valid_names: set[str]) -> list[ToolCa
     Ollama's structured tool_calls field.
 
     Several capable local models (e.g. qwen2.5-coder) reliably emit a
-    `{"name": ..., "arguments": {...}}` object (optionally fenced, optionally a
+    '{"name": ..., "arguments": {...}}' object (optionally fenced, optionally a
     list, sometimes after a sentence of narration) rather than using the
     structured field. Only names present in the turn's tool set are accepted,
     so ordinary JSON the user asked for is never misread as an action.
@@ -98,15 +98,19 @@ def _extract_text_tool_calls(content: str, valid_names: set[str]) -> list[ToolCa
 def _is_any_tool_call(content: str) -> bool:
     """Check if the text represents *any* tool call JSON, even an invalid one."""
     content = content.strip()
-    if content.startswith("```"):
-        content = re.sub(r"^```[a-zA-Z]*\s*", "", content)
-        content = re.sub(r"\s*```$", "", content).strip()
+    if content.startswith("`" * 3):
+        content = re.sub(r"^`{3}[a-zA-Z]*\s*", "", content)
+        content = re.sub(r"\s*`{3}$", "", content).strip()
     
     def check_parsed(parsed: Any) -> bool:
         items = parsed if isinstance(parsed, list) else [parsed]
         for item in items:
-            if isinstance(item, dict) and "name" in item:
-                return True
+            if isinstance(item, dict):
+                if "name" in item and ("arguments" in item or "parameters" in item):
+                    return True
+                # Catch hallucinated JSON schemas (e.g. {"type": "object", "properties": ...})
+                if "type" in item and "properties" in item:
+                    return True
         return False
         
     try:
@@ -125,6 +129,28 @@ def _is_any_tool_call(content: str) -> bool:
             pass
             
     return False
+
+
+def _is_pure_json_blob(content: str) -> bool:
+    """Check if the content is entirely a JSON object/array with no surrounding prose.
+
+    This catches cases where the model outputs a raw JSON definition or schema
+    (e.g. {"description": "...", "examples": [...]}) as its answer instead of
+    natural language. A response that is purely JSON is never a valid user-facing
+    answer — it should be suppressed so the agent can retry or fall through.
+    """
+    stripped = content.strip()
+    if stripped.startswith("`" * 3):
+        stripped = re.sub(r"^`{3}[a-zA-Z]*\s*", "", stripped)
+        stripped = re.sub(r"\s*`{3}$", "", stripped).strip()
+    # Must start with { or [ to be a JSON blob.
+    if not stripped or stripped[0] not in "{[":
+        return False
+    try:
+        json.loads(stripped)
+        return True
+    except json.JSONDecodeError:
+        return False
 
 
 def _to_wire(messages: list[Message]) -> list[dict]:
@@ -269,8 +295,19 @@ class OllamaProvider:
                                 yield Delta(content="", done=True)
                         elif held:
                             if emitted_native_calls and _is_any_tool_call(held):
+                                # Native calls already emitted; this is a duplicate echo — drop it.
+                                yield Delta(content="", done=True)
+                            elif _is_pure_json_blob(held):
+                                # The model output a raw JSON object/array as its
+                                # answer (e.g. a JSON schema for "what is array")
+                                # instead of natural prose. Suppress the JSON and
+                                # let the agent loop see an empty turn, which
+                                # causes it to fall through to a text answer.
+                                log.warning("suppressed_json_blob",
+                                            preview=held.strip()[:120])
                                 yield Delta(content="", done=True)
                             else:
+                                # Held content is not a valid tool call — emit as normal prose.
                                 yield Delta(content=held, done=True)
                         else:
                             yield Delta(content="", done=True)

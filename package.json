@@ -14,7 +14,7 @@
     "lint": "npm run lint --prefix frontend",
     "test": "npm run guard && npm run test --prefix frontend && npm run test:backend",
     "test:backend": "cd backend && .venv\\Scripts\\python.exe -m pytest -q",
-    "dist:backend": "cd backend && set OPENBLAS_NUM_THREADS=1&& set OMP_NUM_THREADS=1&& set MKL_NUM_THREADS=1&& .venv\\Scripts\\pyinstaller ../installer/corvus-backend.spec --distpath ../dist-backend --workpath ../build/pyinstaller --noconfirm",
+    "dist:backend": "cd backend && set OPENBLAS_NUM_THREADS=1&& set OMP_NUM_THREADS=1&& set MKL_NUM_THREADS=1&& .venv\\Scripts\\python.exe -m PyInstaller ../installer/corvus-backend.spec --distpath ../dist-backend --workpath ../build/pyinstaller --noconfirm",
     "dist": "npm run dist:backend && npm run dist --prefix frontend",
     "precommit": "npm run guard",
     "prepare": "husky"
@@ -22,6 +22,6 @@
   "devDependencies": {
     "husky": "^9.1.7",
     "png-to-ico": "^2.1.8",
-    "sharp": "^0.34.1"
+    "sharp": "^0.35.3"
   }
 }

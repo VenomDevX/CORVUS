@@ -281,4 +281,26 @@ def zip_dir(src: Path, dest: Path) -> None:
 
 
 def unzip(src: Path, dest: Path) -> None:
-    shutil.unpack_archive(str(src), str(dest))
+    import tarfile
+    import zipfile
+
+    dest = dest.resolve()
+    
+    # Inspect the archive to prevent ZipSlip/TarSlip vulnerabilities
+    if zipfile.is_zipfile(src):
+        with zipfile.ZipFile(src) as zf:
+            for member in zf.namelist():
+                if not (dest / member).resolve().is_relative_to(dest):
+                    raise ValueError(f"Security error: '{member}' attempts to extract outside destination.")
+            zf.extractall(dest)
+    elif tarfile.is_tarfile(src):
+        with tarfile.open(src) as tf:
+            for member in tf.getmembers():
+                if not (dest / member.name).resolve().is_relative_to(dest):
+                    raise ValueError(f"Security error: '{member.name}' attempts to extract outside destination.")
+            if hasattr(tarfile, "data_filter"):
+                tf.extractall(dest, filter="data")
+            else:
+                tf.extractall(dest)
+    else:
+        shutil.unpack_archive(str(src), str(dest))

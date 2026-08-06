@@ -25,7 +25,7 @@ import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ..config import SYSTEM_PROMPT
-from ..llm.agent import agent_system_prompt, run_agent_turn
+from ..llm.agent import _is_conversational, agent_system_prompt, run_agent_turn
 from ..llm.base import Message
 from ..memory.extractor import extract_memory
 
@@ -78,7 +78,10 @@ async def chat(ws: WebSocket) -> None:
     )
 
     history = repo.list_messages(conversation_id)[-MAX_HISTORY_MESSAGES:]
-    system = SYSTEM_PROMPT + "\n\n" + agent_system_prompt(registry)
+    # For conversational queries, skip tool schemas in the system prompt to
+    # free context window for small models and prevent function-call fixation.
+    include_tools = not await _is_conversational(content)
+    system = SYSTEM_PROMPT + "\n\n" + agent_system_prompt(registry, include_tools=include_tools)
     messages = [Message("system", system)] + [Message(m["role"], m["content"]) for m in history]
     model = ws.app.state.active_model()
 

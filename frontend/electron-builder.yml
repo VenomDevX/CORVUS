@@ -42,6 +42,8 @@ nsis:
   installerIcon: ../design/exports/corvus.ico
   uninstallerIcon: ../design/exports/corvus.ico
   installerHeaderIcon: ../design/exports/corvus.ico
+  installerSidebar: ../design/exports/installer-sidebar.bmp
+  uninstallerSidebar: ../design/exports/installer-sidebar.bmp
 
 # electron-updater reads this to know where to look for new versions.
 # GitHub Releases on the canonical repo — never a domain we don't own.

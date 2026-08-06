@@ -3,49 +3,15 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Copy, Check, Download, Share2, GitBranch } from "lucide-react";
-import ReactDOM from "react-dom";
+import { Copy, Check } from "lucide-react";
 
 function CodeBlock({ language, value }: { language: string; value: string }) {
   const [copied, setCopied] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
-  const [shared, setShared] = useState(false);
-  const [branched, setBranched] = useState(false);
 
   async function copyCode() {
     await navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
-  }
-
-  function downloadCode() {
-    const blob = new Blob([value], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `snippet.${language || "txt"}`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setDownloaded(true);
-    setTimeout(() => setDownloaded(false), 1500);
-  }
-
-  async function shareCode() {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Code Snippet', text: value });
-      } catch {}
-    } else {
-      await navigator.clipboard.writeText(value);
-    }
-    setShared(true);
-    setTimeout(() => setShared(false), 1500);
-  }
-
-  function branchCode() {
-    navigator.clipboard.writeText(value);
-    setBranched(true);
-    setTimeout(() => setBranched(false), 1500);
   }
 
   const codeBlock = (

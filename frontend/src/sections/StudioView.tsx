@@ -617,9 +617,9 @@ export function StudioView() {
         </div>
 
         {/* Right Sidebar */}
-        <div className="flex w-full min-h-0 flex-col border-t border-white/5 bg-black lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px]">
+        <div className="flex w-full min-h-0 flex-col border-t border-black/10 dark:border-white/5 bg-neutral-100 dark:bg-black lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px]">
           {isVoicePickerOpen ? (
-            <div className="flex flex-col h-full text-fg bg-black">
+            <div className="flex flex-col h-full text-fg bg-neutral-100 dark:bg-black">
               <div className="flex items-center gap-3 p-4 py-3">
                 <button 
                   onClick={() => setIsVoicePickerOpen(false)} 
@@ -968,7 +968,7 @@ export function StudioView() {
               )}
             </div>
           ) : (
-            <div className="flex h-full flex-col bg-app-secondary text-fg">
+            <div className="flex h-full flex-col bg-neutral-100 dark:bg-black text-fg">
               <div className="flex items-center gap-8 px-6 mt-4 border-b border-black/10 dark:border-white/10">
                 <button
                   onClick={() => setSidebarTab("settings")}
@@ -1087,10 +1087,10 @@ export function StudioView() {
                           </div>
                           <div className="relative flex items-center h-4">
                             {/* Track background */}
-                            <div className="absolute w-full h-1 bg-black rounded-full border border-black/5 dark:border-white/5" />
+                            <div className="absolute w-full h-1 bg-neutral-300 dark:bg-neutral-700 rounded-full" />
                             {/* Filled track */}
                             <div 
-                              className="absolute h-1 bg-white rounded-full" 
+                              className="absolute h-1 bg-black dark:bg-white rounded-full" 
                               style={{ width: `${((value - min) / (max - min)) * 100}%` }}
                             />
                             {/* The input range itself, made transparent but overlaid for interaction */}
@@ -1105,7 +1105,7 @@ export function StudioView() {
                             />
                             {/* Custom thumb */}
                             <div 
-                              className="absolute h-3.5 w-3.5 rounded-full bg-white shadow-md group-hover:scale-110 transition-transform pointer-events-none"
+                              className="absolute h-3.5 w-3.5 rounded-full bg-black dark:bg-white shadow-md group-hover:scale-110 transition-transform pointer-events-none"
                               style={{ left: `calc(${((value - min) / (max - min)) * 100}% - 7px)` }}
                             />
                           </div>
@@ -1129,7 +1129,7 @@ export function StudioView() {
                     <h3 className="text-sm font-semibold tracking-tight text-fg mt-2">Playback</h3>
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-gray-200">Autoplay</span>
+                        <span className="text-[13px] font-medium text-fg">Autoplay</span>
                         <span className="text-xs text-fg-faint">Play new voiceovers automatically</span>
                       </div>
                       <button
@@ -1137,12 +1137,12 @@ export function StudioView() {
                         aria-checked={autoplay}
                         onClick={() => setAutoplay((a) => !a)}
                         className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
-                          autoplay ? "bg-white" : "bg-zinc-700"
+                          autoplay ? "bg-black dark:bg-white" : "bg-neutral-300 dark:bg-zinc-700"
                         }`}
                       >
                         <span
                           className={`absolute top-0.5 h-4 w-4 rounded-full shadow-sm transition-transform ${
-                            autoplay ? "translate-x-[18px] bg-app-secondary" : "translate-x-0.5 bg-gray-400"
+                            autoplay ? "translate-x-[18px] bg-white dark:bg-black" : "translate-x-0.5 bg-white dark:bg-gray-400"
                           }`}
                         />
                       </button>

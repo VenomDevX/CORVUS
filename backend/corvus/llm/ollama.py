@@ -131,28 +131,6 @@ def _is_any_tool_call(content: str) -> bool:
     return False
 
 
-def _is_pure_json_blob(content: str) -> bool:
-    """Check if the content is entirely a JSON object/array with no surrounding prose.
-
-    This catches cases where the model outputs a raw JSON definition or schema
-    (e.g. {"description": "...", "examples": [...]}) as its answer instead of
-    natural language. A response that is purely JSON is never a valid user-facing
-    answer — it should be suppressed so the agent can retry or fall through.
-    """
-    stripped = content.strip()
-    if stripped.startswith("`" * 3):
-        stripped = re.sub(r"^`{3}[a-zA-Z]*\s*", "", stripped)
-        stripped = re.sub(r"\s*`{3}$", "", stripped).strip()
-    # Must start with { or [ to be a JSON blob.
-    if not stripped or stripped[0] not in "{[":
-        return False
-    try:
-        json.loads(stripped)
-        return True
-    except json.JSONDecodeError:
-        return False
-
-
 def _to_wire(messages: list[Message]) -> list[dict]:
     """Serialize Corvus messages to Ollama's chat schema, including tools."""
     wire: list[dict] = []
@@ -296,15 +274,6 @@ class OllamaProvider:
                         elif held:
                             if emitted_native_calls and _is_any_tool_call(held):
                                 # Native calls already emitted; this is a duplicate echo — drop it.
-                                yield Delta(content="", done=True)
-                            elif _is_pure_json_blob(held):
-                                # The model output a raw JSON object/array as its
-                                # answer (e.g. a JSON schema for "what is array")
-                                # instead of natural prose. Suppress the JSON and
-                                # let the agent loop see an empty turn, which
-                                # causes it to fall through to a text answer.
-                                log.warning("suppressed_json_blob",
-                                            preview=held.strip()[:120])
                                 yield Delta(content="", done=True)
                             else:
                                 # Held content is not a valid tool call — emit as normal prose.

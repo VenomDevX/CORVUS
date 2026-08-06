@@ -143,8 +143,8 @@ export function ChatView() {
       </div>
 
       {!empty && (
-        <div className="relative z-10 flex min-h-0 flex-1 justify-center gap-4">
-          <div ref={scroller} className="min-w-0 w-full max-w-4xl space-y-8 overflow-y-auto px-8 pt-2 pb-4">
+        <div ref={scroller} className="relative z-10 flex min-h-0 flex-1 flex-col items-center overflow-y-auto overflow-x-hidden pt-2 pb-4">
+          <div className="w-full max-w-4xl space-y-8 px-4 md:px-8">
             {messages.map((m, i) => (
               <MessageItem key={"id" in m ? m.id : i} m={m} index={i} initialCount={initialCount} />
             ))}

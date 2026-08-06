@@ -237,7 +237,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
           <button
             onClick={toggle}
             aria-label={playing ? "Pause" : "Play"}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black dark:bg-white text-white dark:text-black transition-transform hover:scale-105 active:scale-95 shadow-md"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-fg text-app transition-transform hover:scale-105 active:scale-95 shadow-md"
           >
             {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current ml-0.5" />}
           </button>
@@ -261,7 +261,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
               setProgress(t);
             }}
             aria-label="Seek"
-            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-neutral-300 dark:bg-neutral-700 accent-black dark:accent-white transition-all"
+            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-fg/20 accent-fg transition-all"
           />
           <span className="w-10 text-xs text-fg-faint font-mono">
             {fmtTime(duration)}
@@ -271,7 +271,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
 
       {/* Right section: Actions */}
       <div className="flex items-center gap-3 w-1/4 justify-end">
-        <div className="flex items-center border border-black/10 dark:border-white/10 rounded-md p-1 mr-2 bg-neutral-200 dark:bg-neutral-800">
+        <div className="flex items-center border border-fg/10 rounded-md p-1 mr-2 bg-fg/10">
           <button className="rounded p-1.5 text-fg-muted hover:bg-black/10 dark:bg-white/10 hover:text-fg transition-colors">
             <ThumbsUp className="h-4 w-4" />
           </button>
@@ -280,7 +280,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
             <ThumbsDown className="h-4 w-4" />
           </button>
         </div>
-        <button className="flex items-center gap-1.5 rounded-md border border-black/10 dark:border-white/10 bg-neutral-200 dark:bg-neutral-800 px-3 py-1.5 text-sm font-medium text-fg-muted hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors">
+        <button className="flex items-center gap-1.5 rounded-md border border-fg/10 bg-fg/10 px-3 py-1.5 text-sm font-medium text-fg-muted hover:bg-fg/20 transition-colors">
           <Share2 className="h-4 w-4" />
           Share
         </button>
@@ -288,7 +288,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
           href={api.voiceoverAudioUrl(item.id)}
           download={item.filename}
           aria-label="Download audio"
-          className="flex items-center justify-center rounded-md border border-black/10 dark:border-white/10 bg-neutral-200 dark:bg-neutral-800 p-2 text-fg-muted hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors"
+          className="flex items-center justify-center rounded-md border border-fg/10 bg-fg/10 p-2 text-fg-muted hover:bg-fg/20 transition-colors"
         >
           <Download className="h-4 w-4" />
         </a>
@@ -378,6 +378,7 @@ function HistoryCard({
 
 export function StudioView() {
   const backendOnline = useCorvus((s) => s.backendOnline);
+  const theme = useCorvus((s) => s.theme);
   const [voices, setVoices] = useState<StudioVoices>({ edge: [], piper: [] });
   const [items, setItems] = useState<Voiceover[]>([]);
   const [engine, setEngine] = useState<VoiceEngine>("edge");
@@ -617,9 +618,9 @@ export function StudioView() {
         </div>
 
         {/* Right Sidebar */}
-        <div className="flex w-full min-h-0 flex-col border-t border-black/10 dark:border-white/5 bg-neutral-100 dark:bg-black lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px]">
+        <div className={`flex w-full min-h-0 flex-col border-t border-black/10 dark:border-white/5 lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px] ${theme === 'dark' ? 'bg-black' : 'bg-app-secondary'}`}>
           {isVoicePickerOpen ? (
-            <div className="flex flex-col h-full text-fg bg-neutral-100 dark:bg-black">
+            <div className={`flex flex-col h-full text-fg ${theme === 'dark' ? 'bg-black' : 'bg-app-secondary'}`}>
               <div className="flex items-center gap-3 p-4 py-3">
                 <button 
                   onClick={() => setIsVoicePickerOpen(false)} 
@@ -968,8 +969,8 @@ export function StudioView() {
               )}
             </div>
           ) : (
-            <div className="flex h-full flex-col bg-neutral-100 dark:bg-black text-fg">
-              <div className="flex items-center gap-8 px-6 mt-4 border-b border-black/10 dark:border-white/10">
+            <div className={`flex h-full flex-col text-fg ${theme === 'dark' ? 'bg-black' : 'bg-app-secondary'}`}>
+              <div className="flex items-center gap-8 px-6 mt-4 border-b border-fg/10">
                 <button
                   onClick={() => setSidebarTab("settings")}
                   className={`flex items-center gap-2 py-3 text-[13px] font-semibold transition-colors ${
@@ -1087,10 +1088,10 @@ export function StudioView() {
                           </div>
                           <div className="relative flex items-center h-4">
                             {/* Track background */}
-                            <div className="absolute w-full h-1 bg-neutral-300 dark:bg-neutral-700 rounded-full" />
+                            <div className="absolute w-full h-1 bg-fg/20 rounded-full" />
                             {/* Filled track */}
                             <div 
-                              className="absolute h-1 bg-black dark:bg-white rounded-full" 
+                              className="absolute h-1 bg-fg rounded-full" 
                               style={{ width: `${((value - min) / (max - min)) * 100}%` }}
                             />
                             {/* The input range itself, made transparent but overlaid for interaction */}
@@ -1105,7 +1106,7 @@ export function StudioView() {
                             />
                             {/* Custom thumb */}
                             <div 
-                              className="absolute h-3.5 w-3.5 rounded-full bg-black dark:bg-white shadow-md group-hover:scale-110 transition-transform pointer-events-none"
+                              className="absolute h-3.5 w-3.5 rounded-full bg-fg shadow-md group-hover:scale-110 transition-transform pointer-events-none"
                               style={{ left: `calc(${((value - min) / (max - min)) * 100}% - 7px)` }}
                             />
                           </div>
@@ -1137,12 +1138,12 @@ export function StudioView() {
                         aria-checked={autoplay}
                         onClick={() => setAutoplay((a) => !a)}
                         className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
-                          autoplay ? "bg-black dark:bg-white" : "bg-neutral-300 dark:bg-zinc-700"
+                          autoplay ? "bg-fg" : "bg-fg/20"
                         }`}
                       >
                         <span
                           className={`absolute top-0.5 h-4 w-4 rounded-full shadow-sm transition-transform ${
-                            autoplay ? "translate-x-[18px] bg-white dark:bg-black" : "translate-x-0.5 bg-white dark:bg-gray-400"
+                            autoplay ? "translate-x-[18px] bg-app-secondary" : "translate-x-0.5 bg-fg/50"
                           }`}
                         />
                       </button>

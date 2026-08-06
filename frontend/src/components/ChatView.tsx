@@ -46,7 +46,6 @@ function MessageActionButtons({ content, onEdit, className = "" }: { content: st
 
 function MessageItem({ m, index, initialCount }: { m: any, index: number, initialCount: React.MutableRefObject<number> }) {
   const actions = "actions" in m ? m.actions : undefined;
-  const [actionsContainer, setActionsContainer] = useState<HTMLElement | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(m.content ?? "");
   const send = useCorvus((s) => s.send);
@@ -91,13 +90,10 @@ function MessageItem({ m, index, initialCount }: { m: any, index: number, initia
           {m.content ? (
             <div className="flex flex-col items-start gap-1 max-w-[80%] group">
               <div className="px-4 py-3 text-fg">
-                <MarkdownContent content={m.content} actionsContainer={actionsContainer} />
+                <MarkdownContent content={m.content} />
               </div>
               <div className="flex w-full justify-start items-start gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div ref={setActionsContainer} className="flex flex-col items-start" />
-                {!m.content?.includes("```") && (
-                  <MessageActionButtons content={m.content ?? ""} className="text-fg-muted" />
-                )}
+                <MessageActionButtons content={m.content ?? ""} className="text-fg-muted" />
               </div>
             </div>
           ) : actions && actions.length > 0 ? (

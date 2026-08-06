@@ -237,7 +237,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
           <button
             onClick={toggle}
             aria-label={playing ? "Pause" : "Play"}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition-transform hover:scale-105 active:scale-95 shadow-md"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-black dark:bg-white text-white dark:text-black transition-transform hover:scale-105 active:scale-95 shadow-md"
           >
             {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current ml-0.5" />}
           </button>
@@ -261,7 +261,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
               setProgress(t);
             }}
             aria-label="Seek"
-            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-black accent-white transition-all hover:bg-black/10 dark:bg-white/10"
+            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-neutral-300 dark:bg-neutral-700 accent-black dark:accent-white transition-all"
           />
           <span className="w-10 text-xs text-fg-faint font-mono">
             {fmtTime(duration)}
@@ -271,7 +271,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
 
       {/* Right section: Actions */}
       <div className="flex items-center gap-3 w-1/4 justify-end">
-        <div className="flex items-center border border-black/10 dark:border-white/10 rounded-md p-1 mr-2 bg-black">
+        <div className="flex items-center border border-black/10 dark:border-white/10 rounded-md p-1 mr-2 bg-neutral-200 dark:bg-neutral-800">
           <button className="rounded p-1.5 text-fg-muted hover:bg-black/10 dark:bg-white/10 hover:text-fg transition-colors">
             <ThumbsUp className="h-4 w-4" />
           </button>
@@ -280,7 +280,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
             <ThumbsDown className="h-4 w-4" />
           </button>
         </div>
-        <button className="flex items-center gap-1.5 rounded-md border border-black/10 dark:border-white/10 bg-black px-3 py-1.5 text-sm font-medium text-fg-muted hover:bg-black/5 dark:bg-white/5 transition-colors">
+        <button className="flex items-center gap-1.5 rounded-md border border-black/10 dark:border-white/10 bg-neutral-200 dark:bg-neutral-800 px-3 py-1.5 text-sm font-medium text-fg-muted hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors">
           <Share2 className="h-4 w-4" />
           Share
         </button>
@@ -288,7 +288,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
           href={api.voiceoverAudioUrl(item.id)}
           download={item.filename}
           aria-label="Download audio"
-          className="flex items-center justify-center rounded-md border border-black/10 dark:border-white/10 bg-black p-2 text-fg-muted hover:bg-black/5 dark:bg-white/5 transition-colors"
+          className="flex items-center justify-center rounded-md border border-black/10 dark:border-white/10 bg-neutral-200 dark:bg-neutral-800 p-2 text-fg-muted hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors"
         >
           <Download className="h-4 w-4" />
         </a>

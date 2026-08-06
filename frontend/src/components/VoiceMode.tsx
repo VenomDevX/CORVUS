@@ -143,7 +143,7 @@ export function VoiceMode() {
           className="group relative flex h-16 w-16 items-center justify-center rounded-full bg-accent text-white shadow-glow-strong transition-all duration-300 enabled:hover:scale-105 enabled:hover:bg-accent-bright disabled:opacity-50 disabled:scale-95"
         >
           <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 transition-opacity group-hover:opacity-100" />
-          <Mic size={28} className={orbState === "listening" ? "animate-pulse" : ""} />
+          <Mic size={28} color="white" className={`relative z-10 ${orbState === "listening" ? "animate-pulse" : ""}`} />
         </button>
         
         <div className="w-[140px]"> {/* Fixed width container to keep mic centered */}

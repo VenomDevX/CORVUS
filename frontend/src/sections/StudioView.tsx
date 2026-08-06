@@ -334,7 +334,7 @@ function HistoryCard({
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 text-sm leading-relaxed text-gray-200" title={item.text}>
+          <p className="line-clamp-2 text-sm leading-relaxed text-fg" title={item.text}>
             {item.text}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">

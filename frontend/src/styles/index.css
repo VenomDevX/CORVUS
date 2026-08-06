@@ -25,7 +25,8 @@
   --liquid-shadow: 0 8px 28px rgba(11, 18, 32, 0.12);
 }
 
-:root[data-theme="light"] img[src="./logo.png"] {
+:root[data-theme="light"] img[src="./logo.png"],
+:root[data-theme="pink"] img[src="./logo.png"] {
   filter: invert(1);
 }
 html,

@@ -616,7 +616,7 @@ function BackendPage() {
         {backendOnline ? (
           <div className="mt-6 flex flex-col gap-1 text-[12px] text-fg-muted">
             <span className="text-success">● Corvus core online (127.0.0.1:8765)</span>
-            <span>Build: Developer Preview (0.1.0-alpha)</span>
+            <span>Build: Developer Preview (0.2.0-alpha)</span>
           </div>
         ) : (
           <span className="text-danger">● Corvus core offline</span>

@@ -378,7 +378,6 @@ function HistoryCard({
 
 export function StudioView() {
   const backendOnline = useCorvus((s) => s.backendOnline);
-  const theme = useCorvus((s) => s.theme);
   const [voices, setVoices] = useState<StudioVoices>({ edge: [], piper: [] });
   const [items, setItems] = useState<Voiceover[]>([]);
   const [engine, setEngine] = useState<VoiceEngine>("edge");
@@ -618,9 +617,9 @@ export function StudioView() {
         </div>
 
         {/* Right Sidebar */}
-        <div className={`flex w-full min-h-0 flex-col border-t border-black/10 dark:border-white/5 lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px] ${theme === 'dark' ? 'bg-black' : 'bg-app-secondary'}`}>
+        <div className="flex w-full min-h-0 flex-col lg:w-[420px] xl:w-[460px]">
           {isVoicePickerOpen ? (
-            <div className={`flex flex-col h-full text-fg ${theme === 'dark' ? 'bg-black' : 'bg-app-secondary'}`}>
+            <div className="flex flex-col h-full text-fg">
               <div className="flex items-center gap-3 p-4 py-3">
                 <button 
                   onClick={() => setIsVoicePickerOpen(false)} 
@@ -969,7 +968,7 @@ export function StudioView() {
               )}
             </div>
           ) : (
-            <div className={`flex h-full flex-col text-fg ${theme === 'dark' ? 'bg-black' : 'bg-app-secondary'}`}>
+            <div className="flex h-full flex-col text-fg">
               <div className="flex items-center gap-8 px-6 mt-4 border-b border-fg/10">
                 <button
                   onClick={() => setSidebarTab("settings")}

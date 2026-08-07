@@ -216,7 +216,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
   };
 
   return (
-    <div className="flex h-24 items-center justify-between border-t border-black/10 dark:border-white/10 bg-app-secondary px-6 shadow-sm">
+    <div className="flex h-24 items-center justify-between border-t border-fg/10 bg-transparent px-6">
       {/* Left section: Info */}
       <div className="flex items-center gap-4 w-1/4 min-w-0">
         <VoiceAvatar name={item.voice} />
@@ -272,11 +272,11 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
       {/* Right section: Actions */}
       <div className="flex items-center gap-3 w-1/4 justify-end">
         <div className="flex items-center border border-fg/10 rounded-md p-1 mr-2 bg-fg/10">
-          <button className="rounded p-1.5 text-fg-muted hover:bg-black/10 dark:bg-white/10 hover:text-fg transition-colors">
+          <button className="rounded p-1.5 text-fg-muted hover:bg-fg/10 hover:text-fg transition-colors">
             <ThumbsUp className="h-4 w-4" />
           </button>
-          <div className="w-px h-4 bg-black/10 dark:bg-white/10 mx-1" />
-          <button className="rounded p-1.5 text-fg-muted hover:bg-black/10 dark:bg-white/10 hover:text-fg transition-colors">
+          <div className="w-px h-4 bg-fg/10 mx-1" />
+          <button className="rounded p-1.5 text-fg-muted hover:bg-fg/10 hover:text-fg transition-colors">
             <ThumbsDown className="h-4 w-4" />
           </button>
         </div>
@@ -292,7 +292,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
         >
           <Download className="h-4 w-4" />
         </a>
-        <button className="rounded-md p-2 text-fg-muted hover:bg-black/10 dark:bg-white/10 transition-colors">
+        <button className="rounded-md p-2 text-fg-muted hover:bg-fg/10 transition-colors">
           <ChevronDown className="h-5 w-5" />
         </button>
       </div>

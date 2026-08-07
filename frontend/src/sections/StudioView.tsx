@@ -216,7 +216,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
   };
 
   return (
-    <div className="flex h-24 items-center justify-between border-t border-fg/20 bg-transparent px-4 sm:px-6 gap-2 sm:gap-4 overflow-hidden">
+    <div className="flex h-24 items-center justify-between border-t border-surface-raised bg-transparent px-4 sm:px-6 gap-2 sm:gap-4 overflow-hidden">
       {/* Left section: Info */}
       <div className="flex items-center gap-3 sm:gap-4 flex-shrink min-w-0">
         <div className="hidden sm:block">
@@ -239,7 +239,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
           <button
             onClick={toggle}
             aria-label={playing ? "Pause" : "Play"}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-fg text-app transition-transform hover:scale-105 active:scale-95 shadow-md"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-fg transition-transform hover:scale-105 active:scale-95 shadow-md shadow-accent/10"
           >
             {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current ml-0.5" />}
           </button>
@@ -263,7 +263,7 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
               setProgress(t);
             }}
             aria-label="Seek"
-            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-fg/20 accent-fg transition-all"
+            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-surface-raised accent-accent transition-all"
           />
           <span className="w-10 text-xs text-fg-faint font-mono">
             {fmtTime(duration)}
@@ -273,16 +273,16 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
 
       {/* Right section: Actions */}
       <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0 justify-end">
-        <div className="hidden sm:flex items-center border border-fg/10 rounded-md p-1 mr-0 sm:mr-2 bg-fg/10">
-          <button className="rounded p-1.5 text-fg-muted hover:bg-fg/10 hover:text-fg transition-colors">
+        <div className="hidden sm:flex items-center border border-surface-raised rounded-md p-1 mr-0 sm:mr-2 bg-transparent">
+          <button className="rounded p-1.5 text-fg-muted hover:bg-surface-raised hover:text-fg transition-colors">
             <ThumbsUp className="h-4 w-4" />
           </button>
-          <div className="w-px h-4 bg-fg/10 mx-1" />
-          <button className="rounded p-1.5 text-fg-muted hover:bg-fg/10 hover:text-fg transition-colors">
+          <div className="w-px h-4 bg-surface-raised mx-1" />
+          <button className="rounded p-1.5 text-fg-muted hover:bg-surface-raised hover:text-fg transition-colors">
             <ThumbsDown className="h-4 w-4" />
           </button>
         </div>
-        <button className="flex items-center gap-1.5 rounded-md border border-fg/10 bg-fg/10 px-3 py-1.5 text-sm font-medium text-fg-muted hover:bg-fg/20 transition-colors">
+        <button className="flex items-center gap-1.5 rounded-md border border-surface-raised bg-transparent px-3 py-1.5 text-sm font-medium text-fg-muted hover:bg-surface-raised transition-colors">
           <Share2 className="h-4 w-4" />
           Share
         </button>
@@ -290,11 +290,11 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
           href={api.voiceoverAudioUrl(item.id)}
           download={item.filename}
           aria-label="Download audio"
-          className="flex items-center justify-center rounded-md border border-fg/10 bg-fg/10 p-2 text-fg-muted hover:bg-fg/20 transition-colors"
+          className="flex items-center justify-center rounded-md border border-surface-raised bg-transparent p-2 text-fg-muted hover:bg-surface-raised transition-colors"
         >
           <Download className="h-4 w-4" />
         </a>
-        <button className="rounded-md p-2 text-fg-muted hover:bg-fg/10 transition-colors">
+        <button className="rounded-md p-2 text-fg-muted hover:bg-surface-raised transition-colors">
           <ChevronDown className="h-5 w-5" />
         </button>
       </div>
@@ -971,7 +971,7 @@ export function StudioView() {
             </div>
           ) : (
             <div className="flex h-full flex-col text-fg">
-              <div className="flex items-center gap-8 px-6 mt-4 border-b border-fg/20">
+              <div className="flex items-center gap-8 px-6 mt-4 border-b border-surface-raised">
                 <button
                   onClick={() => setSidebarTab("settings")}
                   className={`flex items-center gap-2 py-3 text-[13px] font-semibold transition-colors ${
@@ -1089,10 +1089,10 @@ export function StudioView() {
                           </div>
                           <div className="relative flex items-center h-4">
                             {/* Track background */}
-                            <div className="absolute w-full h-1 bg-fg/20 rounded-full" />
+                            <div className="absolute w-full h-1 bg-surface-raised rounded-full" />
                             {/* Filled track */}
                             <div 
-                              className="absolute h-1 bg-fg rounded-full" 
+                              className="absolute h-1 bg-accent rounded-full" 
                               style={{ width: `${((value - min) / (max - min)) * 100}%` }}
                             />
                             {/* The input range itself, made transparent but overlaid for interaction */}
@@ -1107,7 +1107,7 @@ export function StudioView() {
                             />
                             {/* Custom thumb */}
                             <div 
-                              className="absolute h-3.5 w-3.5 rounded-full bg-fg shadow-md group-hover:scale-110 transition-transform pointer-events-none"
+                              className="absolute h-3.5 w-3.5 rounded-full bg-accent shadow-md group-hover:scale-110 transition-transform pointer-events-none"
                               style={{ left: `calc(${((value - min) / (max - min)) * 100}% - 7px)` }}
                             />
                           </div>
@@ -1139,12 +1139,12 @@ export function StudioView() {
                         aria-checked={autoplay}
                         onClick={() => setAutoplay((a) => !a)}
                         className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
-                          autoplay ? "bg-fg" : "bg-fg/20"
+                          autoplay ? "bg-accent" : "bg-surface-raised"
                         }`}
                       >
                         <span
                           className={`absolute top-0.5 h-4 w-4 rounded-full shadow-sm transition-transform ${
-                            autoplay ? "translate-x-[18px] bg-app-secondary" : "translate-x-0.5 bg-fg/50"
+                            autoplay ? "translate-x-[18px] bg-accent-fg" : "translate-x-0.5 bg-fg/50"
                           }`}
                         />
                       </button>

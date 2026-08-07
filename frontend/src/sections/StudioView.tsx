@@ -216,20 +216,22 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
   };
 
   return (
-    <div className="flex h-24 items-center justify-between border-t border-fg/10 bg-transparent px-6">
+    <div className="flex h-24 items-center justify-between border-t border-fg/20 bg-transparent px-4 sm:px-6 gap-2 sm:gap-4 overflow-hidden">
       {/* Left section: Info */}
-      <div className="flex items-center gap-4 w-1/4 min-w-0">
-        <VoiceAvatar name={item.voice} />
+      <div className="flex items-center gap-3 sm:gap-4 flex-shrink min-w-0">
+        <div className="hidden sm:block">
+          <VoiceAvatar name={item.voice} />
+        </div>
         <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-2">
             <span className="truncate text-sm font-medium text-fg">{item.voice}</span>
-            <span className="truncate text-xs text-fg-faint">· Created recently</span>
+            <span className="truncate text-xs text-fg-faint hidden lg:inline">· Created recently</span>
           </div>
         </div>
       </div>
 
       {/* Middle section: Controls & Timeline */}
-      <div className="flex flex-1 flex-col items-center justify-center max-w-2xl px-8">
+      <div className="flex flex-1 flex-col items-center justify-center max-w-2xl px-2 sm:px-4 min-w-[200px]">
         <div className="flex items-center gap-6 mb-1">
           <button onClick={() => seek(-10)} className="text-fg-muted hover:text-fg transition-colors" aria-label="Rewind 10 seconds">
             <RotateCcw className="h-5 w-5" />
@@ -270,8 +272,8 @@ function GlobalPlayer({ item, autoplay }: { item?: Voiceover; autoplay?: boolean
       </div>
 
       {/* Right section: Actions */}
-      <div className="flex items-center gap-3 w-1/4 justify-end">
-        <div className="flex items-center border border-fg/10 rounded-md p-1 mr-2 bg-fg/10">
+      <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0 justify-end">
+        <div className="hidden sm:flex items-center border border-fg/10 rounded-md p-1 mr-0 sm:mr-2 bg-fg/10">
           <button className="rounded p-1.5 text-fg-muted hover:bg-fg/10 hover:text-fg transition-colors">
             <ThumbsUp className="h-4 w-4" />
           </button>
@@ -969,7 +971,7 @@ export function StudioView() {
             </div>
           ) : (
             <div className="flex h-full flex-col text-fg">
-              <div className="flex items-center gap-8 px-6 mt-4 border-b border-fg/10">
+              <div className="flex items-center gap-8 px-6 mt-4 border-b border-fg/20">
                 <button
                   onClick={() => setSidebarTab("settings")}
                   className={`flex items-center gap-2 py-3 text-[13px] font-semibold transition-colors ${

@@ -107,7 +107,7 @@ function PromptPanel({
         placeholder={placeholder}
         className="h-36 shrink-0 resize-none bg-transparent p-0 text-xl font-light leading-relaxed text-fg outline-none placeholder:text-fg-muted/50"
       />
-      <div className="mt-2 flex items-center justify-between border-t border-black/10 dark:border-white/10 pt-3 text-xs font-medium uppercase tracking-wider text-fg-faint">
+      <div className="mt-2 flex items-center justify-between border-t border-surface-raised pt-3 text-xs font-medium uppercase tracking-wider text-fg-faint">
         <span>{prompt.length.toLocaleString()} / 2,000 characters</span>
         {error ? (
           <span className="text-danger normal-case">{error}</span>
@@ -130,7 +130,7 @@ function PromptPanel({
         <button
           onClick={onGenerate}
           disabled={!canGenerate}
-          className="flex items-center justify-center gap-2 rounded-xl bg-white px-8 py-3 text-body font-semibold text-black shadow-lg shadow-white/10 transition-all duration-fast hover:bg-white/90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+          className="flex items-center justify-center gap-2 rounded-xl bg-accent px-8 py-3 text-body font-semibold text-accent-fg shadow-lg shadow-accent/20 transition-all duration-fast hover:bg-accent-bright hover:shadow-accent/40 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
         >
           {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wand2 className="h-5 w-5" />}
           {busy ? "Generating…" : "Generate"}
@@ -143,7 +143,7 @@ function PromptPanel({
 
 function Sidebar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex w-full min-h-0 flex-col border-t border-black/10 dark:border-white/10 bg-app-secondary lg:w-[420px] lg:border-l lg:border-t-0 xl:w-[460px]">
+    <div className="flex w-full min-h-0 flex-col lg:w-[420px] xl:w-[460px]">
       <div className="flex-1 overflow-y-auto p-6 text-fg">{children}</div>
     </div>
   );
@@ -176,7 +176,7 @@ function ChoiceRow<T extends string | number>({
           key={String(o)}
           onClick={() => onChange(o)}
           className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-            value === o ? "bg-white text-black" : "bg-black/5 dark:bg-white/5 text-fg-muted hover:bg-black/10 dark:bg-white/10"
+            value === o ? "bg-accent text-accent-fg" : "bg-surface-raised/50 text-fg-muted hover:bg-surface-raised"
           }`}
         >
           {format ? format(o) : String(o)}
@@ -418,7 +418,7 @@ function HistoryList({
   return (
     <div className="space-y-2">
       {items.map((item) => (
-        <div key={item.id} className="group rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 p-2.5">
+        <div key={item.id} className="group rounded-xl border border-surface-raised bg-surface-raised/20 p-2.5">
           {render(item)}
           <div className="mt-1.5 flex items-center justify-between gap-2">
             <span className="truncate text-caption text-fg-faint">{item.prompt}</span>
@@ -740,11 +740,11 @@ export function StudioSfxPage() {
           {items.map((item) => (
             <div
               key={item.id}
-              className="group flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 p-3"
+              className="group flex items-center gap-3 rounded-xl border border-surface-raised bg-surface-raised/20 p-3"
             >
               <button
                 onClick={() => play(item.id)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black transition-transform hover:scale-105"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-fg transition-transform hover:scale-105 shadow-md shadow-accent/10"
                 aria-label={playingId === item.id ? "Stop" : "Play"}
               >
                 {playingId === item.id ? (
@@ -798,7 +798,7 @@ export function StudioSfxPage() {
               step={0.5}
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value))}
-              className="w-full accent-white"
+              className="w-full accent-accent"
             />
           </Setting>
           <Setting label={`Intensity — ${Math.round(intensity * 100)}%`}>
@@ -809,7 +809,7 @@ export function StudioSfxPage() {
               step={0.05}
               value={intensity}
               onChange={(e) => setIntensity(Number(e.target.value))}
-              className="w-full accent-white"
+              className="w-full accent-accent"
             />
           </Setting>
           <p className="text-caption text-fg-faint">

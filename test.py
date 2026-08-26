@@ -1,0 +1,1 @@
+import re; r = re.compile(r'\{\s*[\"}]|\[\s*[\[{\"]|`json|`(?:j(?:s(?:o(?:n)?)?)?)?$|\{\s*$|\[\s*$', re.IGNORECASE); print(r.search('{\"name\": \"system_status\", \"arguments\": {}}').start() if r.search('{\"name\": \"system_status\", \"arguments\": {}}') else -1)

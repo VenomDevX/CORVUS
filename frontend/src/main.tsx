@@ -1,9 +1,14 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import * as Sentry from "@sentry/electron/renderer";
 import App from "./App";
 import WidgetApp from "./WidgetApp";
 import OverlayApp from "./OverlayApp";
 import "./styles/index.css";
+
+Sentry.init({
+  dsn: "SENTRY_DSN_HERE",
+});
 import { applyThemeVars } from "./lib/theme";
 import { useCorvus } from "./state/store";
 

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .db import connect
+from .. import crypto
 
 MEMORY_CATEGORIES = ("preference", "project", "person", "app")
 
@@ -27,20 +28,29 @@ class Repository:
     # -- conversations -----------------------------------------------------
 
     def create_conversation(self, title: str) -> dict[str, Any]:
+        enc_title = crypto.encrypt(title.strip() or "New chat")
         cur = self.conn.execute(
-            "INSERT INTO conversations (title) VALUES (?) RETURNING *", (title.strip() or "New chat",)
+            "INSERT INTO conversations (title) VALUES (?) RETURNING *", (enc_title,)
         )
         row = dict(cur.fetchone())
+        row["title"] = crypto.decrypt(row["title"])
         self.conn.commit()
         return row
 
     def list_conversations(self) -> list[dict[str, Any]]:
-        return _rows(self.conn.execute("SELECT * FROM conversations ORDER BY updated_at DESC"))
+        rows = _rows(self.conn.execute("SELECT * FROM conversations ORDER BY updated_at DESC"))
+        for r in rows:
+            r["title"] = crypto.decrypt(r["title"])
+        return rows
 
     def get_conversation(self, conversation_id: int) -> dict[str, Any] | None:
         cur = self.conn.execute("SELECT * FROM conversations WHERE id = ?", (conversation_id,))
         row = cur.fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+        r = dict(row)
+        r["title"] = crypto.decrypt(r["title"])
+        return r
 
     def delete_conversation(self, conversation_id: int) -> bool:
         cur = self.conn.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
@@ -56,29 +66,39 @@ class Repository:
     # -- messages ----------------------------------------------------------
 
     def add_message(self, conversation_id: int, role: str, content: str) -> dict[str, Any]:
+        enc_content = crypto.encrypt(content)
         cur = self.conn.execute(
             "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?) RETURNING *",
-            (conversation_id, role, content),
+            (conversation_id, role, enc_content),
         )
         row = dict(cur.fetchone())
+        row["content"] = crypto.decrypt(row["content"])
         self.conn.commit()
         self.touch_conversation(conversation_id)
         return row
 
     def list_messages(self, conversation_id: int) -> list[dict[str, Any]]:
-        return _rows(
+        rows = _rows(
             self.conn.execute(
                 "SELECT * FROM messages WHERE conversation_id = ? ORDER BY id", (conversation_id,)
             )
         )
+        for r in rows:
+            r["content"] = crypto.decrypt(r["content"])
+        return rows
 
     def get_message(self, message_id: int) -> dict[str, Any] | None:
         cur = self.conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,))
         row = cur.fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+        r = dict(row)
+        r["content"] = crypto.decrypt(r["content"])
+        return r
 
     def update_message(self, message_id: int, content: str) -> None:
-        self.conn.execute("UPDATE messages SET content = ? WHERE id = ?", (content, message_id))
+        enc_content = crypto.encrypt(content)
+        self.conn.execute("UPDATE messages SET content = ? WHERE id = ?", (enc_content, message_id))
         self.conn.commit()
 
     def delete_messages_after(self, conversation_id: int, message_id: int) -> None:
@@ -94,16 +114,21 @@ class Repository:
     ) -> dict[str, Any]:
         if category not in MEMORY_CATEGORIES:
             raise ValueError(f"invalid memory category: {category}")
+        enc_content = crypto.encrypt(content)
         cur = self.conn.execute(
             "INSERT INTO memories (category, content, source_conversation) VALUES (?, ?, ?) RETURNING *",
-            (category, content, source_conversation),
+            (category, enc_content, source_conversation),
         )
         row = dict(cur.fetchone())
+        row["content"] = crypto.decrypt(row["content"])
         self.conn.commit()
         return row
 
     def list_memories(self) -> list[dict[str, Any]]:
-        return _rows(self.conn.execute("SELECT * FROM memories ORDER BY created_at DESC, id DESC"))
+        rows = _rows(self.conn.execute("SELECT * FROM memories ORDER BY created_at DESC, id DESC"))
+        for r in rows:
+            r["content"] = crypto.decrypt(r["content"])
+        return rows
 
     def delete_memory(self, memory_id: int) -> bool:
         cur = self.conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
@@ -111,10 +136,12 @@ class Repository:
         return cur.rowcount > 0
 
     def memory_exists(self, content: str) -> bool:
-        cur = self.conn.execute(
-            "SELECT 1 FROM memories WHERE lower(content) = lower(?) LIMIT 1", (content,)
-        )
-        return cur.fetchone() is not None
+        # Check against decrypted content in memory
+        target = content.lower()
+        for mem in self.list_memories():
+            if mem["content"].lower() == target:
+                return True
+        return False
 
     # -- action log --------------------------------------------------------
 

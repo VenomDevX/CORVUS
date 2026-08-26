@@ -19,6 +19,8 @@ export function OllamaModels() {
   const [pulling, setPulling] = useState<string | null>(null);
   const [pull, setPull] = useState<PullProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
+  const [installingOllama, setInstallingOllama] = useState(false);
 
   const refresh = useCallback(async () => {
     const [s, settings] = await Promise.all([api.systemSpecs(), api.getSettings()]);
@@ -34,16 +36,41 @@ export function OllamaModels() {
 
   if (!specs.ollama.running) {
     return (
-      <p className="text-body-sm text-warning">
-        Ollama isn't running — start it (or install it from{" "}
-        <button
-          onClick={() => void window.corvus?.openExternal("https://ollama.com/download")}
-          className="text-accent-bright underline"
-        >
-          ollama.com
-        </button>
-        ) to manage offline models.
-      </p>
+      <div className="flex flex-col gap-2">
+        <p className="text-body-sm text-warning">
+          Ollama isn't running — start it (or{" "}
+          <button
+            onClick={async () => {
+              setInstallingOllama(true);
+              setInstallError(null);
+              try {
+                await window.corvus?.installOllama();
+              } catch (err) {
+                console.error(err);
+                setInstallError(err instanceof Error ? err.message : "Installation failed.");
+              } finally {
+                setInstallingOllama(false);
+              }
+            }}
+            disabled={installingOllama}
+            className="text-accent-bright underline disabled:opacity-50"
+          >
+            {installingOllama ? "installing..." : "install it automatically"}
+          </button>
+          ) to manage offline models.
+        </p>
+        {installError && (
+          <div className="flex flex-col items-start gap-1">
+            <p className="text-xs text-danger">{installError}</p>
+            <button
+              onClick={() => void window.corvus?.openExternal("https://ollama.com/download")}
+              className="text-xs text-accent-bright underline"
+            >
+              Download Manually Instead
+            </button>
+          </div>
+        )}
+      </div>
     );
   }
 

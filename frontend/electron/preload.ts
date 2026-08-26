@@ -16,6 +16,7 @@ const corvusBridge = {
   showMain: (): Promise<void> => ipcRenderer.invoke("corvus:show-main"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("corvus:check-for-updates"),
   installUpdate: (): Promise<void> => ipcRenderer.invoke("corvus:install-update"),
+  installOllama: (): Promise<boolean> => ipcRenderer.invoke("corvus:install-ollama"),
   onUpdateStatus: (callback: (status: UpdateStatus) => void): (() => void) => {
     const listener = (_e: unknown, status: UpdateStatus) => callback(status);
     ipcRenderer.on("corvus:update-status", listener);

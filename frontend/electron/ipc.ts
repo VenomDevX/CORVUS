@@ -1,5 +1,8 @@
 import { BrowserWindow, app, ipcMain, nativeTheme, shell } from "electron";
-
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as https from "node:https";
+import { execFile } from "node:child_process";
 /** IPC surface exposed to the renderer via preload — keep this minimal and typed. */
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
@@ -17,6 +20,35 @@ export function registerIpc(
   ipcMain.handle("corvus:get-backend-token", () => backendToken);
 
   ipcMain.handle("corvus:get-version", () => app.getVersion());
+
+  ipcMain.handle("corvus:install-ollama", async () => {
+    return new Promise((resolve, reject) => {
+      const downloadUrl = "https://ollama.com/download/OllamaSetup.exe";
+      const tempPath = path.join(app.getPath("temp"), "OllamaSetup.exe");
+      
+      const file = fs.createWriteStream(tempPath);
+      https.get(downloadUrl, (response) => {
+        if (response.statusCode !== 200) {
+          return reject(new Error("Failed to download Ollama. Status: " + response.statusCode));
+        }
+        response.pipe(file);
+        file.on("finish", () => {
+          file.close();
+          // Execute silently
+          execFile(tempPath, ["/SILENT"], (error) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(true);
+            }
+          });
+        });
+      }).on("error", (err) => {
+        fs.unlink(tempPath, () => {});
+        reject(err);
+      });
+    });
+  });
 
   ipcMain.handle("corvus:open-external", async (_event, url: string) => {
     if (/^https?:\/\//.test(url)) await shell.openExternal(url);

@@ -37,3 +37,13 @@ Thumbs.db
 # Electron-builder buildResources (icons come from design/exports)
 frontend/build/
 SECURITY.md
+
+# Marketing Site
+CorvusWeb/
+
+# Workflow Visualization App
+CorvusWorkflow/
+CorvusWeb/
+
+
+build-backend/

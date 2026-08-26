@@ -641,9 +641,9 @@ function SetupPage() {
             .then(() => window.location.reload())
         }
         disabled={!backendOnline}
-        className="rounded bg-accent px-4 py-2 text-body text-white transition-colors duration-fast enabled:hover:bg-accent-bright disabled:opacity-40"
+        className="rounded bg-white px-4 py-2 text-body font-semibold text-black transition-colors duration-fast enabled:hover:bg-white/90 disabled:opacity-40"
       >
-        Re-run first-time setup
+        First-time Setup
       </button>
     </>
   );

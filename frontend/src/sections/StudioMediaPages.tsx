@@ -514,18 +514,35 @@ export function StudioImagePage() {
           ) : undefined
         }
       >
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {items.map((item) => (
-            <img
-              key={item.id}
-              src={api.mediaFileUrl(item.id)}
-              alt={item.prompt}
-              title={item.prompt}
-              className="aspect-square w-full rounded-xl object-cover ring-1 ring-white/10"
-              loading="lazy"
-            />
-          ))}
-        </div>
+        {items.length === 0 && !job.busy && (
+          <div className="flex flex-col items-center justify-center h-full gap-4 opacity-70 py-12">
+            <div className="h-16 w-16 rounded-2xl bg-black/5 dark:bg-white/5 border border-white/10 flex items-center justify-center shadow-inner">
+              <Wand2 className="h-8 w-8 text-fg-faint" />
+            </div>
+            <p className="text-body text-fg-muted text-center max-w-sm">
+              No images generated yet. Type a prompt above and click generate to create your first masterpiece.
+            </p>
+          </div>
+        )}
+        {(items.length > 0 || job.busy) && (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            {job.busy && (
+              <div className="aspect-square w-full rounded-xl bg-surface-raised/20 border border-white/5 animate-pulse flex items-center justify-center">
+                <Loader2 className="h-8 w-8 text-fg-muted/50 animate-spin" />
+              </div>
+            )}
+            {items.map((item) => (
+              <img
+                key={item.id}
+                src={api.mediaFileUrl(item.id)}
+                alt={item.prompt}
+                title={item.prompt}
+                className="aspect-square w-full rounded-xl object-cover ring-1 ring-white/10"
+                loading="lazy"
+              />
+            ))}
+          </div>
+        )}
       </PromptPanel>
       <Sidebar>
         <div className="flex flex-col gap-6">
@@ -634,18 +651,35 @@ export function StudioVideoPage() {
           ) : undefined
         }
       >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {items.map((item) => (
-            <img
-              key={item.id}
-              src={api.mediaFileUrl(item.id)}
-              alt={item.prompt}
-              title={item.prompt}
-              className="w-full rounded-xl ring-1 ring-white/10"
-              loading="lazy"
-            />
-          ))}
-        </div>
+        {items.length === 0 && !job.busy && (
+          <div className="flex flex-col items-center justify-center h-full gap-4 opacity-70 py-12">
+            <div className="h-16 w-16 rounded-2xl bg-black/5 dark:bg-white/5 border border-white/10 flex items-center justify-center shadow-inner">
+              <Play className="h-8 w-8 text-fg-faint ml-1" />
+            </div>
+            <p className="text-body text-fg-muted text-center max-w-sm">
+              No videos generated yet. Describe a motion scene above to build your first AI clip.
+            </p>
+          </div>
+        )}
+        {(items.length > 0 || job.busy) && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {job.busy && (
+              <div className="aspect-[4/3] w-full rounded-xl bg-surface-raised/20 border border-white/5 animate-pulse flex items-center justify-center">
+                <Loader2 className="h-8 w-8 text-fg-muted/50 animate-spin" />
+              </div>
+            )}
+            {items.map((item) => (
+              <img
+                key={item.id}
+                src={api.mediaFileUrl(item.id)}
+                alt={item.prompt}
+                title={item.prompt}
+                className="w-full rounded-xl ring-1 ring-white/10"
+                loading="lazy"
+              />
+            ))}
+          </div>
+        )}
       </PromptPanel>
       <Sidebar>
         <div className="flex flex-col gap-6">

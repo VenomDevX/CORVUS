@@ -162,6 +162,8 @@ export default function App() {
         {onboardingComplete === false && (
           <OnboardingSetup onComplete={() => setOnboardingComplete(true)} />
         )}
+        {onboardingComplete !== false && (
+          <>
         <NotificationsLayer />
         <CommandPalette />
         <AnimatePresence>{voiceMode && <VoiceMode />}</AnimatePresence>
@@ -186,7 +188,7 @@ export default function App() {
           </button>
         </header>
         <div className="flex min-h-0 flex-1 gap-4 p-4 pt-1">
-          <div className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} ${onboardingComplete === false ? "hidden" : ""}`}>
+          <div className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <Sidebar />
           </div>
           {sidebarOpen && (
@@ -210,6 +212,8 @@ export default function App() {
             </AnimatePresence>
           </main>
         </div>
+        </>
+        )}
       </div>
     </FluentProvider>
   );

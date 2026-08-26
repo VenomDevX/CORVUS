@@ -2,10 +2,15 @@ import { app, BrowserWindow, globalShortcut, nativeTheme, screen, shell, session
 import { randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import * as Sentry from "@sentry/electron/main";
 import { createTray, destroyTray } from "./tray";
 import { registerIpc } from "./ipc";
 import { startBackend, stopBackend } from "./backend-launcher";
 import { initAutoUpdate } from "./updater";
+
+Sentry.init({
+  dsn: "SENTRY_DSN_HERE",
+});
 
 const DEV_URL = "http://127.0.0.1:5173";
 const isDev = !app.isPackaged;

@@ -1,0 +1,69 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python Dependencies & Build Backend
+        run: |
+          cd backend
+          python -m venv .venv
+          .venv\Scripts\Activate.ps1
+          pip install -e .[dev]
+          pip install pyinstaller
+        shell: powershell
+
+      - name: Install Node Dependencies
+        run: npm install
+        
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Install Playwright Browsers
+        run: |
+          cd frontend
+          npx playwright install --with-deps
+
+      - name: Build Electron main for Playwright
+        run: |
+          cd frontend
+          npm run build:electron
+
+      - name: Run E2E Tests
+        run: |
+          cd frontend
+          npx playwright test
+
+      - name: Build Windows Executable
+        run: npm run dist
+
+      - name: Create Draft Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: dist-installer/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

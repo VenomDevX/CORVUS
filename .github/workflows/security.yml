@@ -42,7 +42,7 @@ jobs:
           npm audit || true
           npm audit --prefix frontend || true
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 

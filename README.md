@@ -9,6 +9,8 @@
   Local-first. Private by design. No cloud required.
 </p>
 
+<p align="center"><sub>⭐ If you like the idea of an AI that stays on your PC, star the repo — it helps others find it.</sub></p>
+
 <p align="center">
   <a href="https://github.com/VenomDevX/CORVUS/releases/latest"><img src="https://img.shields.io/github/v/release/VenomDevX/CORVUS?style=for-the-badge&color=8B5CF6&label=Download" alt="Latest Release" /></a>
   <img src="https://img.shields.io/badge/platform-Windows-0078D4?style=for-the-badge&logo=windows" alt="Windows" />

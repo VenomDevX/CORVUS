@@ -110,10 +110,14 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
     setBusy(true);
     try {
       if (!installed.has(id)) {
-        setPull({ percent: 0, status: "starting download" });
+        setPull({ percent: 0, status: `downloading ${id}...` });
         await pullOllamaModel(id, setPull);
-        setPull(null);
       }
+      if (!installed.has("nomic-embed-text:latest") && !installed.has("nomic-embed-text")) {
+        setPull({ percent: 0, status: "downloading nomic-embed-text for fast semantic search..." });
+        await pullOllamaModel("nomic-embed-text", setPull);
+      }
+      setPull(null);
       await api.updateSettings({ provider: "ollama", model: id });
       setStep("tutorial");
     } catch (e) {

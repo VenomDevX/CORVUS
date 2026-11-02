@@ -72,3 +72,45 @@ def test_search_documents_action(index, docs):
     assert result.ok
     assert "recipe.txt" in result.message
     assert "<<<UNTRUSTED_CONTENT>>>" in result.message
+
+
+def _fake_embed(texts):
+    """Deterministic bag-of-words vectors, so Chroma ranking is testable offline."""
+    import numpy as np
+
+    vecs = np.zeros((len(texts), 64), dtype=np.float32)
+    for row, text in enumerate(texts):
+        for word in text.lower().split():
+            vecs[row, hash(word.strip(".,")) % 64] += 1
+    norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    return vecs / norms
+
+
+def test_semantic_search_uses_chroma_beside_db(tmp_path, docs, monkeypatch):
+    idx = DocsIndex(tmp_path / "rag.db")
+    monkeypatch.setattr(idx, "_check_embeddings", lambda: setattr(idx, "embeddings_available", True) or True)
+    monkeypatch.setattr(idx, "_embed", _fake_embed)
+    idx.index_folder(docs)
+    assert (tmp_path / "rag-vectors").is_dir()
+
+    hits = idx.search("basil pasta")
+    assert hits[0]["path"].endswith("recipe.txt") and "score" in hits[0]
+
+    # A removed file must disappear from vector results too.
+    (docs / "recipe.txt").unlink()
+    idx.index_folder(docs)
+    assert all(not h["path"].endswith("recipe.txt") for h in idx.search("basil pasta"))
+    idx.close()
+
+
+def test_docx_extracted(index, tmp_path):
+    import docx
+
+    d = tmp_path / "word"
+    d.mkdir()
+    doc = docx.Document()
+    doc.add_paragraph("Quarterly budget for the falcon project.")
+    doc.save(d / "plan.docx")
+    assert index.index_folder(d)["added"] == 1
+    assert index.search("falcon")[0]["path"].endswith("plan.docx")

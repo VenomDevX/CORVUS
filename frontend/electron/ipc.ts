@@ -1,7 +1,8 @@
-import { BrowserWindow, app, ipcMain, nativeTheme, shell } from "electron";
+import { BrowserWindow, app, ipcMain, nativeTheme, net, shell } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as https from "node:https";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { execFile } from "node:child_process";
 /** IPC surface exposed to the renderer via preload — keep this minimal and typed. */
 export function registerIpc(
@@ -22,32 +23,22 @@ export function registerIpc(
   ipcMain.handle("corvus:get-version", () => app.getVersion());
 
   ipcMain.handle("corvus:install-ollama", async () => {
-    return new Promise((resolve, reject) => {
-      const downloadUrl = "https://ollama.com/download/OllamaSetup.exe";
-      const tempPath = path.join(app.getPath("temp"), "OllamaSetup.exe");
-      
-      const file = fs.createWriteStream(tempPath);
-      https.get(downloadUrl, (response) => {
-        if (response.statusCode !== 200) {
-          return reject(new Error("Failed to download Ollama. Status: " + response.statusCode));
-        }
-        response.pipe(file);
-        file.on("finish", () => {
-          file.close();
-          // Execute silently
-          execFile(tempPath, ["/SILENT"], (error) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(true);
-            }
-          });
-        });
-      }).on("error", (err) => {
-        fs.unlink(tempPath, () => {});
-        reject(err);
-      });
-    });
+    const tempPath = path.join(app.getPath("temp"), "OllamaSetup.exe");
+    // net.fetch follows redirects; ollama.com 307s to the GitHub release asset.
+    const response = await net.fetch("https://ollama.com/download/OllamaSetup.exe");
+    if (!response.ok || !response.body) {
+      throw new Error("Failed to download Ollama. Status: " + response.status);
+    }
+    try {
+      await pipeline(Readable.fromWeb(response.body as any), fs.createWriteStream(tempPath));
+    } catch (err) {
+      fs.unlink(tempPath, () => {});
+      throw err;
+    }
+    await new Promise<void>((resolve, reject) =>
+      execFile(tempPath, ["/SILENT"], (error) => (error ? reject(error) : resolve())),
+    );
+    return true;
   });
 
   ipcMain.handle("corvus:open-external", async (_event, url: string) => {

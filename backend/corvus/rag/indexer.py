@@ -1,9 +1,8 @@
 """Local documents index (RAG) — fully offline.
 
 SQLite FTS5 keyword search is the always-available baseline. When an Ollama
-embedding model (nomic-embed-text) is installed, FTS candidates are reranked
-by cosine similarity for semantic quality. Nothing ever leaves the machine:
-files are read, chunked, and stored in the Corvus SQLite database.
+embedding model (nomic-embed-text) is installed, chunks are also embedded into
+a ChromaDB store and searched semantically. Nothing ever leaves the machine.
 """
 
 from __future__ import annotations
@@ -17,17 +16,18 @@ import numpy as np
 import structlog
 
 from ..config import OLLAMA_URL
+from ..memory.vector_db import ChromaManager
 
 log = structlog.get_logger("corvus")
 
 EMBED_MODEL = "nomic-embed-text"
 TEXT_EXTS = {".txt", ".md", ".py", ".js", ".ts", ".tsx", ".json", ".csv", ".yml", ".yaml", ".html"}
 PDF_EXT = ".pdf"
+DOCX_EXT = ".docx"
 SKIP_DIRS = {"node_modules", ".git", ".venv", "venv", "__pycache__", "dist", "build"}
 CHUNK_CHARS = 1000
 CHUNK_OVERLAP = 150
 MAX_FILE_BYTES = 20 * 1024 * 1024
-FTS_CANDIDATES = 24
 
 
 def _chunk(text: str) -> list[str]:
@@ -45,12 +45,13 @@ def _chunk(text: str) -> list[str]:
 def _extract_text(path: Path) -> str | None:
     if path.stat().st_size > MAX_FILE_BYTES:
         return None
-    if path.suffix.lower() in TEXT_EXTS:
+    suffix = path.suffix.lower()
+    if suffix in TEXT_EXTS:
         try:
             return path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             return None
-    if path.suffix.lower() == PDF_EXT:
+    if suffix == PDF_EXT:
         try:
             from pypdf import PdfReader
 
@@ -58,6 +59,15 @@ def _extract_text(path: Path) -> str | None:
             return "\n".join(page.extract_text() or "" for page in reader.pages)
         except Exception as exc:  # noqa: BLE001 - one bad PDF must not stop the index
             log.warning("rag_pdf_failed", file=str(path), error=str(exc))
+            return None
+    if suffix == DOCX_EXT:
+        try:
+            import docx
+
+            doc = docx.Document(str(path))
+            return "\n".join(para.text for para in doc.paragraphs)
+        except Exception as exc:  # noqa: BLE001 - one bad .docx must not stop the index
+            log.warning("rag_docx_failed", file=str(path), error=str(exc))
             return None
     return None
 
@@ -70,8 +80,9 @@ def _fts_query(query: str) -> str:
 
 
 class DocsIndex:
-    """Owns its own SQLite connection (separate from the main repo) so long
-    indexing runs never block chat queries."""
+    """Owns its own SQLite connection (separate from the main repo) and, once
+    embeddings are available, a ChromaDB store beside it — so long indexing
+    runs never block chat queries."""
 
     def __init__(self, database: Path):
         self._db_path = database
@@ -86,10 +97,7 @@ class DocsIndex:
             CREATE VIRTUAL TABLE IF NOT EXISTS rag_chunks USING fts5(
               content, path UNINDEXED, chunk_no UNINDEXED
             );
-            CREATE TABLE IF NOT EXISTS rag_embeddings (
-              path TEXT NOT NULL, chunk_no INTEGER NOT NULL, vector BLOB NOT NULL,
-              PRIMARY KEY (path, chunk_no)
-            );
+            DROP TABLE IF EXISTS rag_embeddings;
             """
         )
         self.conn.commit()
@@ -97,6 +105,19 @@ class DocsIndex:
         self.indexing = False
         self.progress = {"done": 0, "total": 0}
         self.embeddings_available: bool | None = None
+        self._chroma: ChromaManager | None = None
+
+    def _vectors_dir(self) -> Path:
+        return self._db_path.with_name(self._db_path.stem + "-vectors")
+
+    def _vectors(self) -> ChromaManager | None:
+        """The Chroma store, opened lazily so keyword-only use never loads it."""
+        if self._chroma is None:
+            try:
+                self._chroma = ChromaManager(self._vectors_dir())
+            except Exception as exc:  # noqa: BLE001 - vectors are optional; FTS still works
+                log.warning("rag_chroma_unavailable", error=str(exc))
+        return self._chroma
 
     # -- embeddings (optional) --------------------------------------------------
 
@@ -142,12 +163,12 @@ class DocsIndex:
                 self.indexing = False
 
     def _index_folder(self, folder: Path) -> dict:
-        use_embeddings = self._check_embeddings()
+        vectors = self._vectors() if self._check_embeddings() else None
         files = [
             p
             for p in folder.rglob("*")
             if p.is_file()
-            and (p.suffix.lower() in TEXT_EXTS or p.suffix.lower() == PDF_EXT)
+            and (p.suffix.lower() in TEXT_EXTS or p.suffix.lower() in (PDF_EXT, DOCX_EXT))
             and not any(part.startswith(".") or part in SKIP_DIRS for part in p.parts)
         ]
         self.progress = {"done": 0, "total": len(files)}
@@ -171,20 +192,19 @@ class DocsIndex:
             self._delete_file_rows(key)
             if text:
                 chunks = _chunk(text)
-                for i, chunk in enumerate(chunks):
-                    self.conn.execute(
-                        "INSERT INTO rag_chunks (content, path, chunk_no) VALUES (?, ?, ?)",
-                        (chunk, key, i),
-                    )
-                if use_embeddings and chunks:
+                self.conn.executemany(
+                    "INSERT INTO rag_chunks (content, path, chunk_no) VALUES (?, ?, ?)",
+                    [(chunk, key, i) for i, chunk in enumerate(chunks)],
+                )
+                if vectors is not None and chunks:
                     vecs = self._embed(chunks)
                     if vecs is not None:
-                        for i, v in enumerate(vecs):
-                            self.conn.execute(
-                                "INSERT OR REPLACE INTO rag_embeddings (path, chunk_no, vector)"
-                                " VALUES (?, ?, ?)",
-                                (key, i, v.tobytes()),
-                            )
+                        vectors.add_documents(
+                            ids=[f"{key}#{i}" for i in range(len(chunks))],
+                            documents=chunks,
+                            embeddings=vecs.tolist(),
+                            metadatas=[{"path": key, "chunk_no": i} for i in range(len(chunks))],
+                        )
                 self.conn.execute(
                     "INSERT OR REPLACE INTO rag_files (path, mtime, size) VALUES (?, ?, ?)",
                     (key, stat.st_mtime, stat.st_size),
@@ -203,56 +223,66 @@ class DocsIndex:
         self.conn.commit()
         log.info(
             "rag_indexed", folder=str(folder), added=added, skipped=skipped, removed=removed,
-            embeddings=use_embeddings,
+            embeddings=vectors is not None,
         )
         return {"files": len(files), "added": added, "skipped": skipped, "removed": removed}
 
     def _delete_file_rows(self, key: str) -> None:
         self.conn.execute("DELETE FROM rag_chunks WHERE path = ?", (key,))
-        self.conn.execute("DELETE FROM rag_embeddings WHERE path = ?", (key,))
+        vectors = self._vectors() if self._vectors_dir().exists() else None
+        if vectors is not None:
+            try:
+                vectors.delete_path(key)
+            except Exception as exc:  # noqa: BLE001 - stale vectors are filtered at search time
+                log.warning("rag_chroma_delete_failed", file=key, error=str(exc))
 
     # -- search -----------------------------------------------------------------
 
     def search(self, query: str, k: int = 6) -> list[dict]:
+        if not query.strip():
+            return []
+        if self.embeddings_available is None:
+            self._check_embeddings()
+        if self.embeddings_available:
+            hits = self._semantic_search(query, k)
+            if hits:
+                return hits
+        return self._keyword_search(query, k)
+
+    def _semantic_search(self, query: str, k: int) -> list[dict]:
+        vectors = self._vectors()
+        if vectors is None or vectors.count() == 0:
+            return []
+        qv = self._embed([query])
+        if qv is None:
+            return []
+        try:
+            res = vectors.query(query_embeddings=qv.tolist(), n_results=k)
+        except Exception as exc:  # noqa: BLE001 - fall back to keyword search
+            log.warning("rag_semantic_search_failed", error=str(exc))
+            return []
+        indexed = {r["path"] for r in self.conn.execute("SELECT path FROM rag_files")}
+        return [
+            {
+                "content": doc,
+                "path": meta["path"],
+                "chunk_no": meta["chunk_no"],
+                "score": round(1.0 - dist, 4),
+            }
+            for doc, meta, dist in zip(res["documents"][0], res["metadatas"][0], res["distances"][0])
+            if meta["path"] in indexed
+        ]
+
+    def _keyword_search(self, query: str, k: int) -> list[dict]:
         fts = _fts_query(query)
         if not fts:
             return []
         rows = self.conn.execute(
-            "SELECT content, path, chunk_no, rank FROM rag_chunks"
+            "SELECT content, path, chunk_no FROM rag_chunks"
             " WHERE rag_chunks MATCH ? ORDER BY rank LIMIT ?",
-            (fts, FTS_CANDIDATES),
+            (fts, k),
         ).fetchall()
-        results = [
-            {"content": r["content"], "path": r["path"], "chunk_no": r["chunk_no"]} for r in rows
-        ]
-        if not results:
-            return []
-
-        # Semantic rerank when the embedding model is around.
-        if self.embeddings_available is None:
-            self._check_embeddings()
-        if self.embeddings_available:
-            qv = self._embed([query])
-            if qv is not None:
-                scored = []
-                for item in results:
-                    row = self.conn.execute(
-                        "SELECT vector FROM rag_embeddings WHERE path = ? AND chunk_no = ?",
-                        (item["path"], item["chunk_no"]),
-                    ).fetchone()
-                    if row is None:
-                        vec = self._embed([item["content"]])
-                        if vec is None:
-                            continue
-                        v = vec[0]
-                    else:
-                        v = np.frombuffer(row["vector"], dtype=np.float32)
-                    scored.append((float(np.dot(qv[0], v)), item))
-                if scored:
-                    scored.sort(key=lambda s: s[0], reverse=True)
-                    results = [dict(item, score=round(score, 4)) for score, item in scored]
-
-        return results[:k]
+        return [{"content": r["content"], "path": r["path"], "chunk_no": r["chunk_no"]} for r in rows]
 
     def status(self) -> dict:
         files = self.conn.execute("SELECT COUNT(*) AS n FROM rag_files").fetchone()["n"]

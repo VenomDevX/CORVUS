@@ -26,6 +26,8 @@ for package in (
     "miniaudio",
     "piper",
     "piper_tts",
+    "chromadb",
+    "docx",
 ):
     try:
         pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)

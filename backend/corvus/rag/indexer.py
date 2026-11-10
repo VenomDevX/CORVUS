@@ -62,8 +62,16 @@ def _extract_text(path: Path) -> str | None:
             return None
     if suffix == DOCX_EXT:
         try:
+            import zipfile
+
             import docx
 
+            # .docx is a zip: cap the *uncompressed* size so a zip bomb can't
+            # exhaust memory under the on-disk size check above.
+            with zipfile.ZipFile(path) as zf:
+                if sum(info.file_size for info in zf.infolist()) > MAX_FILE_BYTES * 5:
+                    log.warning("rag_docx_too_large", file=str(path))
+                    return None
             doc = docx.Document(str(path))
             return "\n".join(para.text for para in doc.paragraphs)
         except Exception as exc:  # noqa: BLE001 - one bad .docx must not stop the index
@@ -169,7 +177,11 @@ class DocsIndex:
             for p in folder.rglob("*")
             if p.is_file()
             and (p.suffix.lower() in TEXT_EXTS or p.suffix.lower() in (PDF_EXT, DOCX_EXT))
-            and not any(part.startswith(".") or part in SKIP_DIRS for part in p.parts)
+            # Relative parts only: "C:\Users\u\.notes\docs" or "F:\build\handbook"
+            # as the chosen folder must not skip every file in it.
+            and not any(
+                part.startswith(".") or part in SKIP_DIRS for part in p.relative_to(folder).parts
+            )
         ]
         self.progress = {"done": 0, "total": len(files)}
 
@@ -183,12 +195,18 @@ class DocsIndex:
         for path in files:
             key = str(path)
             seen.add(key)
-            stat = path.stat()
-            if known.get(key) == (stat.st_mtime, stat.st_size):
-                skipped += 1
+            try:
+                stat = path.stat()
+                if known.get(key) == (stat.st_mtime, stat.st_size):
+                    skipped += 1
+                    self.progress["done"] += 1
+                    continue
+                text = _extract_text(path)
+            except OSError as exc:
+                # Deleted mid-run or locked by another app: skip it, keep indexing.
+                log.warning("rag_file_unreadable", path=key, error=str(exc))
                 self.progress["done"] += 1
                 continue
-            text = _extract_text(path)
             self._delete_file_rows(key)
             if text:
                 chunks = _chunk(text)
@@ -338,5 +356,6 @@ def register_rag_actions(registry, index: DocsIndex) -> None:
             risk=Risk.SAFE,
             handler=search_documents,
             category="documents",
+            blocking=True,  # sync httpx embedding call, up to 120s on a cold model
         )
     )

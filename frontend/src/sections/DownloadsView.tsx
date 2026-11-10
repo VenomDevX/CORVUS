@@ -18,8 +18,9 @@ export function DownloadsView() {
 
   useEffect(() => {
     if (!backendOnline) return;
-    void refresh();
-    const timer = setInterval(() => void refresh(), 5000);
+    const tick = () => void refresh().catch(() => undefined); // next tick retries
+    tick();
+    const timer = setInterval(tick, 5000);
     return () => clearInterval(timer);
   }, [backendOnline, refresh]);
 

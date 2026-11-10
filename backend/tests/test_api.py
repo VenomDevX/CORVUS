@@ -56,6 +56,14 @@ def test_ws_chat_bad_start_frame(tmp_path, fake_provider):
         assert ws.receive_json()["type"] == "error"
 
 
+def test_ws_chat_malformed_start_frame(tmp_path, fake_provider):
+    client = make_client(tmp_path, fake_provider)
+    for raw in ("{not json", "[1, 2]"):
+        with client.websocket_connect("/ws/chat") as ws:
+            ws.send_text(raw)
+            assert ws.receive_json()["type"] == "error"
+
+
 def test_memory_extraction_stores_and_lists(tmp_path):
     provider = FakeProvider(
         extraction=json.dumps(
@@ -222,3 +230,19 @@ def test_upload_sanitizes_filename(tmp_path, fake_provider):
     body = res.json()
     assert "\\" not in body["filename"] and "/" not in body["filename"]
     assert "<" not in body["filename"]
+
+
+def test_describe_error_ollama_down():
+    import httpx
+    from corvus.llm.base import describe_error
+
+    class P:
+        current_name = "ollama"
+
+    class Cloud:
+        current_name = "openai"
+
+    down = httpx.ConnectError("All connection attempts failed")
+    assert "Ollama isn't running" in describe_error(down, P())
+    assert "internet" in describe_error(down, Cloud())
+    assert describe_error(RuntimeError("boom"), P()) == "boom"

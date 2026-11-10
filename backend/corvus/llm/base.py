@@ -8,6 +8,21 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
+import httpx
+
+
+def describe_error(exc: Exception, provider: Any = None) -> str:
+    """User-facing text for a provider failure; a refused connection gets advice, not a raw httpx message."""
+    if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout)):
+        name = getattr(provider, "current_name", None) or getattr(provider, "name", None)
+        if name == "ollama":
+            return (
+                "Ollama isn't running. Start the Ollama app (or install it from "
+                "Settings → Models), then try again."
+            )
+        return "Couldn't reach the AI provider. Check your internet connection and try again."
+    return str(exc)
+
 
 @dataclass(frozen=True)
 class ToolCall:

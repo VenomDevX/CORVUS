@@ -40,7 +40,9 @@ export async function initAutoUpdate(getWindow: () => BrowserWindow | null, isDe
     if (!updater) return { state: "error", message: "updater unavailable" };
     try {
       await updater.checkForUpdates();
-      return { state: "checking" };
+      // The updater's events already pushed "none"/"available" while we
+      // awaited; returning a status here would overwrite that with "checking".
+      return null;
     } catch (err) {
       return { state: "error", message: String(err) };
     }

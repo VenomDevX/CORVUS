@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type ProviderInfo, type SystemSpecs } from "../lib/api";
-import { pullOllamaModel } from "../lib/ollama";
+import { ipcErrorMessage, pullOllamaModel } from "../lib/ollama";
 import { ThinkingAnimation } from "./ThinkingAnimation";
 import { WebGLBackground } from "./WebGLBackground";
 
@@ -304,7 +304,7 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
                           await window.corvus?.installOllama();
                         } catch (e) {
                           console.error(e);
-                          setInstallError(e instanceof Error ? e.message : "Installation failed.");
+                          setInstallError(ipcErrorMessage(e, "Installation failed."));
                         } finally {
                           setInstallingOllama(false);
                         }

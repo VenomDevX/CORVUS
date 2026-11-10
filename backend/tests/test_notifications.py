@@ -73,3 +73,27 @@ async def test_overdue_reminder_fires_immediately(repo):
     event = await asyncio.wait_for(q.get(), timeout=1)
     assert event["message"] == "missed while off"
     await hub.stop()
+
+
+async def test_timezone_aware_time_is_accepted(hub):
+    import asyncio
+    from datetime import datetime, timedelta, timezone
+
+    q = hub.subscribe()
+    hub.schedule("utc", "reminder", datetime.now(timezone.utc) + timedelta(milliseconds=50))
+    event = await asyncio.wait_for(q.get(), 2)
+    assert event["message"] == "utc"
+
+
+async def test_reminder_waits_for_a_subscriber(repo):
+    import asyncio
+
+    repo.add_reminder("missed", "reminder", "2000-01-01T00:00:00")
+    hub = NotificationHub(repo)
+    await hub.start()
+    await asyncio.sleep(0.05)
+    assert len(repo.pending_reminders()) == 1  # not silently dropped
+    q = hub.subscribe()
+    assert (await asyncio.wait_for(q.get(), 1))["message"] == "missed"
+    assert repo.pending_reminders() == []
+    await hub.stop()

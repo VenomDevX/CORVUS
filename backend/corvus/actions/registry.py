@@ -7,6 +7,7 @@ to the model as tools, gates high-risk ones behind confirmation, and executes
 handlers, so adding a capability is: write a handler, register a spec.
 """
 
+import asyncio
 import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -42,6 +43,10 @@ class ActionSpec:
     # Required for anything that confirms; None for SAFE actions.
     confirm_prompt: Callable[[dict[str, Any]], str] | None = None
     category: str = "general"
+    # Sync handler that can take seconds (winget, tree walks, embedding calls):
+    # run it on a worker thread so chat, voice and confirmations keep flowing.
+    # Opt-in, since some handlers touch the event loop and must stay on it.
+    blocking: bool = False
 
     @property
     def requires_confirmation(self) -> bool:
@@ -93,7 +98,10 @@ class Registry:
         if spec is None:
             return ActionResult(False, f"Unknown action: {name}")
         try:
-            result = spec.handler(**args)
+            if spec.blocking and not inspect.iscoroutinefunction(spec.handler):
+                result = await asyncio.to_thread(spec.handler, **args)
+            else:
+                result = spec.handler(**args)
             if inspect.isawaitable(result):
                 result = await result
             if isinstance(result, ActionResult):

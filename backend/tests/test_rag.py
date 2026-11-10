@@ -114,3 +114,16 @@ def test_docx_extracted(index, tmp_path):
     doc.save(d / "plan.docx")
     assert index.index_folder(d)["added"] == 1
     assert index.search("falcon")[0]["path"].endswith("plan.docx")
+
+
+def test_docx_zip_bomb_rejected(index, tmp_path, monkeypatch):
+    import zipfile
+
+    from corvus.rag import indexer
+
+    monkeypatch.setattr(indexer, "MAX_FILE_BYTES", 1000)  # uncompressed cap = 5000
+    bomb = tmp_path / "bomb.docx"
+    with zipfile.ZipFile(bomb, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("word/document.xml", "a" * 100_000)  # tiny on disk, large expanded
+    assert bomb.stat().st_size < 1000
+    assert indexer._extract_text(bomb) is None

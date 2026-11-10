@@ -23,7 +23,7 @@ import structlog
 from ..actions.registry import ActionResult, Registry
 from ..config import SYSTEM_PROMPT
 from ..llm.agent import agent_system_prompt, run_agent_turn
-from ..llm.base import Message
+from ..llm.base import Message, describe_error
 from ..memory.extractor import extract_memory
 from .stt import Transcriber
 from .tts import SentenceChunker, Speaker
@@ -105,6 +105,7 @@ class VoicePipeline:
         self._frames: asyncio.Queue[np.ndarray] = asyncio.Queue(maxsize=256)
         self._loop: asyncio.AbstractEventLoop | None = None
         self._main_task: asyncio.Task | None = None
+        self._stopping = False
         self._turn_task: asyncio.Task | None = None
         self._interrupt = threading.Event()
         self._ptt_requested = asyncio.Event()
@@ -159,13 +160,16 @@ class VoicePipeline:
         log.info("voice_pipeline_started", wake_enabled=self.wake_enabled)
 
     async def stop(self) -> None:
+        # Python 3.11's wait_for can swallow a cancel that lands as a mic frame
+        # arrives, leaving _run looping forever and hanging app shutdown. So:
+        # stop the mic first, have the loop check a flag, and bound the wait.
+        self._stopping = True
         self._interrupt.set()
-        if self._main_task:
-            self._main_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._main_task
         with contextlib.suppress(Exception):
             self.mic.stop()
+        if self._main_task:
+            self._main_task.cancel()
+            await asyncio.wait({self._main_task}, timeout=3)
         self.state = "off"
 
     def _push_frame(self, frame: np.ndarray) -> None:
@@ -193,7 +197,7 @@ class VoicePipeline:
 
     async def _run(self) -> None:
         wake_segmenter = Segmenter(vad=EnergyVAD(), tail_ms=500, max_ms=4000)
-        while True:
+        while not self._stopping:
             if self._ptt_requested.is_set():
                 self._ptt_requested.clear()
                 await self._conversation_turn(reason="ptt")
@@ -336,7 +340,7 @@ class VoicePipeline:
                     sentence_queue.put_nowait(tail)
         except Exception as exc:
             log.error("voice_turn_error", error=str(exc))
-            self.emit({"type": "error", "message": f"Corvus couldn't reach the model: {exc}"})
+            self.emit({"type": "error", "message": describe_error(exc, self.provider)})
         finally:
             sentence_queue.put_nowait(None)
             barge = await speak_task

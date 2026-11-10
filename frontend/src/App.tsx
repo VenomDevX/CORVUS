@@ -84,9 +84,14 @@ export default function App() {
   const restored = useRef(false);
   useEffect(() => {
     if (!backendOnline || restored.current) return;
-    restored.current = true;
     void (async () => {
-      const s = await api.session();
+      let s;
+      try {
+        s = await api.session();
+      } catch {
+        return; // retried the next time the backend comes online
+      }
+      restored.current = true;
       // We no longer restore active_conversation on startup.
       // The user will start with a fresh chat, and previous chats remain in history.
       

@@ -13,6 +13,15 @@ Sentry.init({
 });
 
 const DEV_URL = "http://127.0.0.1:5173";
+const BACKEND_ORIGIN = "http://127.0.0.1:8765";
+
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
 const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
@@ -52,15 +61,22 @@ function savedWidgetPos(): { x: number; y: number } | null {
 /** Navigation guards (SECURITY.md item 6): every Corvus window only ever
  * shows local Corvus content; http(s) links open in the system browser. */
 function applyNavigationGuards(win: BrowserWindow) {
+  // Backend URLs carry ?token=…: never hand them to the system browser (the
+  // token would land in its history/sync). A link to one is a file download.
+  const leaveApp = (url: string) => {
+    if (url.startsWith(`${BACKEND_ORIGIN}/`)) win.webContents.downloadURL(url);
+    else if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+  };
   win.webContents.on("will-navigate", (event, url) => {
-    const allowed = isDev ? url.startsWith(DEV_URL) : url.startsWith("file://");
+    // Compare origins, not string prefixes: "http://127.0.0.1:5173.evil.com" must not pass.
+    const allowed = isDev ? originOf(url) === originOf(DEV_URL) : url.startsWith("file://");
     if (!allowed) {
       event.preventDefault();
-      if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+      leaveApp(url);
     }
   });
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+    leaveApp(url);
     return { action: "deny" };
   });
 }
@@ -209,7 +225,7 @@ if (!gotLock) {
         responseHeaders: {
           ...details.responseHeaders,
           "Content-Security-Policy": [
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: http://127.0.0.1:8765; connect-src 'self' http://127.0.0.1:8765 ws://127.0.0.1:8765 ws://localhost:5173 http://localhost:5173 http://127.0.0.1:11434 http://localhost:11434",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:8765; media-src 'self' blob: http://127.0.0.1:8765; connect-src 'self' http://127.0.0.1:8765 ws://127.0.0.1:8765 ws://localhost:5173 http://localhost:5173 http://127.0.0.1:11434 http://localhost:11434",
           ],
         },
       });
@@ -246,10 +262,17 @@ if (!gotLock) {
     quitting = true;
   });
 
-  app.on("will-quit", () => {
+  let backendStopped = false;
+  app.on("will-quit", (event) => {
     globalShortcut.unregisterAll();
     destroyTray();
-    stopBackend();
+    if (backendStopped) return;
+    // Hold the quit until the backend has shut down cleanly (bounded by stopBackend).
+    event.preventDefault();
+    void stopBackend(backendToken).finally(() => {
+      backendStopped = true;
+      app.quit();
+    });
   });
 
   app.on("window-all-closed", () => {

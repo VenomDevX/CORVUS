@@ -6,6 +6,7 @@ best-effort and raises on failure so the registry reports it to the user.
 """
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -116,36 +117,46 @@ def _run(args: list[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(args, capture_output=True, text=True, timeout=30, **kw)
 
 
-def launch_app(target: str) -> None:
-    """Start an app by executable/alias, Start Menu shortcut, or URI scheme."""
-    # URI schemes (ms-settings:, com.epicgames.launcher:, etc.) use os.startfile
-    if ":" in target and not target.endswith(".exe"):
-        os.startfile(target)
-        return
+# A free-form app name: letters, digits, spaces and . + - _ only. No paths,
+# URI schemes, wildcards or shell metacharacters - those can launch arbitrary
+# files or inject commands, and these actions run without a confirmation.
+_PLAIN_NAME = re.compile(r"[\w][\w .+\-]{0,63}")
+_TRUSTED_TARGETS = set(APP_TARGETS.values())
 
-    # Try Start Menu shortcuts FIRST so we don't trigger Windows error dialogs for missing 'start' targets
+
+def _check_plain_name(name: str) -> str:
+    name = name.strip()
+    if not _PLAIN_NAME.fullmatch(name) or ".." in name:
+        raise ValueError(f"“{name}” isn't an app name Corvus can open or close.")
+    return name
+
+
+def launch_app(target: str) -> None:
+    """Start an app by curated target, Start Menu shortcut, or App Paths name.
+
+    Uses ShellExecute (os.startfile), never `cmd /c start`, so no command
+    parser ever sees the target.
+    """
+    if target in _TRUSTED_TARGETS:
+        if ":" in target:  # curated URI scheme (ms-settings:, ms-teams:, …)
+            os.startfile(target)
+            return
+    else:
+        target = _check_plain_name(target)
+
     shortcut = _find_start_menu_shortcut(target)
     if shortcut:
         os.startfile(str(shortcut))
         return
-
-    # Try the simple 'start' command for PATH apps and App Paths
-    result = subprocess.run(
-        ["cmd", "/c", "start", "", target],
-        shell=False, capture_output=True, timeout=10,
-    )
-    if result.returncode == 0:
-        return
-
-    # Last resort: just try os.startfile directly
     try:
-        os.startfile(target)
-    except FileNotFoundError:
-        pass
+        os.startfile(target)  # resolves PATH and App Paths entries
+    except OSError as exc:
+        raise RuntimeError(f"Couldn't find an app called “{target}”.") from exc
 
 
 def close_app(image: str) -> int:
     """Terminate processes by image name; returns how many were asked to close."""
+    image = _check_plain_name(image)
     exe = image if image.lower().endswith(".exe") else f"{image}.exe"
     result = _run(["taskkill", "/IM", exe, "/F"])
     return 0 if "not found" in (result.stderr + result.stdout).lower() else 1
@@ -234,21 +245,17 @@ def power_command(kind: str) -> None:
 
 def open_url(url: str, browser: str | None = None) -> None:
     if browser:
-        target = APP_TARGETS.get(browser.lower().strip(), browser)
-        
-        # Try simple start command for the browser executable
-        result = subprocess.run(
-            ["cmd", "/c", "start", "", target, url],
-            shell=False, capture_output=True, timeout=10,
-        )
-        if result.returncode == 0:
+        target = APP_TARGETS.get(browser.lower().strip()) or _check_plain_name(browser)
+        # ShellExecute with the URL as a quoted argument - no cmd parsing.
+        arg = '"' + url.replace('"', "%22") + '"'
+        try:
+            os.startfile(target, "open", arg)
             return
-            
-        # Fallback to finding the shortcut
-        shortcut = _find_start_menu_shortcut(target)
-        if shortcut:
-            subprocess.Popen([str(shortcut), url])
-            return
+        except OSError:
+            shortcut = _find_start_menu_shortcut(target)
+            if shortcut:
+                os.startfile(str(shortcut), "open", arg)
+                return
 
     os.startfile(url)  # noqa: S606
 

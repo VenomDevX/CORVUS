@@ -53,4 +53,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel pip-audit
           pip install ./backend
-          pip-audit
+          # chromadb: no fixed release exists, and all four advisories are in its
+          # HTTP server/auth. Corvus only uses the embedded PersistentClient.
+          pip-audit --ignore-vuln PYSEC-2026-311 --ignore-vuln PYSEC-2026-3813 --ignore-vuln PYSEC-2026-3814 --ignore-vuln PYSEC-2026-3815

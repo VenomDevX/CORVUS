@@ -65,11 +65,16 @@ jobs:
 
       - name: Create Draft Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: Corvus ${{ github.ref_name }}
           draft: true
-          files: dist-installer/*.exe
+          # The exe, its blockmap and latest.yml must come from the same build:
+          # electron-updater verifies the exe against the hash in latest.yml.
+          files: |
+            dist-installer/*.exe
+            dist-installer/*.exe.blockmap
+            dist-installer/latest.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

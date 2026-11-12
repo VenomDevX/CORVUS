@@ -78,7 +78,6 @@ def delete(path: str) -> str:
 
 def clean_temp() -> dict:
     """Delete files in the user temp dir; returns count and bytes freed."""
-    import os
     import tempfile
 
     temp = Path(tempfile.gettempdir())

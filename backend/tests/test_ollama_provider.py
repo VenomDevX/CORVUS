@@ -51,6 +51,27 @@ async def test_stream_chat_raises_on_ollama_error():
             pass
 
 
+async def test_http_500_surfaces_ollama_reason_and_404_stays_status_error():
+    """A load failure arrives as HTTP 500 with the reason in the body (not in-stream)."""
+    def oom(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "llama-server process has terminated: cudaMalloc failed"})
+
+    def missing(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": "model 'x' not found"})
+
+    tools = [{"type": "function", "function": {"name": "noop", "parameters": {}}}]
+    for call in (
+        lambda p: p.stream_chat([Message("user", "hi")], "m"),
+        lambda p: p.stream_chat_with_tools([Message("user", "hi")], "m", tools),
+    ):
+        with pytest.raises(RuntimeError, match="ran out of memory.*cudaMalloc failed"):
+            async for _ in call(make_provider(oom)):
+                pass
+        with pytest.raises(httpx.HTTPStatusError):
+            async for _ in call(make_provider(missing)):
+                pass
+
+
 async def test_stream_chat_with_tools_streams_text_and_collects_calls():
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)

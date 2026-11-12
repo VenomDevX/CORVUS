@@ -14,6 +14,7 @@ chat.
 """
 
 import json
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -27,6 +28,7 @@ from .base import LLMProvider, Message, ToolCall, TurnResult
 log = structlog.get_logger("corvus")
 
 MAX_TOOL_ROUNDS = 6
+EMPTY_REPLY = "I couldn't work out how to do that. Could you rephrase it?"
 
 # event: {"type": "delta"|"action_proposed"|"action_confirming"|"action_result", ...}
 EventSink = Callable[[dict[str, Any]], Awaitable[None] | None]
@@ -111,7 +113,9 @@ async def _is_conversational(text: str) -> bool:
         "difference between", "compare",
     )
     if any(t.startswith(prefix) for prefix in _KNOWLEDGE_STARTS):
-        return True
+        # "what is my battery level" asks about this machine, not general
+        # knowledge - it needs the tools.
+        return not re.search(r"\b(my|this (pc|computer|laptop|machine))\b", t)
 
     # Coding help — model should write code from knowledge, not call tools
     _CODE_PATTERNS = (
@@ -192,6 +196,11 @@ async def run_agent_turn(
             empty_text_rounds = 0
 
         if not turn.tool_calls or (should_stop and should_stop()):
+            if not "".join(spoken).strip() and not (should_stop and should_stop()):
+                # The model produced nothing showable (e.g. a malformed tool
+                # call the provider dropped): never leave the user with silence.
+                await _emit(emit, {"type": "delta", "content": EMPTY_REPLY})
+                spoken.append(EMPTY_REPLY)
             return outcome()
 
         # If the model keeps calling tools without producing ANY text,
@@ -245,6 +254,16 @@ async def _run_one(
         "risk": spec.risk.value,
         "category": spec.category,
     })
+
+    # Bad arguments fail before the confirmation card: never ask the user to
+    # approve a call that can't run.
+    if (problem := spec.argument_error(call.arguments)) is not None:
+        result = ActionResult(False, problem)
+        await _emit(emit, {"type": "action_result", "name": call.name, "ok": False,
+                           "message": problem})
+        if log_action:
+            log_action(call.name, call.arguments, result, "failed")
+        return result
 
     outcome = "executed"
     if spec.requires_confirmation:

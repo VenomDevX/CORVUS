@@ -12,7 +12,6 @@ machine is testable with fakes.
 
 import asyncio
 import contextlib
-import json
 import threading
 from collections.abc import Callable
 from typing import Protocol
@@ -20,7 +19,7 @@ from typing import Protocol
 import numpy as np
 import structlog
 
-from ..actions.registry import ActionResult, Registry
+from ..actions.registry import Registry
 from ..config import SYSTEM_PROMPT
 from ..llm.agent import agent_system_prompt, run_agent_turn
 from ..llm.base import Message, describe_error
@@ -299,7 +298,6 @@ class VoicePipeline:
         speak_task = asyncio.create_task(self._speak_loop(sentence_queue))
 
         parts: list[str] = []
-        interrupted = False
 
         # Voice auto-approves safe and low-risk actions; medium/high are
         # declined because the user can't see a confirmation dialog.
@@ -316,7 +314,7 @@ class VoicePipeline:
 
         try:
             if self.registry is not None:
-                outcome = await run_agent_turn(
+                await run_agent_turn(
                     self.provider, model, messages, self.registry,
                     voice_confirm, emit=voice_emit,
                     should_stop=lambda: self._interrupt.is_set(),
@@ -327,7 +325,6 @@ class VoicePipeline:
                 # Fallback: plain chat without tools
                 async for delta in self.provider.stream_chat(messages, model):
                     if self._interrupt.is_set():
-                        interrupted = True
                         break
                     if delta.content:
                         parts.append(delta.content)

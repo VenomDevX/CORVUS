@@ -3,6 +3,7 @@
 import json
 import re
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -131,6 +132,15 @@ def _is_any_tool_call(content: str) -> bool:
     return False
 
 
+def _is_broken_tool_call(content: str, valid_names: set[str]) -> bool:
+    """Malformed JSON that is still plainly a call to one of this turn's tools,
+    e.g. '{"name": "cancel_reminder", "arguments": {"reminder_id": <id>}}'.
+    It can't run, and it must not reach the user as an answer."""
+    match = re.search(r'"name"\s*:\s*"([^"]+)"', content)
+    return bool(match and match.group(1) in valid_names
+                and re.search(r'"(arguments|parameters)"\s*:', content))
+
+
 def _to_wire(messages: list[Message]) -> list[dict]:
     """Serialize Corvus messages to Ollama's chat schema, including tools."""
     wire: list[dict] = []
@@ -156,6 +166,20 @@ def _format_ollama_error(msg: str) -> str:
     return f"Ollama error: {msg}"
 
 
+async def _raise_for_error(response: httpx.Response) -> None:
+    """5xx carries Ollama's real reason (e.g. cudaMalloc failed) in the body;
+    surface it through _format_ollama_error instead of httpx's generic text.
+    4xx stays an HTTPStatusError for describe_error (404 = model not pulled)."""
+    if response.status_code >= 500:
+        body = (await response.aread()).decode("utf-8", errors="replace")
+        try:
+            body = json.loads(body).get("error", body)
+        except (ValueError, AttributeError):
+            pass
+        raise RuntimeError(_format_ollama_error(str(body)))
+    response.raise_for_status()
+
+
 class OllamaProvider:
     name = "ollama"
 
@@ -177,7 +201,7 @@ class OllamaProvider:
         }
         async with self._client(timeout=300.0) as client:
             async with client.stream("POST", "/api/chat", json=payload) as response:
-                response.raise_for_status()
+                await _raise_for_error(response)
                 async for line in response.aiter_lines():
                     if not line.strip():
                         continue
@@ -238,7 +262,7 @@ class OllamaProvider:
                 break
 
             try:
-                response.raise_for_status()
+                await _raise_for_error(response)
                 async for line in response.aiter_lines():
                     if not line.strip():
                         continue
@@ -272,8 +296,8 @@ class OllamaProvider:
                             else:
                                 yield Delta(content="", done=True)
                         elif held:
-                            if emitted_native_calls and _is_any_tool_call(held):
-                                # Native calls already emitted; this is a duplicate echo — drop it.
+                            if (emitted_native_calls and _is_any_tool_call(held)) or _is_broken_tool_call(held, valid_names):
+                                # A duplicate echo of native calls, or an unparseable call — drop it.
                                 yield Delta(content="", done=True)
                             else:
                                 # Held content is not a valid tool call — emit as normal prose.
@@ -299,7 +323,7 @@ class OllamaProvider:
         """
         import base64
 
-        data = base64.b64encode(open(image_path, "rb").read()).decode()
+        data = base64.b64encode(Path(image_path).read_bytes()).decode()
         payload = {
             "model": model,
             "messages": [

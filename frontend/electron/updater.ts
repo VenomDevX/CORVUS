@@ -23,9 +23,14 @@ let updater: AppUpdater | null = null;
 async function loadUpdater(): Promise<AppUpdater | null> {
   try {
     // Lazily required so dev (unpackaged) runs don't need the module resolved.
-    const { autoUpdater } = await import("electron-updater");
+    // require, not import(): electron-updater is CommonJS and `autoUpdater` is a
+    // lazy getter, which ESM interop can't see as a named export - import()
+    // resolved it to undefined, so every packaged build had no updater.
+    const { autoUpdater } = require("electron-updater") as typeof import("electron-updater");
+    if (!autoUpdater) throw new Error("electron-updater exported no autoUpdater");
     return autoUpdater;
-  } catch {
+  } catch (err) {
+    console.error("[Corvus] auto-update unavailable:", err);
     return null;
   }
 }

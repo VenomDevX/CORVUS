@@ -6,7 +6,6 @@ import time
 from ctypes import wintypes
 
 import structlog
-from pathlib import Path
 from cryptography.fernet import Fernet, InvalidToken
 
 from .config import data_dir

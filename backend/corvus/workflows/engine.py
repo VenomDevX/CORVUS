@@ -14,7 +14,7 @@ import contextlib
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import structlog
 

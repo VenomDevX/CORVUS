@@ -18,7 +18,7 @@ def pytest_configure(config):
     os.environ["CORVUS_TOKEN"] = "test-token"
 
 
-from corvus.llm.base import Delta, Message, ToolCall, TurnResult  # noqa: E402
+from corvus.llm.base import Delta, Message, TurnResult  # noqa: E402
 from corvus.memory.repository import Repository  # noqa: E402
 
 

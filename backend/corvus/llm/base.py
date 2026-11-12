@@ -4,6 +4,7 @@ Milestone 8 adds OpenAI/Anthropic/Gemini/DeepSeek implementations behind this
 same protocol.
 """
 
+import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
@@ -21,6 +22,22 @@ def describe_error(exc: Exception, provider: Any = None) -> str:
                 "Settings → Models), then try again."
             )
         return "Couldn't reach the AI provider. Check your internet connection and try again."
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        name = getattr(provider, "current_name", None) or getattr(provider, "name", None)
+        if status == 404 and name == "ollama":
+            # Ollama answers 404 when the selected model isn't pulled.
+            try:
+                model = json.loads(exc.request.content).get("model")
+            except Exception:  # noqa: BLE001 - streamed/empty body
+                model = None
+            which = f"“{model}”" if model else "The selected model"
+            return (
+                f"{which} isn't installed in Ollama. Pick an installed model or "
+                "download it in Settings → Models."
+            )
+        if status in (401, 403):
+            return "The AI provider rejected the API key. Check it in Settings → Models."
     return str(exc)
 
 

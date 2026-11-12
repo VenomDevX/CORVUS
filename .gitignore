@@ -47,3 +47,7 @@ CorvusWeb/
 
 
 build-backend/
+
+# Playwright output
+frontend/test-results/
+frontend/playwright-report/

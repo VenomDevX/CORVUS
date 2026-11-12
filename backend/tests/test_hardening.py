@@ -91,3 +91,56 @@ def test_bare_json_tool_call_is_recovered():
     calls = _extract_text_tool_calls(content, {"system_status"})
     assert [c.name for c in calls] == ["system_status"]
     assert _is_any_tool_call(content)
+
+
+async def test_bad_arguments_fail_before_confirmation_with_valid_names():
+    from corvus.llm.agent import _run_one
+    from corvus.llm.base import ToolCall
+
+    ran, asked = [], []
+    reg = Registry()
+    reg.register(ActionSpec(
+        "make_dir", "Create a folder.",
+        {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
+        Risk.MEDIUM, lambda path: ran.append(path), confirm_prompt=lambda a: "ok?",
+    ))
+
+    async def confirm(name, prompt, args):
+        asked.append(name)
+        return True
+
+    result = await _run_one(ToolCall("make_dir", {"folder": "x"}), reg, confirm, None, None)
+    assert not result.ok and not asked and not ran  # no confirmation card for a call that can't run
+    assert "unknown folder" in result.message and "missing path" in result.message
+    assert "Valid parameters: path" in result.message
+
+    # A TypeError raised *inside* a handler is a failure, not "invalid arguments".
+    reg.register(ActionSpec("boom", "x", {"type": "object", "properties": {}}, Risk.SAFE,
+                            lambda: None + 1))
+    r = await reg.execute("boom", {})
+    assert not r.ok and r.message.startswith("boom failed:")
+
+
+async def test_questions_about_this_machine_keep_tools_and_broken_calls_never_leak():
+    from corvus.llm.agent import EMPTY_REPLY, _is_conversational, run_agent_turn
+    from corvus.llm.base import Delta, Message
+    from corvus.llm.ollama import _is_broken_tool_call
+
+    assert await _is_conversational("what is an array")
+    assert not await _is_conversational("What is my system status right now?")
+    assert not await _is_conversational("how is this pc doing")
+
+    broken = '{"name": "cancel_reminder", "arguments": {"reminder_id": <reminder_id>}}'
+    assert _is_broken_tool_call(broken, {"cancel_reminder"})
+    assert not _is_broken_tool_call(broken, {"system_status"})  # not one of our tools: user JSON
+    assert not _is_broken_tool_call('Here is {"name": "Ada"} as JSON', {"cancel_reminder"})
+
+    class Silent:
+        async def stream_chat_with_tools(self, messages, model, tools):
+            yield Delta(content="", done=True)
+
+    async def confirm(name, prompt, args):
+        return False
+
+    out = await run_agent_turn(Silent(), "m", [Message("user", "delete the thing now")], Registry(), confirm)
+    assert out.text == EMPTY_REPLY  # silence becomes a visible reply

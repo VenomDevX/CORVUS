@@ -1,6 +1,6 @@
 import pytest
 
-from corvus.actions.files import PathNotAllowed, safe_path
+from corvus.actions.files import PathNotAllowed
 from corvus.actions.registry import ActionResult, ActionSpec, Registry, Risk
 from corvus.actions.registry import build_default_registry
 

@@ -58,6 +58,7 @@ function useJob(onDone: (generationId: number) => void) {
   function track(jobId: number) {
     setPercent(0);
     setError(null);
+    if (timer.current) clearInterval(timer.current);
     timer.current = setInterval(() => {
       void api
         .mediaJob(jobId)
@@ -70,7 +71,13 @@ function useJob(onDone: (generationId: number) => void) {
             else if (job.generation_id != null) onDone(job.generation_id);
           }
         })
-        .catch(() => undefined);
+        .catch(() => {
+          // Jobs live in backend memory: a 404 after a restart never recovers,
+          // so stop polling instead of spinning "busy" forever.
+          if (timer.current) clearInterval(timer.current);
+          setPercent(null);
+          setError("Lost track of this generation (Corvus may have restarted). Please try again.");
+        });
     }, 700);
   }
   return { percent, error, setError, track, busy: percent !== null };

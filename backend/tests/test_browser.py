@@ -60,6 +60,30 @@ async def test_fill_field_by_placeholder(engine):
     assert await page.input_value("input[name=q]") == "corvus raven"
 
 
+def test_only_web_schemes_allowed():
+    from corvus.automation.browser import check_web_url
+
+    assert check_web_url("localhost:3000/x") == "https://localhost:3000/x"
+    for bad in ("file:///C:/Windows/win.ini", "chrome://settings", "view-source:https://a.com"):
+        with pytest.raises(ValueError):
+            check_web_url(bad)
+
+
+async def test_fill_field_refuses_password(engine):
+    page = await engine._ensure_page()
+    await page.set_content('<label>Pass <input type="password" name="p"></label>')
+    with pytest.raises(PermissionError):
+        await engine.fill_field("Pass", "hunter2")
+    assert await page.input_value("input[name=p]") == ""
+
+
+async def test_relaunches_after_user_closes_window(engine):
+    page = await engine._ensure_page()
+    await page.close()
+    assert not engine.is_open
+    assert not (await engine._ensure_page()).is_closed()
+
+
 async def test_fill_field_missing_raises(engine):
     page = await engine._ensure_page()
     await page.set_content("<p>no fields here</p>")

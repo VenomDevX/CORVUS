@@ -1,8 +1,11 @@
 """Application-level encryption for sensitive database fields."""
 
 import ctypes
+import threading
+import time
 from ctypes import wintypes
-from pathlib import Path
+
+import structlog
 from cryptography.fernet import Fernet, InvalidToken
 
 from .config import data_dir
@@ -40,27 +43,31 @@ def _get_fernet() -> Fernet:
     if key_path.exists():
         encrypted_key = key_path.read_bytes()
         try:
-            key = _decrypt_dpapi(encrypted_key)
-            return Fernet(key)
+            return Fernet(_decrypt_dpapi(encrypted_key))
         except Exception:
-            # If decryption fails (e.g., moved to a new PC without the profile), 
-            # we must generate a new key and they will lose encrypted data.
-            # In a real app we'd want to handle this gracefully, but for now we regenerate.
-            pass
+            # Unreadable under this Windows profile (e.g. copied from another PC).
+            # Never overwrite it: set it aside so restoring the profile (or the
+            # file) brings the encrypted conversations and memories back.
+            backup = key_path.with_name(f"corvus_key.unreadable-{int(time.time())}.bin")
+            key_path.replace(backup)
+            structlog.get_logger("corvus").error("encryption_key_unreadable", backup=backup.name)
 
-    # Generate new key
     key = Fernet.generate_key()
-    encrypted_key = _encrypt_dpapi(key)
-    key_path.write_bytes(encrypted_key)
+    key_path.write_bytes(_encrypt_dpapi(key))
     return Fernet(key)
 
 
 _fernet_instance = None
+_fernet_lock = threading.Lock()
+
 
 def get_fernet() -> Fernet:
     global _fernet_instance
     if _fernet_instance is None:
-        _fernet_instance = _get_fernet()
+        # Two threadpool requests on first run must not each mint a different key.
+        with _fernet_lock:
+            if _fernet_instance is None:
+                _fernet_instance = _get_fernet()
     return _fernet_instance
 
 

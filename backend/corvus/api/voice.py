@@ -61,8 +61,11 @@ async def voice_ws(ws: WebSocket) -> None:
     forwarder = asyncio.create_task(forward_events())
     try:
         while True:
-            command = await ws.receive_json()
-            kind = command.get("type")
+            try:
+                command = await ws.receive_json()
+            except ValueError:
+                continue  # malformed frame: ignore, keep the socket alive
+            kind = command.get("type") if isinstance(command, dict) else None
             if kind == "ptt":
                 pipeline.push_to_talk()
             elif kind == "set_wake":

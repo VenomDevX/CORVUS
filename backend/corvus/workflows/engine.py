@@ -12,8 +12,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import structlog
 
@@ -21,8 +22,11 @@ from ..actions.registry import Risk
 
 log = structlog.get_logger("corvus")
 
-# Risk tiers allowed inside a saved workflow (no destructive/high-impact steps).
-ALLOWED_RISK = {Risk.SAFE, Risk.LOW, Risk.MEDIUM}
+# Risk tiers allowed inside a saved workflow. Workflows run with no
+# confirmation card, so anything that normally confirms (medium/high) is barred.
+ALLOWED_RISK = {Risk.SAFE, Risk.LOW}
+# Workflow-management actions can't be steps (no recursion, no self-editing).
+BARRED_ACTIONS = {"create_workflow", "run_workflow", "delete_workflow"}
 
 
 class WorkflowError(Exception):
@@ -43,6 +47,7 @@ class WorkflowEngine:
         self.hub = hub
         self._loop: asyncio.AbstractEventLoop | None = None
         self._scheduler: asyncio.Task | None = None
+        self._tasks: set[asyncio.Task] = set()
 
     # -- validation & CRUD ----------------------------------------------------
 
@@ -51,7 +56,11 @@ class WorkflowEngine:
             raise WorkflowError("A workflow needs at least one step.")
         clean = []
         for step in steps:
+            if not isinstance(step, dict):
+                raise WorkflowError("Each workflow step must be an object with an action.")
             name = step.get("action")
+            if name in BARRED_ACTIONS:
+                raise WorkflowError(f"'{name}' can't be used as a workflow step.")
             spec = self.registry.get(name)
             if spec is None:
                 raise WorkflowError(f"Unknown action in workflow: {name}")
@@ -93,7 +102,9 @@ class WorkflowEngine:
         row = self.repo.get_workflow(name)
         if row is None:
             raise WorkflowError(f"No workflow named '{name}'.")
-        steps = json.loads(row["steps"])
+        # Re-check at run time: an action's risk may have changed since the
+        # workflow was saved (e.g. a plugin re-registered it), or the row predates the rules.
+        steps = self.validate_steps(json.loads(row["steps"]))
         log.info("workflow_run", workflow=name, steps=len(steps))
         if self.hub:
             self.hub.notify("Corvus", f"Running workflow “{name}”…")
@@ -113,12 +124,16 @@ class WorkflowEngine:
 
     def match_voice(self, text: str) -> str | None:
         """Return the name of a voice-triggered workflow matching the phrase."""
-        low = text.lower().strip().rstrip(".!?")
+        # Whole-phrase, word-boundary match only: Whisper hallucinates short
+        # words ("you", ".") on near-silence, which must never fire a workflow.
+        low = " ".join(re.findall(r"\w+", text.lower()))
+        if not low:
+            return None
         for row in self.repo.list_workflows():
             if row["trigger_type"] != "voice" or not row["enabled"]:
                 continue
-            phrase = json.loads(row["trigger_config"]).get("phrase", "").lower().strip()
-            if phrase and (phrase in low or low in phrase):
+            phrase = " ".join(re.findall(r"\w+", json.loads(row["trigger_config"]).get("phrase", "").lower()))
+            if phrase and re.search(rf"\b{re.escape(phrase)}\b", low):
                 return row["name"]
         return None
 
@@ -142,20 +157,42 @@ class WorkflowEngine:
 
     async def _schedule_loop(self) -> None:
         """Fire 'schedule' workflows at their daily HH:MM (minute resolution)."""
-        fired_today: set[tuple[str, str]] = set()
+        # Keyed by (name, date) so a skipped minute (sleep, slow tick) still
+        # fires late the same day, and a new day always resets. Times already
+        # past at startup are marked done: no surprise catch-up runs on launch.
+        fired: set[tuple[str, object]] = set()
+        first = True
         while True:
             now = datetime.now()
-            hhmm = now.strftime("%H:%M")
-            if hhmm == "00:00":
-                fired_today.clear()
+            hhmm, today = now.strftime("%H:%M"), now.date()
             for row in self.repo.list_workflows():
                 if row["trigger_type"] != "schedule" or not row["enabled"]:
                     continue
-                at = json.loads(row["trigger_config"]).get("at", "")
-                key = (row["name"], hhmm)
-                if at == hhmm and key not in fired_today:
-                    fired_today.add(key)
-                    with contextlib.suppress(Exception):
-                        await self.run(row["name"])
+                try:  # normalize "8:00" -> "08:00" so string comparison orders correctly
+                    at = datetime.strptime(
+                        str(json.loads(row["trigger_config"]).get("at", "")), "%H:%M"
+                    ).strftime("%H:%M")
+                except ValueError:
+                    continue
+                key = (row["name"], today)
+                if not at or at > hhmm or key in fired:
+                    continue
+                fired.add(key)
+                if not first or at == hhmm:
+                    self._spawn(row["name"])
+            first = False
+            fired = {k for k in fired if k[1] == today}
             # Align to the next minute boundary.
             await asyncio.sleep(60 - datetime.now().second)
+
+    def _spawn(self, name: str) -> None:
+        """Run a workflow without blocking the scheduler tick."""
+        async def go() -> None:
+            try:
+                await self.run(name)
+            except Exception as exc:
+                log.warning("workflow_scheduled_run_failed", workflow=name, error=str(exc))
+
+        task = asyncio.get_running_loop().create_task(go())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)

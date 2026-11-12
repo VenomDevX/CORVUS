@@ -56,6 +56,14 @@ def test_ws_chat_bad_start_frame(tmp_path, fake_provider):
         assert ws.receive_json()["type"] == "error"
 
 
+def test_ws_chat_malformed_start_frame(tmp_path, fake_provider):
+    client = make_client(tmp_path, fake_provider)
+    for raw in ("{not json", "[1, 2]"):
+        with client.websocket_connect("/ws/chat") as ws:
+            ws.send_text(raw)
+            assert ws.receive_json()["type"] == "error"
+
+
 def test_memory_extraction_stores_and_lists(tmp_path):
     provider = FakeProvider(
         extraction=json.dumps(
@@ -222,3 +230,40 @@ def test_upload_sanitizes_filename(tmp_path, fake_provider):
     body = res.json()
     assert "\\" not in body["filename"] and "/" not in body["filename"]
     assert "<" not in body["filename"]
+
+
+def test_describe_error_ollama_down():
+    import httpx
+    from corvus.llm.base import describe_error
+
+    class P:
+        current_name = "ollama"
+
+    class Cloud:
+        current_name = "openai"
+
+    down = httpx.ConnectError("All connection attempts failed")
+    assert "Ollama isn't running" in describe_error(down, P())
+    assert "internet" in describe_error(down, Cloud())
+    assert describe_error(RuntimeError("boom"), P()) == "boom"
+
+
+def test_describe_error_missing_model_and_bad_key():
+    import httpx
+    from corvus.llm.base import describe_error
+
+    class P:
+        current_name = "ollama"
+
+    class Cloud:
+        current_name = "openai"
+
+    def status_err(code, **req):
+        request = httpx.Request("POST", "http://127.0.0.1:11434/api/chat", **req)
+        return httpx.HTTPStatusError("raw", request=request, response=httpx.Response(code, request=request))
+
+    msg = describe_error(status_err(404, json={"model": "qwen2.5-coder:7b"}), P())
+    assert "“qwen2.5-coder:7b” isn't installed" in msg and "Settings → Models" in msg
+    assert "isn't installed" in describe_error(status_err(404), P())  # no body: generic
+    assert "rejected the API key" in describe_error(status_err(401), Cloud())
+    assert describe_error(status_err(404), Cloud()) == "raw"  # non-Ollama 404 untouched

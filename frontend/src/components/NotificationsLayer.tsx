@@ -35,10 +35,22 @@ export function NotificationsLayer() {
       }
     };
 
-    // The backend health poll flips backendOnline, which re-runs this effect
-    // and reconnects if the socket drops.
-    const socket = connectNotifications(raise, () => {});
-    return () => socket.close();
+    // Reconnect on drop: a socket can close while the backend stays up (or a
+    // restart is shorter than the health poll), and backendOnline never flips.
+    let socket: { close: () => void } | null = null;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
+    const connect = () => {
+      socket = connectNotifications(raise, () => {
+        if (!disposed) retry = setTimeout(connect, 2000);
+      });
+    };
+    connect();
+    return () => {
+      disposed = true;
+      if (retry) clearTimeout(retry);
+      socket?.close();
+    };
   }, [backendOnline]);
 
   return (

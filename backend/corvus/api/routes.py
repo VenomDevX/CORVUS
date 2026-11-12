@@ -1,5 +1,6 @@
 """REST routes: health, conversations, memories, settings, models, logs."""
 
+import os
 from datetime import datetime
 
 from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 
 from .. import __version__
 from ..config import data_dir
+from ..llm.base import describe_error
 from ..log import tail_log
 
 router = APIRouter()
@@ -30,7 +32,24 @@ class ApiKeyBody(BaseModel):
 
 @router.get("/health")
 def health() -> dict:
-    return {"status": "ok", "version": __version__, "app": "Corvus"}
+    # pid lets the Electron launcher replace a stale backend (one left holding
+    # an old launch token); port lookups via netstat proved unreliable.
+    return {"status": "ok", "version": __version__, "app": "Corvus", "pid": os.getpid()}
+
+
+@router.post("/shutdown")
+def shutdown(request: Request) -> dict:
+    """Graceful exit for the Electron launcher (token-protected like every route).
+
+    Flags uvicorn to stop, so the app lifespan shutdown runs (session marked
+    clean, voice/browser/db closed). A force-kill would skip it and every next
+    launch would report a crash.
+    """
+    server = getattr(request.app.state, "server", None)
+    if server is None:
+        raise HTTPException(503, "shutdown is only available when run via corvus.main")
+    server.should_exit = True
+    return {"ok": True}
 
 
 @router.get("/session")
@@ -174,7 +193,14 @@ def set_provider_key(request: Request, body: ApiKeyBody) -> dict:
 
 @router.delete("/providers/key/{provider}")
 def clear_provider_key(request: Request, provider: str) -> dict:
+    from ..llm.factory import PROVIDERS
+
+    if provider not in PROVIDERS:
+        raise HTTPException(404, f"unknown provider: {provider}")
     request.app.state.vault.clear_key(provider)
+    # Drop the in-memory client too, or the deleted key keeps working until restart.
+    if request.app.state.repo.get_setting("provider") == provider:
+        request.app.state.provider.reload()
     return {"ok": True}
 
 
@@ -183,7 +209,7 @@ async def list_models(request: Request) -> dict:
     try:
         return {"models": await request.app.state.provider.list_models()}
     except Exception as exc:
-        raise HTTPException(502, f"provider unreachable: {exc}")
+        raise HTTPException(502, describe_error(exc, request.app.state.provider))
 
 
 @router.get("/logs")

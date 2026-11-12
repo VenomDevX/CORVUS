@@ -28,10 +28,43 @@ log = structlog.get_logger("corvus")
 DEFAULT_TITLE = "about:blank"
 
 
+ALLOWED_SCHEMES = {"http", "https"}
+
+
 def normalize_url(url: str) -> str:
-    if not urlparse(url).scheme:
-        return "https://" + url
+    url = url.strip()
+    if urlparse(url).scheme.lower() in ALLOWED_SCHEMES or "://" in url:
+        return url
+    # "example.com", "localhost:3000/x" (parses as scheme "localhost").
+    return "https://" + url
+
+
+def check_web_url(url: str) -> str:
+    """Normalize and allow only web pages: file://, chrome://, view-source:,
+    javascript: etc. could read local files and send them to a website."""
+    url = normalize_url(url)
+    if urlparse(url).scheme.lower() not in ALLOWED_SCHEMES:
+        raise ValueError("Corvus's browser only opens http:// and https:// web pages.")
     return url
+
+
+def _install_chromium(browsers_dir: Path) -> None:
+    """Install Playwright's Chromium via its bundled driver.
+
+    Uses the driver's node + cli.js directly rather than `sys.executable -m
+    playwright`: in the frozen (PyInstaller) build sys.executable is the Corvus
+    backend itself, which would just start a second server.
+    """
+    import os
+    import subprocess
+
+    from playwright._impl._driver import compute_driver_executable, get_driver_env
+
+    node, cli = compute_driver_executable()
+    env = {**get_driver_env(), "PLAYWRIGHT_BROWSERS_PATH": str(browsers_dir)}
+    subprocess.run([node, cli, "install", "chromium"], check=True, env=env, timeout=600,
+                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(browsers_dir)
 
 
 def site_of(url: str) -> str:
@@ -79,69 +112,68 @@ class BrowserEngine:
 
     @property
     def is_open(self) -> bool:
-        return self._page is not None
+        return self._page is not None and not self._page.is_closed()
+
+    async def _teardown(self) -> None:
+        for closer in (self._context, self._browser):
+            if closer is not None:
+                with contextlib.suppress(Exception):
+                    await closer.close()
+        if self._pw is not None:
+            with contextlib.suppress(Exception):
+                await self._pw.stop()
+        self._pw = self._browser = self._context = self._page = None
 
     async def _ensure_page(self):
         async with self._lock:
+            if self._page is not None and self._page.is_closed():
+                # The user closed the Chromium window: start a fresh session.
+                await self._teardown()
             if self._page is None:
-                import os
-                import subprocess
-                import sys
-
-                from playwright.async_api import async_playwright
-
-                # Redirect Playwright's browser cache to a persistent,
-                # user-writable location so the bundled (PyInstaller) app
-                # doesn't try to find Chromium inside its read-only _internal/
-                # tree.  This must be set *before* launching the browser.
-                from ..config import data_dir
-
-                browsers_dir = data_dir() / "playwright-browsers"
-                browsers_dir.mkdir(parents=True, exist_ok=True)
-                os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(browsers_dir)
-
-                self._pw = await async_playwright().start()
-
                 try:
-                    self._browser = await self._pw.chromium.launch(
-                        headless=self.headless,
-                    )
-                except Exception as first_err:
-                    # Chromium binary is missing — install it automatically.
-                    log.info("browser_install_start",
-                             reason=str(first_err),
-                             dest=str(browsers_dir))
-                    try:
-                        subprocess.run(
-                            [sys.executable, "-m", "playwright", "install",
-                             "chromium"],
-                            check=True,
-                            env={**os.environ,
-                                 "PLAYWRIGHT_BROWSERS_PATH": str(browsers_dir)},
-                            timeout=300,
-                        )
-                        log.info("browser_install_done")
-                    except Exception as install_err:
-                        await self._pw.stop()
-                        self._pw = None
-                        raise RuntimeError(
-                            f"Failed to install Chromium: {install_err}"
-                        ) from first_err
-
-                    # Retry the launch after install.
-                    self._browser = await self._pw.chromium.launch(
-                        headless=self.headless,
-                    )
-
-                self._context = await self._browser.new_context(accept_downloads=True)
-                self._page = await self._context.new_page()
-                self._page.on("download", self._handle_download)
-                log.info("browser_launched", headless=self.headless)
+                    await self._launch()
+                except Exception:
+                    await self._teardown()  # don't leak the Playwright driver
+                    raise
         return self._page
+
+    async def _launch(self) -> None:
+        import os
+
+        from playwright.async_api import async_playwright
+
+        # Redirect Playwright's browser cache to a persistent, user-writable
+        # location so the bundled (PyInstaller) app doesn't look for Chromium
+        # inside its read-only _internal/ tree. Must be set before launching.
+        from ..config import data_dir
+
+        browsers_dir = data_dir() / "playwright-browsers"
+        browsers_dir.mkdir(parents=True, exist_ok=True)
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(browsers_dir)
+
+        self._pw = await async_playwright().start()
+        try:
+            self._browser = await self._pw.chromium.launch(headless=self.headless)
+        except Exception as first_err:
+            # Chromium binary is missing - install it (off the event loop).
+            log.info("browser_install_start", reason=str(first_err), dest=str(browsers_dir))
+            try:
+                await asyncio.to_thread(_install_chromium, browsers_dir)
+                log.info("browser_install_done")
+            except Exception as install_err:
+                raise RuntimeError(f"Failed to install Chromium: {install_err}") from first_err
+            self._browser = await self._pw.chromium.launch(headless=self.headless)
+
+        self._context = await self._browser.new_context(accept_downloads=True)
+        self._page = await self._context.new_page()
+        self._page.on("download", self._handle_download)
+        log.info("browser_launched", headless=self.headless)
 
     def _handle_download(self, download) -> None:
         async def save():
-            dest = self.downloads_dir / download.suggested_filename
+            # The site picks the name: keep only the final component.
+            name = Path(download.suggested_filename.replace("\\", "/")).name.strip(" .") or "download"
+            dest = self.downloads_dir / name
             with contextlib.suppress(Exception):
                 await download.save_as(str(dest))
                 self.downloads.append(
@@ -168,7 +200,7 @@ class BrowserEngine:
 
     async def navigate(self, url: str) -> PageView:
         page = await self._ensure_page()
-        await page.goto(normalize_url(url), wait_until="domcontentloaded", timeout=30000)
+        await page.goto(check_web_url(url), wait_until="domcontentloaded", timeout=30000)
         return await self.read()
 
     async def read(self, max_chars: int = 6000) -> PageView:
@@ -211,8 +243,18 @@ class BrowserEngine:
             page.locator(f"input[name='{label}']"),
             page.locator(f"textarea[name='{label}']"),
         ):
+            target = locator.first
             try:
-                await locator.first.fill(value, timeout=3000)
+                kind = (await target.get_attribute("type", timeout=3000) or "").lower()
+                autocomplete = (await target.get_attribute("autocomplete") or "").lower()
+            except Exception:
+                continue
+            if kind == "password" or "password" in autocomplete:
+                # Product rule: Corvus never types passwords (browser_open_login
+                # hands sign-in to the browser's own credential manager).
+                raise PermissionError("Corvus doesn't type passwords. Use the browser's saved-password fill instead.")
+            try:
+                await target.fill(value, timeout=3000)
                 return
             except Exception:
                 continue
@@ -247,14 +289,7 @@ class BrowserEngine:
 
     async def close(self) -> None:
         async with self._lock:
-            for closer in (self._context, self._browser):
-                if closer is not None:
-                    with contextlib.suppress(Exception):
-                        await closer.close()
-            if self._pw is not None:
-                with contextlib.suppress(Exception):
-                    await self._pw.stop()
-            self._pw = self._browser = self._context = self._page = None
+            await self._teardown()
             log.info("browser_closed")
 
     def download_list(self) -> list[dict]:

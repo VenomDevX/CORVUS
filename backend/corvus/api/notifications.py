@@ -8,7 +8,7 @@ Windows toasts.
 import asyncio
 import contextlib
 
-from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Request, WebSocket
 
 notify_router = APIRouter()
 
@@ -35,13 +35,25 @@ async def notifications_ws(ws: WebSocket) -> None:
         await ws.close()
         return
     queue = hub.subscribe()
-    try:
+
+    async def forward() -> None:
         while True:
-            event = await queue.get()
-            await ws.send_json(event)
-    except (WebSocketDisconnect, RuntimeError):
-        pass
+            await ws.send_json(await queue.get())
+
+    async def until_disconnect() -> None:
+        # The client never sends, but reading is the only way to notice a close.
+        # Without it this handler sits in queue.get() forever, and uvicorn's
+        # graceful shutdown waits on it indefinitely.
+        while (await ws.receive())["type"] != "websocket.disconnect":
+            pass
+
+    tasks = [asyncio.create_task(forward()), asyncio.create_task(until_disconnect())]
+    try:
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
     finally:
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         hub.unsubscribe(queue)
         with contextlib.suppress(Exception):
             await ws.close()

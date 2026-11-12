@@ -7,6 +7,7 @@ to the model as tools, gates high-risk ones behind confirmation, and executes
 handlers, so adding a capability is: write a handler, register a spec.
 """
 
+import asyncio
 import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -42,6 +43,10 @@ class ActionSpec:
     # Required for anything that confirms; None for SAFE actions.
     confirm_prompt: Callable[[dict[str, Any]], str] | None = None
     category: str = "general"
+    # Sync handler that can take seconds (winget, tree walks, embedding calls):
+    # run it on a worker thread so chat, voice and confirmations keep flowing.
+    # Opt-in, since some handlers touch the event loop and must stay on it.
+    blocking: bool = False
 
     @property
     def requires_confirmation(self) -> bool:
@@ -51,6 +56,25 @@ class ActionSpec:
         if self.confirm_prompt:
             return self.confirm_prompt(args)
         return f"Corvus will run {self.name}. Continue?"
+
+    def argument_error(self, args: dict[str, Any]) -> str | None:
+        """Argument names checked against the schema. The text goes back to the
+        model, so it names the valid parameters (not a Python TypeError) for a retry."""
+        props = self.parameters.get("properties")
+        if not isinstance(props, dict):
+            return None  # free-form schema (some plugins): let the handler decide
+        takes_kwargs = any(p.kind is p.VAR_KEYWORD
+                           for p in inspect.signature(self.handler).parameters.values())
+        unknown = [] if takes_kwargs else sorted(set(args) - set(props))
+        missing = sorted(set(self.parameters.get("required", [])) - set(args))
+        if not (unknown or missing):
+            return None
+        problems = "; ".join(
+            p for p in (unknown and f"unknown {', '.join(unknown)}",
+                        missing and f"missing {', '.join(missing)}") if p
+        )
+        return (f"Invalid arguments for {self.name} ({problems}). "
+                f"Valid parameters: {', '.join(props) or 'none'}.")
 
     def tool_schema(self) -> dict[str, Any]:
         """OpenAI/Ollama-style function tool definition."""
@@ -92,15 +116,18 @@ class Registry:
         spec = self._actions.get(name)
         if spec is None:
             return ActionResult(False, f"Unknown action: {name}")
+        if (problem := spec.argument_error(args)) is not None:
+            return ActionResult(False, problem)
         try:
-            result = spec.handler(**args)
+            if spec.blocking and not inspect.iscoroutinefunction(spec.handler):
+                result = await asyncio.to_thread(spec.handler, **args)
+            else:
+                result = spec.handler(**args)
             if inspect.isawaitable(result):
                 result = await result
             if isinstance(result, ActionResult):
                 return result
             return ActionResult(True, str(result) if result is not None else "Done.")
-        except TypeError as exc:
-            return ActionResult(False, f"Invalid arguments for {name}: {exc}")
         except Exception as exc:  # noqa: BLE001 - surface handler failures to the user
             return ActionResult(False, f"{name} failed: {exc}")
 

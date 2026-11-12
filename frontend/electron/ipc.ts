@@ -1,8 +1,54 @@
-import { BrowserWindow, app, ipcMain, nativeTheme, shell } from "electron";
+import { BrowserWindow, app, ipcMain, nativeTheme, net, shell } from "electron";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
-import * as https from "node:https";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { execFile } from "node:child_process";
+const OPENABLE_EXTS = new Set([
+  ".pdf", ".txt", ".md", ".csv", ".json", ".rtf",
+  ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp",
+  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg",
+  ".mp3", ".wav", ".ogg", ".flac", ".m4a", ".mp4", ".webm", ".mkv", ".mov", ".avi",
+  ".zip",
+]);
+
+/** Download and silently run the Ollama installer; errors carry user-facing text. */
+async function installOllama(): Promise<boolean> {
+  const tempPath = path.join(app.getPath("temp"), `OllamaSetup-${Date.now()}.exe`);
+  try {
+    let response: Response;
+    try {
+      // net.fetch follows redirects; ollama.com 307s to the GitHub release asset.
+      response = await net.fetch("https://ollama.com/download/OllamaSetup.exe");
+    } catch {
+      throw new Error("Couldn't download Ollama. Check your internet connection and try again.");
+    }
+    if (!response.ok || !response.body) {
+      throw new Error(`Couldn't download Ollama (server returned ${response.status}). Try again later.`);
+    }
+    try {
+      await pipeline(Readable.fromWeb(response.body as any), fs.createWriteStream(tempPath));
+    } catch {
+      throw new Error("The Ollama download was interrupted. Check your connection and try again.");
+    }
+    await new Promise<void>((resolve, reject) =>
+      execFile(
+        tempPath,
+        ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
+        { timeout: 10 * 60 * 1000 },
+        (error) =>
+          error
+            ? reject(new Error("The Ollama installer was cancelled or failed. Try installing it manually."))
+            : resolve(),
+      ),
+    );
+    return true;
+  } finally {
+    fs.unlink(tempPath, () => {});
+  }
+}
+
 /** IPC surface exposed to the renderer via preload — keep this minimal and typed. */
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
@@ -21,64 +67,40 @@ export function registerIpc(
 
   ipcMain.handle("corvus:get-version", () => app.getVersion());
 
-  ipcMain.handle("corvus:install-ollama", async () => {
-    return new Promise((resolve, reject) => {
-      const downloadUrl = "https://ollama.com/download/OllamaSetup.exe";
-      const tempPath = path.join(app.getPath("temp"), "OllamaSetup.exe");
-      
-      const file = fs.createWriteStream(tempPath);
-      https.get(downloadUrl, (response) => {
-        if (response.statusCode !== 200) {
-          return reject(new Error("Failed to download Ollama. Status: " + response.statusCode));
-        }
-        response.pipe(file);
-        file.on("finish", () => {
-          file.close();
-          // Execute silently
-          execFile(tempPath, ["/SILENT"], (error) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(true);
-            }
-          });
-        });
-      }).on("error", (err) => {
-        fs.unlink(tempPath, () => {});
-        reject(err);
-      });
+  // One install at a time: Settings and onboarding both have an install button,
+  // and a second click must not truncate the installer the first is writing.
+  let ollamaInstall: Promise<boolean> | null = null;
+  ipcMain.handle("corvus:install-ollama", () => {
+    ollamaInstall ??= installOllama().finally(() => {
+      ollamaInstall = null;
     });
+    return ollamaInstall;
   });
 
   ipcMain.handle("corvus:open-external", async (_event, url: string) => {
     if (/^https?:\/\//.test(url)) await shell.openExternal(url);
   });
 
-  ipcMain.handle("corvus:open-path", async (_event, path: string) => {
+  ipcMain.handle("corvus:open-path", async (_event, target: string) => {
     // Local files Corvus created (e.g. browser downloads); shell picks the app.
-    const normalized = require("node:path").normalize(path);
-    const ext = require("node:path").extname(normalized).toLowerCase();
-    
-    // Block executable extensions
-    const BLOCKED_EXTS = [".exe", ".bat", ".cmd", ".vbs", ".ps1", ".scr", ".pif", ".msi", ".com"];
-    if (BLOCKED_EXTS.includes(ext)) {
-      console.warn(`Blocked attempt to open executable file: ${path}`);
-      return;
-    }
+    // Windows drops trailing dots/spaces ("x.exe." opens x.exe), so trim before checking.
+    const normalized = path.normalize(String(target)).replace(/[. ]+$/, "");
 
     // Restrict to the Corvus data dir (where downloads and uploads live).
     // Compare case-insensitively (NTFS) and require the separator so a
     // sibling like ...\CorvusEvil can't pass a bare prefix check.
-    const sep = require("node:path").sep;
-    const baseDir = process.env.LOCALAPPDATA
-      ? require("node:path").join(process.env.LOCALAPPDATA, "Corvus")
-      : require("node:path").join(require("node:os").homedir(), "Corvus");
-    const inBase = normalized.toLowerCase().startsWith(baseDir.toLowerCase() + sep);
-    if (!inBase) {
-      console.warn(`Blocked attempt to open path outside data dir: ${path}`);
+    const baseDir = path.join(process.env.LOCALAPPDATA ?? os.homedir(), "Corvus");
+    if (!normalized.toLowerCase().startsWith(baseDir.toLowerCase() + path.sep)) {
+      console.warn(`Blocked attempt to open path outside data dir: ${target}`);
       return;
     }
 
+    // Websites pick download names, so only open known document/media types.
+    // Anything else (.hta, .js, .lnk, .exe, …) is revealed in Explorer, not run.
+    if (!OPENABLE_EXTS.has(path.extname(normalized).toLowerCase())) {
+      shell.showItemInFolder(normalized);
+      return;
+    }
     await shell.openPath(normalized);
   });
 

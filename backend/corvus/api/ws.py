@@ -26,13 +26,14 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ..config import SYSTEM_PROMPT
 from ..llm.agent import _is_conversational, agent_system_prompt, run_agent_turn
-from ..llm.base import Message
+from ..llm.base import Message, describe_error
 from ..memory.extractor import extract_memory
 
 ws_router = APIRouter()
 log = structlog.get_logger("corvus")
 
 MAX_HISTORY_MESSAGES = 40
+_background: set[asyncio.Task] = set()
 
 
 @ws_router.websocket("/ws/chat")
@@ -46,15 +47,25 @@ async def chat(ws: WebSocket) -> None:
         start = await ws.receive_json()
     except WebSocketDisconnect:
         return
-    if start.get("type") != "start" or not str(start.get("content", "")).strip():
+    except ValueError:
+        start = None
+    if (
+        not isinstance(start, dict)
+        or start.get("type") != "start"
+        or not str(start.get("content", "")).strip()
+    ):
         await ws.send_json({"type": "error", "message": "expected a start frame with content"})
         await ws.close()
         return
 
     content = str(start["content"]).strip()
-    conversation_id = start.get("conversation_id")
-    edit_message_id = start.get("edit_message_id")
-    
+    # Ids must be real ints (not "1", dicts, or bools) or the lookups misbehave.
+    def _int_or_none(v):
+        return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+    conversation_id = _int_or_none(start.get("conversation_id"))
+    edit_message_id = _int_or_none(start.get("edit_message_id"))
+
     if conversation_id is None or repo.get_conversation(conversation_id) is None:
         title = content[:60] + ("…" if len(content) > 60 else "")
         conversation_id = repo.create_conversation(title)["id"]
@@ -113,17 +124,29 @@ async def chat(ws: WebSocket) -> None:
             fut.set_result(approved)
 
     async def read_client() -> None:
-        """Feed confirm/cancel frames to the agent loop."""
-        with contextlib.suppress(WebSocketDisconnect, RuntimeError):
-            while True:
+        """Feed confirm/cancel frames to the agent loop. A disconnect cancels the
+        turn, so the agent doesn't keep running actions for a client that's gone."""
+        try:
+            await _read_frames()
+        except (WebSocketDisconnect, RuntimeError):
+            cancelled.set()
+            resolve_pending(False)
+
+    async def _read_frames() -> None:
+        while True:
+            try:
                 frame = await ws.receive_json()
-                if frame.get("type") == "confirm":
-                    resolve_pending(bool(frame.get("approved")))
-                elif frame.get("type") == "cancel":
-                    # Stop generating, and decline whatever is awaiting an answer.
-                    cancelled.set()
-                    resolve_pending(False)
-                    return
+            except ValueError:
+                continue
+            if not isinstance(frame, dict):
+                continue
+            if frame.get("type") == "confirm":
+                resolve_pending(bool(frame.get("approved")))
+            elif frame.get("type") == "cancel":
+                # Stop generating, and decline whatever is awaiting an answer.
+                cancelled.set()
+                resolve_pending(False)
+                return
 
     reader = asyncio.create_task(read_client())
 
@@ -140,7 +163,7 @@ async def chat(ws: WebSocket) -> None:
         )
         assistant_text = outcome.text
     except Exception as exc:
-        error = str(exc)
+        error = describe_error(exc, provider)
         log.error("chat_turn_error", conversation_id=conversation_id, error=error)
     finally:
         reader.cancel()
@@ -168,8 +191,11 @@ async def chat(ws: WebSocket) -> None:
     )
 
     if assistant_text and not cancelled.is_set():
-        # Non-blocking background pass; failures only log.
-        asyncio.create_task(
+        # Non-blocking background pass; failures only log. Keep a reference:
+        # the loop holds tasks weakly, so an unreferenced one can be GC'd mid-run.
+        task = asyncio.create_task(
             extract_memory(provider, model, repo, content, assistant_text, conversation_id)
         )
+        _background.add(task)
+        task.add_done_callback(_background.discard)
 

@@ -4,7 +4,9 @@ Thin, explicit SQL - no ORM. One Repository instance owns one connection;
 FastAPI keeps a single instance on app.state (SQLite serializes writes).
 """
 
+import functools
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -18,9 +20,31 @@ def _rows(cursor: sqlite3.Cursor) -> list[dict[str, Any]]:
     return [dict(row) for row in cursor.fetchall()]
 
 
+def _serialized(cls):
+    """Run every public method under the instance's lock.
+
+    One connection is shared by sync routes (threadpool), blocking actions
+    (worker threads) and the event loop. Without a lock their execute/commit
+    pairs interleave: one caller commits another's half-done write, or sqlite
+    raises "Recursive use of cursors". RLock, since methods call each other.
+    """
+    for name, fn in list(vars(cls).items()):
+        if callable(fn) and not name.startswith("_"):
+            def wrap(fn=fn):
+                @functools.wraps(fn)
+                def locked(self, *args, **kwargs):
+                    with self.lock:
+                        return fn(self, *args, **kwargs)
+                return locked
+            setattr(cls, name, wrap())
+    return cls
+
+
+@_serialized
 class Repository:
     def __init__(self, path: Path):
         self.conn = connect(path)
+        self.lock = threading.RLock()
 
     def close(self) -> None:
         self.conn.close()

@@ -11,6 +11,7 @@ automation and computer vision are Milestone 7; input automation of arbitrary
 coordinates is deferred with them.
 """
 
+from itertools import islice
 from pathlib import Path
 
 from . import files, monitor, win
@@ -53,6 +54,9 @@ def register_all(reg: Registry) -> None:
     def open_folder(folder: str) -> ActionResult:
         known = win.KNOWN_FOLDERS.get(folder.lower().strip())
         path = known or files.safe_path(folder)
+        if not Path(path).is_dir():
+            # os.startfile on a file would run it - this action only opens folders.
+            return ActionResult(False, f"“{folder}” isn't a folder.")
         win.open_path(path)
         return ActionResult(True, f"Opening {folder} folder…")
 
@@ -204,8 +208,14 @@ def register_all(reg: Registry) -> None:
     ))
 
     def search_files(query: str, folder: str = "documents") -> ActionResult:
-        root = win.KNOWN_FOLDERS.get(folder.lower(), files.safe_path(folder))
-        matches = [str(p) for p in Path(root).rglob(f"*{query}*")][:25]
+        if any(c in query for c in "/\\") or ".." in query:
+            return ActionResult(False, "Search by file name only - no paths in the query.")
+        root = Path(win.KNOWN_FOLDERS.get(folder.lower()) or files.safe_path(folder)).resolve()
+        matches = [
+            str(p) for p in islice(
+                (p for p in root.rglob(f"*{query}*") if p.resolve().is_relative_to(root)), 25
+            )
+        ]
         msg = f"Found {len(matches)} match(es) for “{query}” in {folder}."
         return ActionResult(True, msg, {"matches": matches})
 
@@ -215,7 +225,7 @@ def register_all(reg: Registry) -> None:
             "query": {"type": "string"},
             "folder": {"type": "string", "description": "downloads/documents/desktop or a path", "default": "documents"},
         }, "required": ["query"]},
-        Risk.SAFE, search_files, category="search",
+        Risk.SAFE, search_files, category="search", blocking=True,
     ))
 
     # -- File management ------------------------------------------------------
@@ -249,7 +259,7 @@ def register_all(reg: Registry) -> None:
         "move_item", "Move a file or folder to a new location.",
         {"type": "object", "properties": {"src": {"type": "string"}, "dest": {"type": "string"}},
          "required": ["src", "dest"]},
-        Risk.MEDIUM, move_item,
+        Risk.MEDIUM, move_item, blocking=True,
         confirm_prompt=lambda a: f"Move “{a.get('src')}” to “{a.get('dest')}”?",
         category="files",
     ))
@@ -262,7 +272,7 @@ def register_all(reg: Registry) -> None:
         "copy_item", "Copy a file or folder to a new location.",
         {"type": "object", "properties": {"src": {"type": "string"}, "dest": {"type": "string"}},
          "required": ["src", "dest"]},
-        Risk.MEDIUM, copy_item,
+        Risk.MEDIUM, copy_item, blocking=True,
         confirm_prompt=lambda a: f"Copy “{a.get('src')}” to “{a.get('dest')}”?",
         category="files",
     ))
@@ -313,7 +323,7 @@ def register_all(reg: Registry) -> None:
         "extract_zip", "Extract a .zip archive into a folder.",
         {"type": "object", "properties": {"src": {"type": "string"}, "dest": {"type": "string"}},
          "required": ["src", "dest"]},
-        Risk.MEDIUM, extract_zip,
+        Risk.MEDIUM, extract_zip, blocking=True,
         confirm_prompt=lambda a: f"Extract “{a.get('src')}” into “{a.get('dest')}”?",
         category="files",
     ))
@@ -339,7 +349,7 @@ def register_all(reg: Registry) -> None:
     reg.register(ActionSpec(
         "install_software", "Install software via winget by its exact package ID (e.g. Mozilla.Firefox).",
         _str_param("package_id", "Exact winget package ID"),
-        Risk.HIGH, install_software,
+        Risk.HIGH, install_software, blocking=True,
         confirm_prompt=lambda a: f"Install “{a.get('package_id')}” via winget? This downloads and runs an installer.",
         category="software",
     ))
@@ -352,7 +362,7 @@ def register_all(reg: Registry) -> None:
     reg.register(ActionSpec(
         "uninstall_software", "Uninstall software via winget by its exact package ID.",
         _str_param("package_id", "Exact winget package ID"),
-        Risk.HIGH, uninstall_software,
+        Risk.HIGH, uninstall_software, blocking=True,
         confirm_prompt=lambda a: f"Uninstall “{a.get('package_id')}”? This removes the app.",
         category="software",
     ))

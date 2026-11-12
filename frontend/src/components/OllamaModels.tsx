@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, Loader2, Cpu } from "lucide-react";
 import { api, type SystemSpecs } from "../lib/api";
-import { pullOllamaModel, type PullProgress } from "../lib/ollama";
+import { ipcErrorMessage, pullOllamaModel, type PullProgress } from "../lib/ollama";
 import { useCorvus } from "../state/store";
 
 const FIT_LABEL = {
@@ -45,9 +45,10 @@ export function OllamaModels() {
               setInstallError(null);
               try {
                 await window.corvus?.installOllama();
+                await refresh();
               } catch (err) {
                 console.error(err);
-                setInstallError(err instanceof Error ? err.message : "Installation failed.");
+                setInstallError(ipcErrorMessage(err, "Installation failed."));
               } finally {
                 setInstallingOllama(false);
               }

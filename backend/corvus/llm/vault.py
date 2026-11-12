@@ -80,7 +80,7 @@ class KeyVault:
 
     def clear_key(self, provider: str) -> None:
         # Overwrite with empty then leave a tombstone-free state.
-        self.repo.set_setting(_KEY_PREFIX + provider, "")
-        self.repo.set_setting(_KEY_PREFIX + provider, "")
-        self.repo.conn.execute("DELETE FROM settings WHERE key = ?", (_KEY_PREFIX + provider,))
-        self.repo.conn.commit()
+        with self.repo.lock:
+            self.repo.set_setting(_KEY_PREFIX + provider, "")
+            self.repo.conn.execute("DELETE FROM settings WHERE key = ?", (_KEY_PREFIX + provider,))
+            self.repo.conn.commit()

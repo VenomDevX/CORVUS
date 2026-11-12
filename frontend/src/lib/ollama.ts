@@ -22,8 +22,9 @@ export async function pullOllamaModel(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     });
-  } catch (err) {
-    throw new Error(parseOllamaError(err));
+  } catch {
+    // A failed fetch to localhost means Ollama itself isn't listening.
+    throw new Error(OLLAMA_DOWN);
   }
   if (!res.ok || !res.body) throw new Error(parseOllamaError(`Ollama pull failed: ${res.status}`));
 
@@ -57,6 +58,16 @@ export async function pullOllamaModel(
   } catch (err) {
     throw new Error(parseOllamaError(err));
   }
+  // Stream ended without Ollama's "success" frame: the pull did not finish.
+  throw new Error("The model download stopped before finishing. Please try again.");
+}
+
+const OLLAMA_DOWN = "Ollama isn't running. Start the Ollama app, then try again.";
+
+/** Strip Electron's "Error invoking remote method '…': Error:" wrapper from an IPC failure. */
+export function ipcErrorMessage(err: unknown, fallback: string): string {
+  const raw = err instanceof Error ? err.message : "";
+  return raw.replace(/^Error invoking remote method '[^']*':\s*(Error:\s*)?/, "") || fallback;
 }
 
 export function parseOllamaError(err: unknown): string {

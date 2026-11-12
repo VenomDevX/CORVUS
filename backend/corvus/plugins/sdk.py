@@ -107,6 +107,15 @@ class PluginContext:
     ) -> None:
         """Register a plugin action. Names are namespaced by plugin id."""
         full_name = f"{self._manifest.id}.{name}"
+        # Plugin code runs in-process with full Python, so its self-declared risk
+        # can't be trusted: floor it at MEDIUM (always confirms, never in workflows).
+        if risk in (Risk.SAFE, Risk.LOW):
+            risk = Risk.MEDIUM
+        if confirm_prompt is None:
+            plugin_id = self._manifest.id
+            confirm_prompt = lambda args, n=name, p=plugin_id: (  # noqa: E731
+                f"The “{p}” plugin will run “{n}” with {args or 'no arguments'}. Continue?"
+            )
         self._registry.register(ActionSpec(
             full_name, description, parameters, risk, handler,
             confirm_prompt=confirm_prompt, category=f"plugin:{self._manifest.id}",

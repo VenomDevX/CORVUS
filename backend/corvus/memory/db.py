@@ -51,16 +51,6 @@ CREATE TABLE IF NOT EXISTS reminders (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS workflows (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    steps TEXT NOT NULL,
-    trigger_type TEXT NOT NULL DEFAULT 'manual'
-        CHECK (trigger_type IN ('manual', 'schedule', 'voice')),
-    trigger_config TEXT NOT NULL DEFAULT '{}',
-    enabled INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
 
 CREATE TABLE IF NOT EXISTS voiceovers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,6 +70,41 @@ CREATE INDEX IF NOT EXISTS idx_reminders_pending ON reminders(fired, fire_at);
 """
 
 
+# Kept out of SCHEMA so the migration below can build it under a temp name.
+# Trigger list must match TRIGGERS in workflows/engine.py.
+WORKFLOWS_TABLE = """
+CREATE TABLE IF NOT EXISTS {name} (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    steps TEXT NOT NULL,
+    trigger_type TEXT NOT NULL DEFAULT 'manual'
+        CHECK (trigger_type IN ('manual', 'schedule', 'interval', 'startup',
+                                'idle', 'folder', 'voice')),
+    trigger_config TEXT NOT NULL DEFAULT '{{}}',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+"""
+_WORKFLOW_COLUMNS = "id, name, steps, trigger_type, trigger_config, enabled, created_at"
+
+
+def _migrate_workflows(conn: sqlite3.Connection) -> None:
+    """Older databases only allow manual/schedule/voice triggers. SQLite
+    can't alter a CHECK constraint, so rebuild the table once, atomically."""
+    row = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='workflows'").fetchone()
+    if row is None:
+        conn.executescript(WORKFLOWS_TABLE.format(name="workflows"))
+    elif "'folder'" not in row[0]:
+        conn.executescript(
+            "BEGIN;"
+            + WORKFLOWS_TABLE.format(name="workflows_new")
+            + f"INSERT INTO workflows_new ({_WORKFLOW_COLUMNS}) SELECT {_WORKFLOW_COLUMNS} FROM workflows;"
+            "DROP TABLE workflows;"
+            "ALTER TABLE workflows_new RENAME TO workflows;"
+            "COMMIT;"
+        )
+
+
 def connect(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -87,4 +112,5 @@ def connect(path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous = NORMAL")
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    _migrate_workflows(conn)
     return conn

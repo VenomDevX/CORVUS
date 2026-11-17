@@ -50,7 +50,8 @@ def create_app(
         # notification subscriber is connected this early in startup).
         if app.state.notifications is not None:
             await app.state.notifications.start()
-        await app.state.workflows.start()
+        # After a crash the respawned backend must not re-run the launch routine.
+        await app.state.workflows.start(run_startup=not app.state.session.recovered)
         if voice is not False:
             if voice is True:
                 from ..voice.pipeline import VoicePipeline

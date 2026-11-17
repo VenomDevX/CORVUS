@@ -155,3 +155,31 @@ async def test_guard_blocks_internal_subresource_requests(tmp_path):
     await eng._guard_navigation(internal)
     await eng._guard_navigation(external)
     assert (internal.result, external.result) == ("aborted", "continued")
+
+
+async def test_guard_rechecks_allowed_hosts(tmp_path, monkeypatch):
+    """An allow verdict is never cached: a host that rebinds to a LAN IP is caught."""
+    import corvus.automation.browser as browser
+
+    eng = BrowserEngine(tmp_path / "dl", headless=True)
+    answers = iter([False, True])
+
+    async def fake_internal(_url):
+        return next(answers)
+
+    monkeypatch.setattr(browser, "is_internal_host", fake_internal)
+
+    class Route:
+        request = type("R", (), {"url": "https://rebind.example/"})()
+        result = None
+
+        async def abort(self, _r):
+            self.result = "aborted"
+
+        async def continue_(self):
+            self.result = "continued"
+
+    first, second = Route(), Route()
+    await eng._guard_navigation(first)
+    await eng._guard_navigation(second)
+    assert (first.result, second.result) == ("continued", "aborted")

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Switch } from "@fluentui/react-components";
 import { SectionShell } from "./SectionShell";
-import { api, type Memory, type LogEntry } from "../lib/api";
+import { api, currentBackendPort, type Memory, type LogEntry } from "../lib/api";
 import { useCorvus } from "../state/store";
 import { Orb } from "../components/Orb";
 import { ProviderSettings } from "../components/ProviderSettings";
@@ -10,6 +10,7 @@ import { DocumentsIndex } from "../components/DocumentsIndex";
 import { Select } from "../components/ui/Select";
 import { AboutSettings } from "../components/AboutSettings";
 import { MemoryGraph } from "../components/MemoryGraph";
+import { PrivacyData } from "../components/PrivacyData";
 import { ORB_STATES, type OrbState } from "../lib/tokens";
 import {
   Paintbrush,
@@ -24,6 +25,7 @@ import {
   Activity,
   RotateCcw,
   Search,
+  ShieldCheck,
 } from "lucide-react";
 
 // ─── Sidebar definition ──────────────────────────────────────────────
@@ -37,6 +39,7 @@ type SettingsPage =
   | "wakework"
   | "ttsvoice"
   | "memory"
+  | "privacy"
   | "logs"
   | "backend"
   | "setup";
@@ -79,6 +82,7 @@ const SETTINGS_NAV: SettingsNavGroup[] = [
     label: "SYSTEM",
     items: [
       { key: "memory", label: "Memory", icon: <Brain className="h-4 w-4" /> },
+      { key: "privacy", label: "Privacy & Data", icon: <ShieldCheck className="h-4 w-4" /> },
       { key: "logs", label: "Logs", icon: <ScrollText className="h-4 w-4" /> },
       { key: "backend", label: "Backend Status", icon: <Activity className="h-4 w-4" /> },
     ],
@@ -615,7 +619,7 @@ function BackendPage() {
       <p className="text-body">
         {backendOnline ? (
           <div className="mt-6 flex flex-col gap-1 text-[12px] text-fg-muted">
-            <span className="text-success">● Corvus core online (127.0.0.1:8765)</span>
+            <span className="text-success">● Corvus core online (127.0.0.1:{currentBackendPort()})</span>
             <span>Build: Developer Preview</span>
           </div>
         ) : (
@@ -660,6 +664,7 @@ const PAGES: Record<SettingsPage, () => JSX.Element> = {
   wakework: WakeWordPage,
   ttsvoice: TtsVoicePage,
   memory: MemoryPage,
+  privacy: PrivacyData,
   logs: LogsPage,
   backend: BackendPage,
   setup: SetupPage,

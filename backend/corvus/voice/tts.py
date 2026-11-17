@@ -88,6 +88,10 @@ class EdgeSpeaker:
     async def synthesize(self, text: str) -> bytes:
         import edge_tts
 
+        from .. import egress
+
+        egress.record("Microsoft Edge TTS", "spoken reply", len(text), ["text to speak"])
+
         rate, pitch = prosody_for(text)
         communicate = edge_tts.Communicate(text, voice=self.voice, rate=rate, pitch=pitch)
         parts: list[bytes] = []

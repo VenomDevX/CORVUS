@@ -1,30 +1,50 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
+import { verifyBackend } from "./guards";
 
-const BACKEND_URL = "http://127.0.0.1:8765";
 const RESTART_DELAY_MS = 1000;
 
 let child: ChildProcess | null = null;
 let shuttingDown = false;
 let restartTimer: NodeJS.Timeout | null = null;
+let port = 0;
+
+/** Resolves with the port once a backend has passed the handshake; replaced
+ * (pending again) while a respawned backend comes up. */
+let ready!: Promise<number>;
+let markReady!: (p: number) => void;
+function resetReady() {
+  ready = new Promise((resolve) => (markReady = resolve));
+}
+resetReady();
+
+export const backendUrl = () => `http://127.0.0.1:${port}`;
+export const backendPort = (): Promise<number> => ready;
+
+/** Resolves the next time a (re)spawned backend passes the handshake. */
+const restartWaiters: ((p: number) => void)[] = [];
+export const nextBackend = (): Promise<number> => new Promise((r) => restartWaiters.push(r));
+
+/** A free loopback port, picked fresh per launch: a fixed, well-known port
+ * could be squatted by another local process before Corvus starts. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const srv = createServer();
+    srv.unref();
+    srv.on("error", reject);
+    srv.listen(0, "127.0.0.1", () => {
+      const address = srv.address();
+      srv.close(() => (typeof address === "object" && address ? resolve(address.port) : reject()));
+    });
+  });
+}
 
 async function isHealthy(): Promise<boolean> {
   try {
-    const res = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(1500) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-/** /health is open; /session proves the backend was started with *this* launch's token. */
-async function acceptsToken(token: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${BACKEND_URL}/session`, {
-      headers: { "X-Corvus-Token": token },
-      signal: AbortSignal.timeout(1500),
-    });
+    const res = await fetch(`${backendUrl()}/health`, { signal: AbortSignal.timeout(1500) });
     return res.ok;
   } catch {
     return false;
@@ -35,30 +55,6 @@ function run(cmd: string, args: string[]): Promise<string> {
   return new Promise((resolve) =>
     execFile(cmd, args, { windowsHide: true }, (_err, stdout) => resolve(stdout ?? "")),
   );
-}
-
-/**
- * A backend left over from a crashed launch still serves /health but holds the
- * old token, so every request would 401. Kill it - but only if the listener on
- * our port really is a Corvus backend (corvus-backend.exe, or python in dev).
- */
-async function killStaleBackend(): Promise<void> {
-  // /health reports the backend's pid (netstat doesn't reliably list the
-  // frozen backend's listener). Still verify the image before killing.
-  let pid: number | undefined;
-  try {
-    const res = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(1500) });
-    pid = (await res.json()).pid;
-  } catch {
-    return;
-  }
-  if (!Number.isInteger(pid)) return; // an older backend without pid: leave it
-  const info = (await run("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"])).toLowerCase();
-  // Dev runs under Store Python, whose real process is python3.11.exe.
-  if (!/"(corvus-backend|python[\d.]*)\.exe"/.test(info)) return;
-  console.warn(`[Corvus] replacing stale backend (pid ${pid})`);
-  await run("taskkill", ["/PID", String(pid), "/T", "/F"]);
-  for (let i = 0; i < 20 && (await isHealthy()); i++) await new Promise((r) => setTimeout(r, 250));
 }
 
 function backendPath(isDev: boolean): string {
@@ -73,7 +69,7 @@ function backendPath(isDev: boolean): string {
  * is still running, respawn it after a short delay. Quitting the app sets
  * `shuttingDown`, which suppresses the respawn.
  */
-function spawnBackend(isDev: boolean, token: string): void {
+function spawnBackend(isDev: boolean, token: string, adminToken: string): void {
   if (shuttingDown || child) return;
 
   const python = backendPath(isDev);
@@ -88,8 +84,16 @@ function spawnBackend(isDev: boolean, token: string): void {
     cwd: isDev ? join(repoRoot, "backend") : undefined,
     stdio: "inherit",
     windowsHide: true,
-    // The backend enforces this token on every request (SECURITY.md item 1).
-    env: { ...process.env, CORVUS_TOKEN: token },
+    env: {
+      ...process.env,
+      CORVUS_PORT: String(port),
+      CORVUS_TOKEN: token,
+      // Second secret for consent routes (plugin approval, data wipe); the
+      // renderer never sees it.
+      CORVUS_ADMIN_TOKEN: adminToken,
+      // The backend exits when we do, so a crash never leaves an orphan.
+      CORVUS_PARENT_PID: String(process.pid),
+    },
   });
 
   const spawned = child;
@@ -104,38 +108,42 @@ function spawnBackend(isDev: boolean, token: string): void {
     console.log(`[Corvus] backend exited with code ${code}`);
     child = null;
     if (shuttingDown || restartTimer) return;
+    resetReady();
     console.log(`[Corvus] respawning backend in ${RESTART_DELAY_MS}ms`);
     restartTimer = setTimeout(() => {
       restartTimer = null;
-      // A backend may have come up in the meantime (e.g. started externally).
-      void isHealthy().then((ok) => {
-        if (!ok) spawnBackend(isDev, token);
-      });
+      void launch(isDev, token, adminToken);
     }, RESTART_DELAY_MS);
   });
 }
 
-/**
- * Ensure the backend is running. Reuses one that is already serving (e.g.
- * started manually during development); otherwise spawns and supervises one.
- * Resolves once /health responds or the startup window elapses; the renderer
- * also surfaces live backend status.
- */
-export async function startBackend(isDev: boolean, token: string): Promise<boolean> {
-  shuttingDown = false;
-  if (await isHealthy()) {
-    if (await acceptsToken(token)) return true;
-    await killStaleBackend();
-  }
-
-  spawnBackend(isDev, token);
-
+async function launch(isDev: boolean, token: string, adminToken: string): Promise<boolean> {
+  port = await freePort();
+  spawnBackend(isDev, token, adminToken);
   for (let i = 0; i < 40; i++) {
-    if (await isHealthy()) return true;
+    if (await isHealthy()) {
+      // Anything could be answering /health on this port; only a backend that
+      // proves it holds this launch's token gets the renderer's traffic.
+      if (await verifyBackend(backendUrl(), token, randomBytes(16).toString("hex"))) {
+        console.log(`[Corvus] backend verified on port ${port}`);
+        markReady(port);
+        for (const waiter of restartWaiters.splice(0)) waiter(port);
+        return true;
+      }
+      console.error("[Corvus] listener on the backend port failed the handshake");
+      return false;
+    }
     await new Promise((r) => setTimeout(r, 500));
   }
   console.error("[Corvus] backend did not become healthy within 20s");
   return false;
+}
+
+/** Spawn, supervise and verify the backend. Resolves once it passed the
+ * handshake (true) or the startup window elapsed (false). */
+export async function startBackend(isDev: boolean, token: string, adminToken: string): Promise<boolean> {
+  shuttingDown = false;
+  return launch(isDev, token, adminToken);
 }
 
 /**
@@ -154,7 +162,7 @@ export async function stopBackend(token: string): Promise<void> {
   if (!proc || proc.exitCode !== null) return;
   const exited = new Promise<void>((r) => proc.once("exit", () => r()));
   try {
-    await fetch(`${BACKEND_URL}/shutdown`, {
+    await fetch(`${backendUrl()}/shutdown`, {
       method: "POST",
       headers: { "X-Corvus-Token": token },
       signal: AbortSignal.timeout(1500),

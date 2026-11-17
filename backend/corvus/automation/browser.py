@@ -48,6 +48,39 @@ def check_web_url(url: str) -> str:
     return url
 
 
+def _is_internal_ip(ip: str) -> bool:
+    import ipaddress
+
+    addr = ipaddress.ip_address(ip.split("%")[0])
+    return not addr.is_global or addr.is_multicast
+
+
+async def is_internal_host(url: str) -> bool:
+    """True when the URL's host resolves to loopback/private/link-local space.
+
+    The agent's browser is steerable by page content (prompt injection), so it
+    must not reach the local Ollama API, router admin pages or LAN services.
+    # ponytail: checked at navigation time only; DNS rebinding between this
+    # lookup and Chromium's own is out of scope.
+    """
+    import socket
+
+    host = urlparse(url).hostname
+    if not host:
+        return False
+    try:
+        return _is_internal_ip(host)  # an IP literal
+    except ValueError:
+        pass
+    if host == "localhost" or host.endswith(".localhost") or host.endswith(".local"):
+        return True
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except OSError:
+        return False  # unresolvable: Chromium will fail it on its own
+    return any(_is_internal_ip(info[4][0]) for info in infos)
+
+
 def _install_chromium(browsers_dir: Path) -> None:
     """Install Playwright's Chromium via its bundled driver.
 
@@ -147,7 +180,8 @@ class BrowserEngine:
         # inside its read-only _internal/ tree. Must be set before launching.
         from ..config import data_dir
 
-        browsers_dir = data_dir() / "playwright-browsers"
+        # An explicit PLAYWRIGHT_BROWSERS_PATH wins (dev machines, tests reuse their cache).
+        browsers_dir = Path(os.environ.get("PLAYWRIGHT_BROWSERS_PATH") or data_dir() / "playwright-browsers")
         browsers_dir.mkdir(parents=True, exist_ok=True)
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(browsers_dir)
 
@@ -165,9 +199,21 @@ class BrowserEngine:
             self._browser = await self._pw.chromium.launch(headless=self.headless)
 
         self._context = await self._browser.new_context(accept_downloads=True)
+        # Redirects and in-page links get the same internal-host check as
+        # browser_navigate; sub-resources load normally.
+        await self._context.route("**/*", self._guard_navigation)
         self._page = await self._context.new_page()
         self._page.on("download", self._handle_download)
         log.info("browser_launched", headless=self.headless)
+
+    async def _guard_navigation(self, route) -> None:
+        request = route.request
+        if (request.is_navigation_request() and request.url.startswith(("http://", "https://"))
+                and await is_internal_host(request.url)):
+            log.warning("browser_internal_navigation_blocked", url=request.url)
+            await route.abort("blockedbyclient")
+            return
+        await route.continue_()
 
     def _handle_download(self, download) -> None:
         async def save():
@@ -193,14 +239,16 @@ class BrowserEngine:
     def grant_consent(self, site: str) -> None:
         self.consented_sites.add(site)
 
-    def has_consent(self, site: str) -> bool:
-        return site in self.consented_sites
-
     # -- navigation & reading -------------------------------------------------
 
     async def navigate(self, url: str) -> PageView:
+        url = check_web_url(url)
+        if await is_internal_host(url):
+            raise PermissionError(
+                "Corvus's browser doesn't open local or private-network addresses."
+            )
         page = await self._ensure_page()
-        await page.goto(check_web_url(url), wait_until="domcontentloaded", timeout=30000)
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
         return await self.read()
 
     async def read(self, max_chars: int = 6000) -> PageView:

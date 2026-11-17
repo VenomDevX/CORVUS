@@ -21,7 +21,7 @@ from typing import Any
 
 import structlog
 
-from ..actions.registry import ActionResult, Registry
+from ..actions.registry import ActionResult, Registry, Risk
 from ..untrusted import UNTRUSTED_RULE
 from .base import LLMProvider, Message, ToolCall, TurnResult
 
@@ -79,81 +79,96 @@ async def _stream_turn(
     return TurnResult(content=text, tool_calls=calls)
 
 
+_GREETINGS = {
+    "hi", "hello", "hey", "how are you", "what's up", "good morning",
+    "good evening", "good afternoon", "sup", "yo", "hola", "namaste",
+    "thanks", "thank you", "bye", "goodbye", "good night",
+}
+_KNOWLEDGE_STARTS = (
+    "what is", "what are", "what was", "what were", "what does", "what do",
+    "who is", "who are", "who was", "who were",
+    "where is", "where are", "where was",
+    "when is", "when was", "when did",
+    "why is", "why are", "why do", "why does", "why did",
+    "how is", "how are", "how does", "how do", "how did",
+    "how to", "how can", "how would", "how should",
+    "explain", "define", "describe", "tell me about", "tell me what",
+    "can you explain", "can you tell me", "could you explain",
+    "difference between", "compare",
+)
+_CODE_STARTS = (
+    "write a", "write me", "write code", "write python", "write java",
+    "write javascript", "write html", "write css", "write sql",
+    "give me a function", "give me code", "give me a script",
+    "create a function", "create a class", "create a program",
+    "code for", "code to", "code that",
+    "implement", "algorithm for", "regex for", "pattern for",
+    "fix this code", "debug this", "refactor",
+)
+_CHAT_PATTERNS = (
+    "tell me a joke", "tell me a story", "tell me a fact",
+    "sing", "poem", "quote", "meaning of", "translate",
+)
+# Words that only ever mean "do something on this PC".
+_ACTION_VERBS = {
+    "open", "close", "launch", "kill", "delete", "paste", "play", "pause",
+    "install", "uninstall", "download", "upload", "screenshot", "browse", "navigate",
+    "shutdown", "restart", "mute", "unmute", "click", "remind", "rename", "unzip",
+    "volume", "brightness",
+}
+# Ambiguous in programming questions ("write a function to list files"): they
+# only veto the shortcut when the message isn't a knowledge/coding request.
+_WEAK_ACTION_VERBS = {
+    "run", "start", "stop", "remove", "move", "copy", "send", "set", "search", "find",
+    "show", "list", "check", "type", "capture", "lock", "zip", "extract",
+}
+_LOCAL_NOUNS = {
+    "clipboard", "file", "files", "folder", "folders", "battery", "screen",
+    "downloads", "desktop", "workflow", "reminder", "timer", "alarm",
+}
+_THIS_MACHINE = re.compile(r"\b(my|this (pc|computer|laptop|machine))\b")
+
+# What a source of outside-world content is called in a taint prompt.
+_SOURCE_LABEL = {
+    "browser": "a web page", "vision": "your screen or an image",
+    "documents": "your documents", "clipboard": "the clipboard",
+}
+
+# What a local-data action would hand to a cloud model.
+_LOCAL_DATA_LABEL = {
+    "read_screen_text": "your screen text",
+    "describe_image": "this image",
+    "search_documents": "passages from your documents",
+    "read_clipboard": "your clipboard",
+    "list_folder": "a folder listing",
+    "search_files": "file names from your folders",
+}
+
+
 async def _is_conversational(text: str) -> bool:
     """Decide whether a user message is purely conversational / knowledge-based
     and therefore needs NO tools at all.
 
     Small local models (7B) get overwhelmed by dozens of tool schemas and try to
-    emit JSON function calls for every query — even "hi" or "what is an array".
+    emit JSON function calls for every query - even "hi" or "what is an array".
     By stripping tools for these queries the model can just answer naturally.
+    Any action word or reference to this machine anywhere in the message
+    vetoes the shortcut ("write me an email and copy it to the clipboard").
     """
     t = text.strip().lower()
-
-    # Greetings
-    _GREETINGS = {
-        "hi", "hello", "hey", "how are you", "what's up", "good morning",
-        "good evening", "good afternoon", "sup", "yo", "hola", "namaste",
-        "thanks", "thank you", "bye", "goodbye", "good night",
-    }
-    if t in _GREETINGS or t.rstrip("!?.") in _GREETINGS:
+    if t.rstrip("!?.") in _GREETINGS:
         return True
-
-    # Knowledge / explanation patterns — the user is asking a question that
-    # can be answered from the model's built-in knowledge, not a system action.
-    _KNOWLEDGE_STARTS = (
-        "what is", "what are", "what was", "what were", "what does", "what do",
-        "who is", "who are", "who was", "who were",
-        "where is", "where are", "where was",
-        "when is", "when was", "when did",
-        "why is", "why are", "why do", "why does", "why did",
-        "how is", "how are", "how does", "how do", "how did",
-        "how to", "how can", "how would", "how should",
-        "explain", "define", "describe", "tell me about", "tell me what",
-        "can you explain", "can you tell me", "could you explain",
-        "difference between", "compare",
-    )
-    if any(t.startswith(prefix) for prefix in _KNOWLEDGE_STARTS):
-        # "what is my battery level" asks about this machine, not general
-        # knowledge - it needs the tools.
-        return not re.search(r"\b(my|this (pc|computer|laptop|machine))\b", t)
-
-    # Coding help — model should write code from knowledge, not call tools
-    _CODE_PATTERNS = (
-        "write a", "write me", "write code", "write python", "write java",
-        "write javascript", "write html", "write css", "write sql",
-        "write a function", "write a program", "write a script",
-        "give me a function", "give me code", "give me a script",
-        "create a function", "create a class", "create a program",
-        "code for", "code to", "code that",
-        "implement", "algorithm for", "regex for", "pattern for",
-        "fix this code", "debug this", "refactor",
-    )
-    if any(t.startswith(prefix) for prefix in _CODE_PATTERNS):
+    words = re.findall(r"[a-z0-9']+", t)
+    if any(w in _ACTION_VERBS or w in _LOCAL_NOUNS for w in words) or _THIS_MACHINE.search(t):
+        return False
+    if t.startswith(_KNOWLEDGE_STARTS) or t.startswith(_CODE_STARTS):
         return True
-
-    # General chat / fun — no tool needed
-    _CHAT_PATTERNS = (
-        "tell me a joke", "tell me a story", "tell me a fact",
-        "sing", "poem", "quote",
-        "meaning of life", "meaning of",
-        "translate",
-    )
+    if any(w in _WEAK_ACTION_VERBS for w in words):
+        return False
     if any(pattern in t for pattern in _CHAT_PATTERNS):
         return True
-
-    # Very short messages (≤3 words) without action verbs are almost always chat
-    words = t.split()
-    _ACTION_VERBS = {
-        "open", "close", "run", "start", "stop", "launch", "kill", "delete",
-        "remove", "create", "move", "copy", "send", "set", "play", "pause",
-        "search", "find", "show", "list", "check", "get", "install", "uninstall",
-        "download", "upload", "screenshot", "capture", "browse", "navigate",
-        "shutdown", "restart", "lock", "mute", "unmute", "type", "click",
-    }
-    if len(words) <= 3 and not any(w in _ACTION_VERBS for w in words):
-        return True
-
-    return False
+    # Very short messages without action words are almost always chat.
+    return len(words) <= 3
 
 
 async def run_agent_turn(
@@ -166,8 +181,15 @@ async def run_agent_turn(
     log_action: Callable[[str, dict, ActionResult, str], None] | None = None,
     should_stop: StopCheck | None = None,
     max_rounds: int = MAX_TOOL_ROUNDS,
+    include_tools: bool | None = None,
+    cloud_provider: str | None = None,
 ) -> AgentOutcome:
-    """Run one user turn to completion, executing any requested actions."""
+    """Run one user turn to completion, executing any requested actions.
+
+    include_tools: the caller's precomputed decision (None = decide here).
+    cloud_provider: label of the active non-local provider, if any - actions
+    that read local data then confirm first, since their result leaves the PC.
+    """
     convo = list(messages)
     actions_run: list[dict[str, Any]] = []
     # Exactly the text the user saw stream by, across every round: a tool
@@ -182,12 +204,14 @@ async def run_agent_turn(
 
     # Decide whether to include tools at all. Small models (7B) get completely
     # derailed by 30+ tool schemas for simple conversational queries.
-    user_text = messages[-1].content if messages and messages[-1].role == "user" else ""
-    skip_tools = await _is_conversational(user_text)
-    tools = [] if skip_tools else registry.tool_schemas()
-
-    if skip_tools:
-        log.debug("skipping_tools_for_conversational_query", preview=user_text[:80])
+    if include_tools is None:
+        user_text = messages[-1].content if messages and messages[-1].role == "user" else ""
+        include_tools = not await _is_conversational(user_text)
+    tools = registry.tool_schemas() if include_tools else []
+    # Taint: once outside-world content (web, OCR, documents, clipboard) is in
+    # this turn it may carry injected instructions, so every later non-safe
+    # action goes through the user whatever its normal tier.
+    taint: dict[str, str | None] = {"source": None}
 
     for _round in range(max_rounds):
         turn = await _stream_turn(provider, model, convo, tools, emit, should_stop)
@@ -221,7 +245,8 @@ async def run_agent_turn(
         convo.append(Message("assistant", turn.content, tool_calls=turn.tool_calls))
 
         for call in turn.tool_calls:
-            result = await _run_one(call, registry, confirm, emit, log_action)
+            result = await _run_one(call, registry, confirm, emit, log_action,
+                                    taint=taint, cloud_provider=cloud_provider)
             actions_run.append({"name": call.name, "arguments": call.arguments, "ok": result.ok, "message": result.message})
             convo.append(Message("tool", json.dumps({"ok": result.ok, "message": result.message, **result.data}), tool_name=call.name))
 
@@ -242,7 +267,10 @@ async def _run_one(
     confirm: Confirmer,
     emit: EventSink | None,
     log_action: Callable[[str, dict, ActionResult, str], None] | None,
+    taint: dict[str, str | None] | None = None,
+    cloud_provider: str | None = None,
 ) -> ActionResult:
+    taint = taint if taint is not None else {"source": None}
     spec = registry.get(call.name)
     if spec is None:
         return ActionResult(False, f"Unknown action: {call.name}")
@@ -266,8 +294,8 @@ async def _run_one(
         return result
 
     outcome = "executed"
-    if spec.requires_confirmation:
-        prompt = spec.describe_confirmation(call.arguments)
+    prompt = confirmation_prompt(spec, call.arguments, taint["source"], cloud_provider)
+    if prompt is not None:
         await _emit(emit, {"type": "action_confirming", "name": call.name,
                            "prompt": prompt, "risk": spec.risk.value})
         approved = await confirm(call.name, prompt, call.arguments)
@@ -281,12 +309,30 @@ async def _run_one(
             return result
 
     result = await registry.execute(call.name, call.arguments)
+    if result.ok and spec.untrusted_output and not taint["source"]:
+        taint["source"] = _SOURCE_LABEL.get(spec.category, "an outside source")
     log.info("action_executed", action=call.name, ok=result.ok)
     await _emit(emit, {"type": "action_result", "name": call.name, "ok": result.ok,
                        "message": result.message, "data": result.data})
     if log_action:
         log_action(call.name, call.arguments, result, outcome if result.ok else "failed")
     return result
+
+
+def confirmation_prompt(spec, args: dict[str, Any], tainted_by: str | None,
+                        cloud_provider: str | None) -> str | None:
+    """The confirmation text for this call, or None when it may run directly."""
+    if spec.requires_confirmation:
+        prompt = spec.describe_confirmation(args)
+        return f"(This turn contains content from {tainted_by}.) {prompt}" if tainted_by else prompt
+    if tainted_by and spec.risk != Risk.SAFE:
+        shown = ", ".join(f"{k}={v!r}" for k, v in args.items()) or "no arguments"
+        return (f"Content from {tainted_by} is in this conversation and could be steering "
+                f"Corvus. It wants to run {spec.name} ({shown}). Continue?")
+    if cloud_provider and spec.reads_local_data:
+        what = _LOCAL_DATA_LABEL.get(spec.name, "your local data")
+        return f"This sends {what} to {cloud_provider}, off this computer. Continue?"
+    return None
 
 
 def agent_system_prompt(registry: Registry, include_tools: bool = True) -> str:

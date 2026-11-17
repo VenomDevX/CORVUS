@@ -102,9 +102,30 @@ async def test_interactive_elements_have_coordinates(engine):
 
 
 async def test_consent_tracking(engine):
-    assert not engine.has_consent("github.com")
     engine.grant_consent("github.com")
-    assert engine.has_consent("github.com")
+    assert "github.com" in engine.consented_sites
+
+
+@pytest.mark.parametrize("url", [
+    "http://127.0.0.1:11434/api/tags", "http://localhost:8765/logs", "http://10.0.0.1/",
+    "http://192.168.1.1/admin", "http://169.254.169.254/latest", "http://[::1]/",
+    "http://printer.local/",
+])
+async def test_internal_hosts_blocked(url):
+    from corvus.automation.browser import is_internal_host
+
+    assert await is_internal_host(url)
+
+
+async def test_public_ip_allowed():
+    from corvus.automation.browser import is_internal_host
+
+    assert not await is_internal_host("https://1.1.1.1/")
+
+
+async def test_navigate_refuses_internal_host(engine):
+    with pytest.raises(PermissionError):
+        await engine.navigate("http://127.0.0.1:11434/")
 
 
 async def test_screenshot_written(engine, tmp_path):

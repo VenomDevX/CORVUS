@@ -67,13 +67,38 @@ def rename(src: str, new_name: str) -> Path:
     return dest
 
 
+def recycle(target: Path) -> None:
+    """Move a file or folder to the Windows Recycle Bin (undoable delete)."""
+    import ctypes
+    from ctypes import wintypes
+
+    class SHFILEOPSTRUCTW(ctypes.Structure):
+        _fields_ = [
+            ("hwnd", wintypes.HWND), ("wFunc", wintypes.UINT),
+            ("pFrom", wintypes.LPCWSTR), ("pTo", wintypes.LPCWSTR),
+            ("fFlags", ctypes.c_ushort), ("fAnyOperationsAborted", wintypes.BOOL),
+            ("hNameMappings", ctypes.c_void_p), ("lpszProgressTitle", wintypes.LPCWSTR),
+        ]
+
+    FO_DELETE = 3
+    FOF_SILENT, FOF_NOCONFIRMATION, FOF_ALLOWUNDO, FOF_NOERRORUI = 0x4, 0x10, 0x40, 0x400
+    op = SHFILEOPSTRUCTW(
+        wFunc=FO_DELETE,
+        pFrom=str(target) + "\0",  # double-NUL-terminated list (ctypes adds the second)
+        fFlags=FOF_SILENT | FOF_NOCONFIRMATION | FOF_ALLOWUNDO | FOF_NOERRORUI,
+    )
+    code = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(op))
+    if code != 0 or op.fAnyOperationsAborted:
+        raise OSError(f"couldn't move {target.name} to the Recycle Bin (error {code})")
+
+
 def delete(path: str) -> str:
     target = safe_path(path)
-    if target.is_dir():
-        shutil.rmtree(target)
-        return f"folder {target.name}"
-    target.unlink()
-    return f"file {target.name}"
+    if not target.exists():
+        raise FileNotFoundError(f"{target} doesn't exist")
+    kind = "folder" if target.is_dir() else "file"
+    recycle(target)
+    return f"{kind} {target.name}"
 
 
 def clean_temp() -> dict:

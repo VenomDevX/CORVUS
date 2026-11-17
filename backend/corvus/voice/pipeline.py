@@ -22,6 +22,7 @@ import structlog
 from ..actions.registry import Registry
 from ..config import SYSTEM_PROMPT
 from ..llm.agent import agent_system_prompt, run_agent_turn
+from ..llm.factory import cloud_label
 from ..llm.base import Message, describe_error
 from ..memory.extractor import extract_memory
 from .stt import Transcriber
@@ -318,7 +319,7 @@ class VoicePipeline:
                     self.provider, model, messages, self.registry,
                     voice_confirm, emit=voice_emit,
                     should_stop=lambda: self._interrupt.is_set(),
-                    max_rounds=2,
+                    max_rounds=2, cloud_provider=cloud_label(self.provider),
                 )
                 # parts were already collected via voice_emit
             else:

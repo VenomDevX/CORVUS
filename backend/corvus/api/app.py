@@ -13,6 +13,7 @@ from ..config import DEFAULT_MODEL, data_dir, db_path
 from ..llm.ollama import OllamaProvider
 from ..log import setup_logging
 from ..memory.repository import Repository
+from .data import data_router, wipe_data_dir
 from .media import media_router
 from .notifications import notify_router
 from .plugins import plugin_router
@@ -38,7 +39,13 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        import asyncio
+        import contextlib
+
+        from ..retention import retention_loop
+
         app.state.session.begin()
+        retention = asyncio.create_task(retention_loop(app.state.repo))
         # The frontend surfaces recovery on its first /session fetch (no
         # notification subscriber is connected this early in startup).
         if app.state.notifications is not None:
@@ -56,6 +63,9 @@ def create_app(
                 app.state.voice = voice
             await app.state.voice.start()
         yield
+        retention.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await retention
         if app.state.voice is not None:
             await app.state.voice.stop()
         await app.state.workflows.stop()
@@ -68,6 +78,10 @@ def create_app(
         app.state.image_engine.unload()
         app.state.media_store.close()
         app.state.repo.close()
+        if getattr(app.state, "wipe_on_exit", False):
+            failed = wipe_data_dir()
+            if failed:
+                print(f"Corvus data wipe left: {', '.join(failed)}")
 
     app = FastAPI(title="Corvus", version=__version__, lifespan=lifespan)
 
@@ -170,7 +184,10 @@ def create_app(
         # readable via /logs.
         launch_token = secrets.token_hex(32)
         log.warning("corvus_token_missing_generated_fallback")
-    app.add_middleware(TokenAuthMiddleware, token=launch_token)
+    app.state.launch_token = launch_token
+    app.add_middleware(
+        TokenAuthMiddleware, token=launch_token, admin_token=os.environ.get("CORVUS_ADMIN_TOKEN"),
+    )
 
     # Tight CORS (SECURITY.md item 7): the packaged renderer loads from
     # file:// (Origin "null"); the Vite dev-server origins are allowed only
@@ -196,5 +213,6 @@ def create_app(
     app.include_router(plugin_router)
     app.include_router(rag_router)
     app.include_router(media_router)
+    app.include_router(data_router)
 
     return app

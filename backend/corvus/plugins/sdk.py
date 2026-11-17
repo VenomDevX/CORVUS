@@ -119,6 +119,7 @@ class PluginContext:
         self._registry.register(ActionSpec(
             full_name, description, parameters, risk, handler,
             confirm_prompt=confirm_prompt, category=f"plugin:{self._manifest.id}",
+            untrusted_output=True,  # plugin output is third-party content
         ))
         self.registered_actions.append(full_name)
 

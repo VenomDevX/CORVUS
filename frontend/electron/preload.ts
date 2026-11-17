@@ -11,7 +11,14 @@ const corvusBridge = {
   setTitlebarSymbolColor: (color: string): Promise<void> =>
     ipcRenderer.invoke("corvus:set-titlebar-symbol-color", color),
   getVersion: (): Promise<string> => ipcRenderer.invoke("corvus:get-version"),
-  getBackendToken: (): Promise<string> => ipcRenderer.invoke("corvus:get-backend-token"),
+  getBackendInfo: (): Promise<{ token: string; port: number }> =>
+    ipcRenderer.invoke("corvus:get-backend-info"),
+  installPlugin: (): Promise<unknown> => ipcRenderer.invoke("corvus:plugin-install"),
+  enablePlugin: (id: string): Promise<{ loaded: boolean; error: string | null; cancelled?: boolean }> =>
+    ipcRenderer.invoke("corvus:plugin-enable", id),
+  setPluginPermissions: (id: string, permissions: string[]): Promise<{ ok: boolean; cancelled?: boolean }> =>
+    ipcRenderer.invoke("corvus:plugin-set-permissions", id, permissions),
+  wipeData: (): Promise<{ ok: boolean; cancelled?: boolean }> => ipcRenderer.invoke("corvus:wipe-data"),
   toggleWidget: (): Promise<void> => ipcRenderer.invoke("corvus:toggle-widget"),
   showMain: (): Promise<void> => ipcRenderer.invoke("corvus:show-main"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("corvus:check-for-updates"),

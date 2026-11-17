@@ -1,9 +1,8 @@
 """REST routes: health, conversations, memories, settings, models, logs."""
 
-import os
 from datetime import datetime
 
-from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel
 
 from .. import __version__
@@ -32,9 +31,19 @@ class ApiKeyBody(BaseModel):
 
 @router.get("/health")
 def health() -> dict:
-    # pid lets the Electron launcher replace a stale backend (one left holding
-    # an old launch token); port lookups via netstat proved unreliable.
-    return {"status": "ok", "version": __version__, "app": "Corvus", "pid": os.getpid()}
+    return {"status": "ok", "version": __version__, "app": "Corvus"}
+
+
+@router.get("/handshake")
+def handshake(request: Request, nonce: str = Query(min_length=16, max_length=128)) -> dict:
+    """Prove this server holds the launch token without revealing it: the
+    Electron launcher sends a random nonce and checks HMAC-SHA256(token, nonce),
+    so a process squatting the port can't impersonate the backend."""
+    import hashlib
+    import hmac
+
+    mac = hmac.new(request.app.state.launch_token.encode(), nonce.encode(), hashlib.sha256)
+    return {"hmac": mac.hexdigest()}
 
 
 @router.post("/shutdown")
@@ -213,8 +222,8 @@ async def list_models(request: Request) -> dict:
 
 
 @router.get("/logs")
-def logs(limit: int = 200) -> list[dict]:
-    return tail_log(min(limit, 1000))
+def logs(limit: int = Query(200, ge=1, le=1000)) -> list[dict]:
+    return tail_log(limit)
 
 
 @router.get("/actions")
@@ -234,8 +243,8 @@ def list_actions(request: Request) -> list[dict]:
 
 
 @router.get("/actions/log")
-def action_log(request: Request, limit: int = 100) -> list[dict]:
-    return request.app.state.repo.list_actions(min(limit, 500))
+def action_log(request: Request, limit: int = Query(100, ge=1, le=500)) -> list[dict]:
+    return request.app.state.repo.list_actions(limit)
 
 
 # Upload hardening (SECURITY.md item 9): streamed to disk in chunks with a
@@ -244,17 +253,24 @@ def action_log(request: Request, limit: int = 100) -> list[dict]:
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 
+def safe_upload_name(raw: str | None) -> str:
+    """Reduce a client-supplied filename to [alnum ._- ], never a path."""
+    import re
+
+    name = "".join(c for c in (raw or "file") if c.isalnum() or c in "._- ")
+    name = re.sub(r"\.{2,}", ".", name)  # after filtering: "a.:.b" must not become "a..b"
+    name = name.strip(" .")  # Windows drops trailing dots/spaces; no dotfiles
+    return name or "file"
+
+
 @router.post("/upload")
 async def upload(file: UploadFile = File(...)) -> dict:
     """Save a user-attached file so agent actions (e.g. describe_image) can read
     it by path. Returned into the message so the model can act on it."""
     uploads = data_dir() / "uploads"
     uploads.mkdir(parents=True, exist_ok=True)
-    raw_name = (file.filename or "file").replace("..", "")
-    safe_name = "".join(c for c in raw_name if c.isalnum() or c in "._- ")
-    if safe_name.startswith("."):
-        safe_name = "file" + safe_name
-    dest = uploads / f"{datetime.now():%Y%m%d-%H%M%S}-{safe_name or 'file'}"
+    safe_name = safe_upload_name(file.filename)
+    dest = uploads / f"{datetime.now():%Y%m%d-%H%M%S}-{safe_name}"
 
     bytes_read = 0
     try:

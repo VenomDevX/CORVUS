@@ -49,7 +49,7 @@ def register_browser_actions(reg: Registry, browser: BrowserEngine, provider, ge
     reg.register(ActionSpec(
         "browser_navigate", "Open a URL in Corvus's browser and load the page.",
         _STR("url", "The URL or address to open"),
-        Risk.LOW, navigate, category="browser",
+        Risk.LOW, navigate, category="browser", untrusted_output=True,
     ))
 
     async def read_page() -> ActionResult:
@@ -62,6 +62,7 @@ def register_browser_actions(reg: Registry, browser: BrowserEngine, provider, ge
     reg.register(ActionSpec(
         "browser_read_page", "Read the text and links of the page currently open in the browser.",
         {"type": "object", "properties": {}}, Risk.SAFE, read_page, category="browser",
+        untrusted_output=True,
     ))
 
     async def summarize_page() -> ActionResult:
@@ -74,6 +75,7 @@ def register_browser_actions(reg: Registry, browser: BrowserEngine, provider, ge
     reg.register(ActionSpec(
         "browser_summarize_page", "Summarize the page currently open in the browser.",
         {"type": "object", "properties": {}}, Risk.SAFE, summarize_page, category="browser",
+        untrusted_output=True,
     ))
 
     async def click(text: str) -> ActionResult:
@@ -141,7 +143,7 @@ def register_browser_actions(reg: Registry, browser: BrowserEngine, provider, ge
         "browser_research", "Research a topic on the web: search, read the top results, and "
         "summarize an answer with sources.",
         _STR("topic", "The topic or question to research"),
-        Risk.LOW, research, category="browser",
+        Risk.LOW, research, category="browser", untrusted_output=True,
     ))
 
     async def open_login(site: str) -> ActionResult:
@@ -182,7 +184,9 @@ def register_vision_actions(reg: Registry, provider) -> None:
     from . import win
 
     async def describe_image(path: str) -> ActionResult:
-        p = Path(path).expanduser()
+        from .files import safe_path
+
+        p = safe_path(path)  # user-profile files only (uploads live under it)
         if not p.exists():
             return ActionResult(False, f"No image at {path}.")
         result = await vision.describe_image(provider, str(p))
@@ -203,6 +207,7 @@ def register_vision_actions(reg: Registry, provider) -> None:
         "model is installed, describe it.",
         _STR("path", "Path to the image file"),
         Risk.SAFE, describe_image, category="vision",
+        untrusted_output=True, reads_local_data=True,
     ))
 
     async def read_screen() -> ActionResult:
@@ -217,6 +222,7 @@ def register_vision_actions(reg: Registry, provider) -> None:
     reg.register(ActionSpec(
         "read_screen_text", "Take a screenshot of the screen and read the text on it (OCR).",
         {"type": "object", "properties": {}}, Risk.SAFE, read_screen, category="vision",
+        untrusted_output=True, reads_local_data=True,
     ))
 
     async def click_on_screen(target: str) -> ActionResult:

@@ -169,6 +169,9 @@ async def synthesize_edge(
     """Synthesize with an Edge neural voice; rate/volume in ±%, pitch in ±Hz."""
     import edge_tts
 
+    from .. import egress
+
+    egress.record("Microsoft Edge TTS", "voiceover", len(text), ["text to speak"])
     out = bytearray()
     for chunk in _batches(text):
         communicate = edge_tts.Communicate(

@@ -2,27 +2,15 @@ import { app, BrowserWindow, globalShortcut, nativeTheme, screen, shell, session
 import { randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import * as Sentry from "@sentry/electron/main";
 import { createTray, destroyTray } from "./tray";
 import { registerIpc } from "./ipc";
-import { startBackend, stopBackend } from "./backend-launcher";
+import { backendUrl, startBackend, stopBackend } from "./backend-launcher";
+import { contentSecurityPolicy, isAllowedNavigation } from "./guards";
 import { initAutoUpdate } from "./updater";
 
-Sentry.init({
-  dsn: "SENTRY_DSN_HERE",
-});
-
 const DEV_URL = "http://127.0.0.1:5173";
-const BACKEND_ORIGIN = "http://127.0.0.1:8765";
-
-function originOf(url: string): string | null {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return null;
-  }
-}
 const isDev = !app.isPackaged;
+const APP_INDEX = join(__dirname, "..", "dist", "index.html");
 
 let mainWindow: BrowserWindow | null = null;
 let widgetWindow: BrowserWindow | null = null;
@@ -32,6 +20,9 @@ let quitting = false;
 // Per-launch token every backend request must present (SECURITY.md item 1).
 // The spawned backend receives it via CORVUS_TOKEN; the renderer via IPC.
 const backendToken = randomBytes(32).toString("hex");
+// Second secret, never given to the renderer: the backend requires it for
+// consent routes (plugin approval, data wipe) that main gates with a dialog.
+const adminToken = randomBytes(32).toString("hex");
 
 function assetPath(...parts: string[]) {
   // dist-electron/ sits inside frontend/; design assets live at the repo root.
@@ -64,13 +55,13 @@ function applyNavigationGuards(win: BrowserWindow) {
   // Backend URLs carry ?token=…: never hand them to the system browser (the
   // token would land in its history/sync). A link to one is a file download.
   const leaveApp = (url: string) => {
-    if (url.startsWith(`${BACKEND_ORIGIN}/`)) win.webContents.downloadURL(url);
+    if (url.startsWith(`${backendUrl()}/`)) win.webContents.downloadURL(url);
     else if (/^https?:\/\//.test(url)) void shell.openExternal(url);
   };
   win.webContents.on("will-navigate", (event, url) => {
-    // Compare origins, not string prefixes: "http://127.0.0.1:5173.evil.com" must not pass.
-    const allowed = isDev ? originOf(url) === originOf(DEV_URL) : url.startsWith("file://");
-    if (!allowed) {
+    // Dev: same origin as Vite (not a string prefix). Packaged: exactly our
+    // own index.html - any other file:// page would get the preload bridge.
+    if (!isAllowedNavigation(url, isDev ? DEV_URL : null, APP_INDEX)) {
       event.preventDefault();
       leaveApp(url);
     }
@@ -112,7 +103,7 @@ export function toggleWidgetWindow() {
   widgetWindow.setMenuBarVisibility(false);
   applyNavigationGuards(widgetWindow);
   if (isDev) void widgetWindow.loadURL(`${DEV_URL}/#/widget`);
-  else void widgetWindow.loadFile(join(__dirname, "..", "dist", "index.html"), { hash: "/widget" });
+  else void widgetWindow.loadFile(APP_INDEX, { hash: "/widget" });
   widgetWindow.on("moved", () => {
     const [x, y] = widgetWindow?.getPosition() ?? [];
     if (x !== undefined) {
@@ -157,7 +148,7 @@ function createOverlayWindow() {
   if (isDev) {
     void overlayWindow.loadURL(`${DEV_URL}/#/overlay`);
   } else {
-    void overlayWindow.loadFile(join(__dirname, "..", "dist", "index.html"), { hash: "/overlay" });
+    void overlayWindow.loadFile(APP_INDEX, { hash: "/overlay" });
   }
 
   overlayWindow.on("closed", () => {
@@ -197,7 +188,7 @@ function createWindow() {
   if (isDev) {
     void mainWindow.loadURL(DEV_URL);
   } else {
-    void mainWindow.loadFile(join(__dirname, "..", "dist", "index.html"));
+    void mainWindow.loadFile(APP_INDEX);
   }
 
   // Close-to-tray: Corvus keeps running in the background.
@@ -224,14 +215,12 @@ if (!gotLock) {
       callback({
         responseHeaders: {
           ...details.responseHeaders,
-          "Content-Security-Policy": [
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:8765; media-src 'self' blob: http://127.0.0.1:8765; connect-src 'self' http://127.0.0.1:8765 ws://127.0.0.1:8765 ws://localhost:5173 http://localhost:5173 http://127.0.0.1:11434 http://localhost:11434",
-          ],
+          "Content-Security-Policy": [contentSecurityPolicy(isDev)],
         },
       });
     });
 
-    registerIpc(() => mainWindow, backendToken, {
+    registerIpc(() => mainWindow, backendToken, adminToken, {
       toggleWidget: toggleWidgetWindow,
       showMain: showMainWindow,
     });
@@ -254,7 +243,7 @@ if (!gotLock) {
       else showMainWindow();
     });
     if (!altSpaceOk) console.warn("Alt+Space is taken by another app; Ctrl+Shift+C still works.");
-    void startBackend(isDev, backendToken);
+    void startBackend(isDev, backendToken, adminToken);
     void initAutoUpdate(() => mainWindow, isDev);
   });
 

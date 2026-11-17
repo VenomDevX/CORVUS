@@ -26,7 +26,7 @@ def test_delete_confirmation_names_the_target():
     reg = build_default_registry()
     prompt = reg.get("delete_item").describe_confirmation({"path": "report.docx"})
     assert "report.docx" in prompt
-    assert "permanently delete" in prompt.lower()
+    assert "recycle bin" in prompt.lower()
 
 
 def test_risk_tiers_gate_confirmation():

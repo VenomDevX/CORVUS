@@ -20,6 +20,15 @@ def _rows(cursor: sqlite3.Cursor) -> list[dict[str, Any]]:
     return [dict(row) for row in cursor.fetchall()]
 
 
+def _decrypted(row: dict[str, Any] | None, *fields: str) -> dict[str, Any] | None:
+    """Decrypt the named columns in place (legacy plaintext passes through)."""
+    if row is not None:
+        for name in fields:
+            if row.get(name) is not None:
+                row[name] = crypto.decrypt(row[name])
+    return row
+
+
 def _serialized(cls):
     """Run every public method under the instance's lock.
 
@@ -178,16 +187,18 @@ class Repository:
         cur = self.conn.execute(
             "INSERT INTO action_log (conversation_id, action, arguments, outcome, message) "
             "VALUES (?, ?, ?, ?, ?) RETURNING *",
-            (conversation_id, action, json.dumps(arguments), outcome, message),
+            (conversation_id, action, crypto.encrypt(json.dumps(arguments)), outcome,
+             crypto.encrypt(message)),
         )
-        row = dict(cur.fetchone())
+        row = _decrypted(dict(cur.fetchone()), "arguments", "message")
         self.conn.commit()
         return row
 
     def list_actions(self, limit: int = 100) -> list[dict[str, Any]]:
-        return _rows(
+        rows = _rows(
             self.conn.execute("SELECT * FROM action_log ORDER BY id DESC LIMIT ?", (limit,))
         )
+        return [_decrypted(r, "arguments", "message") for r in rows]
 
     # -- voiceovers (Voice Studio) -------------------------------------------
 
@@ -198,19 +209,20 @@ class Repository:
         cur = self.conn.execute(
             "INSERT INTO voiceovers (text, engine, voice, rate, pitch, volume, filename)"
             " VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *",
-            (text, engine, voice, rate, pitch, volume, filename),
+            (crypto.encrypt(text), engine, voice, rate, pitch, volume, filename),
         )
-        row = dict(cur.fetchone())
+        row = _decrypted(dict(cur.fetchone()), "text")
         self.conn.commit()
         return row
 
     def list_voiceovers(self) -> list[dict[str, Any]]:
-        return _rows(self.conn.execute("SELECT * FROM voiceovers ORDER BY id DESC"))
+        rows = _rows(self.conn.execute("SELECT * FROM voiceovers ORDER BY id DESC"))
+        return [_decrypted(r, "text") for r in rows]
 
     def get_voiceover(self, voiceover_id: int) -> dict[str, Any] | None:
         cur = self.conn.execute("SELECT * FROM voiceovers WHERE id = ?", (voiceover_id,))
         row = cur.fetchone()
-        return dict(row) if row else None
+        return _decrypted(dict(row), "text") if row else None
 
     def delete_voiceover(self, voiceover_id: int) -> bool:
         cur = self.conn.execute("DELETE FROM voiceovers WHERE id = ?", (voiceover_id,))
@@ -222,16 +234,17 @@ class Repository:
     def add_reminder(self, text: str, kind: str, fire_at: str) -> dict[str, Any]:
         cur = self.conn.execute(
             "INSERT INTO reminders (text, kind, fire_at) VALUES (?, ?, ?) RETURNING *",
-            (text, kind, fire_at),
+            (crypto.encrypt(text), kind, fire_at),
         )
-        row = dict(cur.fetchone())
+        row = _decrypted(dict(cur.fetchone()), "text")
         self.conn.commit()
         return row
 
     def pending_reminders(self) -> list[dict[str, Any]]:
-        return _rows(
+        rows = _rows(
             self.conn.execute("SELECT * FROM reminders WHERE fired = 0 ORDER BY fire_at")
         )
+        return [_decrypted(r, "text") for r in rows]
 
     def mark_reminder_fired(self, reminder_id: int) -> None:
         self.conn.execute("UPDATE reminders SET fired = 1 WHERE id = ?", (reminder_id,))
@@ -254,19 +267,21 @@ class Repository:
             "ON CONFLICT(name) DO UPDATE SET steps=excluded.steps, "
             "trigger_type=excluded.trigger_type, trigger_config=excluded.trigger_config "
             "RETURNING *",
-            (name, json.dumps(steps), trigger_type, json.dumps(trigger_config or {})),
+            (name, crypto.encrypt(json.dumps(steps)), trigger_type,
+             crypto.encrypt(json.dumps(trigger_config or {}))),
         )
-        row = dict(cur.fetchone())
+        row = _decrypted(dict(cur.fetchone()), "steps", "trigger_config")
         self.conn.commit()
         return row
 
     def list_workflows(self) -> list[dict[str, Any]]:
-        return _rows(self.conn.execute("SELECT * FROM workflows ORDER BY name"))
+        rows = _rows(self.conn.execute("SELECT * FROM workflows ORDER BY name"))
+        return [_decrypted(r, "steps", "trigger_config") for r in rows]
 
     def get_workflow(self, name: str) -> dict[str, Any] | None:
         cur = self.conn.execute("SELECT * FROM workflows WHERE name = ?", (name,))
         row = cur.fetchone()
-        return dict(row) if row else None
+        return _decrypted(dict(row), "steps", "trigger_config") if row else None
 
     def delete_workflow(self, name: str) -> bool:
         cur = self.conn.execute("DELETE FROM workflows WHERE name = ?", (name,))

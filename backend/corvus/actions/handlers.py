@@ -42,13 +42,16 @@ def register_all(reg: Registry) -> None:
 
     def close_app(app: str) -> ActionResult:
         target = win.APP_TARGETS.get(app.lower().strip(), app)
-        win.close_app(target)
-        return ActionResult(True, f"Closed {app}.")
+        if not win.close_app(target):
+            return ActionResult(False, f"{app} isn't running.")
+        return ActionResult(True, f"Asked {app} to close.")
 
     reg.register(ActionSpec(
         "close_app", "Close a running application by name.",
         _str_param("app", "Application name to close"),
-        Risk.LOW, close_app, category="apps",
+        Risk.MEDIUM, close_app,
+        confirm_prompt=lambda a: f"Close {a.get('app')}? Unsaved work in it may be lost.",
+        category="apps",
     ))
 
     def open_folder(folder: str) -> ActionResult:
@@ -100,6 +103,7 @@ def register_all(reg: Registry) -> None:
 
     # -- Audio / display ------------------------------------------------------
     def volume(direction: str, steps: int = 5) -> ActionResult:
+        steps = max(1, min(50, int(steps)))
         if direction == "up":
             win.volume_up(steps)
             return ActionResult(True, "Turned the volume up.")
@@ -110,7 +114,8 @@ def register_all(reg: Registry) -> None:
         "change_volume", "Turn the system volume up or down.",
         {"type": "object", "properties": {
             "direction": {"type": "string", "enum": ["up", "down"]},
-            "steps": {"type": "integer", "description": "Number of 2%% steps", "default": 5},
+            "steps": {"type": "integer", "description": "Number of 2% steps",
+                      "minimum": 1, "maximum": 50, "default": 5},
         }, "required": ["direction"]},
         Risk.LOW, volume, category="audio",
     ))
@@ -225,7 +230,7 @@ def register_all(reg: Registry) -> None:
             "query": {"type": "string"},
             "folder": {"type": "string", "description": "downloads/documents/desktop or a path", "default": "documents"},
         }, "required": ["query"]},
-        Risk.SAFE, search_files, category="search", blocking=True,
+        Risk.SAFE, search_files, category="search", blocking=True, reads_local_data=True,
     ))
 
     # -- File management ------------------------------------------------------
@@ -236,7 +241,7 @@ def register_all(reg: Registry) -> None:
     reg.register(ActionSpec(
         "list_folder", "List the contents of a folder.",
         _str_param("path", "Folder path or name"),
-        Risk.SAFE, list_folder, category="files",
+        Risk.SAFE, list_folder, category="files", reads_local_data=True,
     ))
 
     def create_folder(path: str) -> ActionResult:
@@ -292,13 +297,13 @@ def register_all(reg: Registry) -> None:
 
     def delete_item(path: str) -> ActionResult:
         what = files.delete(path)
-        return ActionResult(True, f"Deleted {what}.")
+        return ActionResult(True, f"Moved {what} to the Recycle Bin.")
 
     reg.register(ActionSpec(
-        "delete_item", "Permanently delete a file or folder.",
+        "delete_item", "Delete a file or folder (moves it to the Recycle Bin).",
         _str_param("path", "Path to delete"),
-        Risk.HIGH, delete_item,
-        confirm_prompt=lambda a: f"This will permanently delete “{a.get('path')}”. Continue?",
+        Risk.MEDIUM, delete_item,
+        confirm_prompt=lambda a: f"Move “{a.get('path')}” to the Recycle Bin? You can restore it from there.",
         category="files",
     ))
 
@@ -378,6 +383,7 @@ def register_all(reg: Registry) -> None:
             "you to read or paste what they copied. NEVER use for greetings or general questions."
         ),
         _NO_PARAMS, Risk.SAFE, get_clipboard, category="clipboard",
+        untrusted_output=True, reads_local_data=True,
     ))
 
     def set_clipboard(text: str) -> ActionResult:

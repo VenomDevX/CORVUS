@@ -1,6 +1,7 @@
 """Application-level encryption for sensitive database fields."""
 
 import ctypes
+import os
 import threading
 import time
 from ctypes import wintypes
@@ -53,7 +54,11 @@ def _get_fernet() -> Fernet:
             structlog.get_logger("corvus").error("encryption_key_unreadable", backup=backup.name)
 
     key = Fernet.generate_key()
-    key_path.write_bytes(_encrypt_dpapi(key))
+    # Atomic: a crash mid-write must never leave a truncated key behind
+    # (that would make every encrypted row unreadable).
+    tmp = key_path.with_suffix(".tmp")
+    tmp.write_bytes(_encrypt_dpapi(key))
+    os.replace(tmp, key_path)
     return Fernet(key)
 
 

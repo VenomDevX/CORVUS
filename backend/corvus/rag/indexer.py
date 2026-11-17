@@ -357,5 +357,7 @@ def register_rag_actions(registry, index: DocsIndex) -> None:
             handler=search_documents,
             category="documents",
             blocking=True,  # sync httpx embedding call, up to 120s on a cold model
+            untrusted_output=True,
+            reads_local_data=True,
         )
     )

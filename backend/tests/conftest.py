@@ -16,6 +16,11 @@ def pytest_configure(config):
     _tmp = tempfile.mkdtemp(prefix="corvus-test-")
     os.environ["CORVUS_DATA_DIR"] = _tmp
     os.environ["CORVUS_TOKEN"] = "test-token"
+    # Reuse the machine's Playwright browser cache instead of downloading
+    # Chromium into the fresh temp data dir every run.
+    cache = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
+    if os.path.isdir(cache):
+        os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", cache)
 
 
 from corvus.llm.base import Delta, Message, TurnResult  # noqa: E402

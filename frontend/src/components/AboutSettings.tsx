@@ -84,7 +84,7 @@ export function AboutSettings() {
             href="#" 
             onClick={(e) => {
               e.preventDefault();
-              window.corvus?.openExternal("https://github.com/corvus-ai/corvus");
+              window.corvus?.openExternal("https://github.com/VenomDevX/CORVUS");
             }}
             className="text-fg hover:underline transition-all"
           >

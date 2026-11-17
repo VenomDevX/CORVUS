@@ -7,8 +7,9 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Least privilege: only the tag-release job gets write access.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-and-test:
@@ -16,62 +17,96 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
 
       - name: Setup Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
 
-      - name: Install Python Dependencies & Build Backend
+      - name: Install Python Dependencies
         run: |
           cd backend
           python -m venv .venv
           .venv\Scripts\Activate.ps1
-          pip install -e .[dev]
-          pip install pyinstaller
+          pip install -e .[dev,build]
         shell: powershell
 
       - name: Install Node Dependencies
-        run: npm install
-        
+        run: npm ci
+
       - name: Install Frontend Dependencies
-        run: |
-          cd frontend
-          npm install
+        run: npm ci
+        working-directory: frontend
+
+      - name: Naming guard
+        run: npm run guard
+
+      - name: Type check
+        run: npm run lint
+
+      # Root `npm test`: naming guard + vitest (renderer + electron guards) + pytest.
+      - name: Unit and security tests
+        run: npm test
 
       - name: Install Playwright Browsers
-        run: |
-          cd frontend
-          npx playwright install --with-deps
+        run: npx playwright install --with-deps
+        working-directory: frontend
 
       - name: Build Electron main for Playwright
-        run: |
-          cd frontend
-          npm run build:electron
+        run: npm run build
+        working-directory: frontend
 
       - name: Run E2E Tests
-        run: |
-          cd frontend
-          npx playwright test
+        run: npx playwright test
+        working-directory: frontend
+        env:
+          CORVUS_TEST_PROVIDER: scripted
 
       - name: Build Windows Executable
         run: npm run dist
 
-      - name: Create Draft Release
+      - name: Installer smoke test
+        run: ./scripts/smoke-installer.ps1
+        shell: powershell
+
+      - name: Upload installer
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v3
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer
+          # The exe, its blockmap and latest.yml must come from the same build:
+          # electron-updater verifies the exe against the hash in latest.yml.
+          path: |
+            dist-installer/*.exe
+            dist-installer/*.exe.blockmap
+            dist-installer/latest.yml
+          if-no-files-found: error
+
+  release:
+    needs: build-and-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download installer
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: installer
+          path: dist-installer
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           tag_name: ${{ github.ref_name }}
           name: Corvus ${{ github.ref_name }}
           draft: true
-          # The exe, its blockmap and latest.yml must come from the same build:
-          # electron-updater verifies the exe against the hash in latest.yml.
           files: |
             dist-installer/*.exe
             dist-installer/*.exe.blockmap

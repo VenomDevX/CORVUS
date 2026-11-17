@@ -47,6 +47,12 @@ class ActionSpec:
     # run it on a worker thread so chat, voice and confirmations keep flowing.
     # Opt-in, since some handlers touch the event loop and must stay on it.
     blocking: bool = False
+    # Result carries outside-world content (web page, OCR, document, clipboard):
+    # once it's in the turn, every later non-safe action must confirm (taint).
+    untrusted_output: bool = False
+    # Result carries the user's local data (screen, files, documents,
+    # clipboard) to the model - with a cloud provider that leaves the machine.
+    reads_local_data: bool = False
 
     @property
     def requires_confirmation(self) -> bool:
@@ -67,12 +73,15 @@ class ActionSpec:
                            for p in inspect.signature(self.handler).parameters.values())
         unknown = [] if takes_kwargs else sorted(set(args) - set(props))
         missing = sorted(set(self.parameters.get("required", [])) - set(args))
-        if not (unknown or missing):
-            return None
-        problems = "; ".join(
-            p for p in (unknown and f"unknown {', '.join(unknown)}",
-                        missing and f"missing {', '.join(missing)}") if p
-        )
+        if unknown or missing:
+            problems = "; ".join(
+                p for p in (unknown and f"unknown {', '.join(unknown)}",
+                            missing and f"missing {', '.join(missing)}") if p
+            )
+        else:
+            problems = _schema_problem(self.parameters, args)
+            if problems is None:
+                return None
         return (f"Invalid arguments for {self.name} ({problems}). "
                 f"Valid parameters: {', '.join(props) or 'none'}.")
 
@@ -86,6 +95,21 @@ class ActionSpec:
                 "parameters": self.parameters,
             },
         }
+
+
+def _schema_problem(schema: dict[str, Any], args: dict[str, Any]) -> str | None:
+    """First JSON-schema violation (types, enums, ranges) as model-readable text."""
+    from jsonschema import Draft202012Validator
+    from jsonschema.exceptions import SchemaError
+
+    try:
+        error = next(iter(Draft202012Validator(schema).iter_errors(args)), None)
+    except SchemaError:
+        return None  # a malformed plugin schema: let the handler decide
+    if error is None:
+        return None
+    where = ".".join(str(p) for p in error.absolute_path) or "arguments"
+    return f"{where}: {error.message}"
 
 
 class Registry:

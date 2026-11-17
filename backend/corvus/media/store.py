@@ -6,6 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 
+from .. import crypto
 from ..config import data_dir
 
 KINDS = ("image", "video", "sfx")
@@ -42,7 +43,7 @@ class MediaStore:
         cur = self.conn.execute(
             "INSERT INTO media_generations (kind, prompt, params, filename) VALUES (?, ?, ?, '')"
             " RETURNING id",
-            (kind, prompt, json.dumps(params)),
+            (kind, crypto.encrypt(prompt), crypto.encrypt(json.dumps(params))),
         )
         row_id = cur.fetchone()["id"]
         filename = f"{kind}-{row_id}.{_EXT[kind]}"
@@ -88,7 +89,8 @@ class MediaStore:
 
     def _out(self, row: sqlite3.Row) -> dict:
         d = dict(row)
-        d["params"] = json.loads(d.get("params") or "{}")
+        d["prompt"] = crypto.decrypt(d["prompt"])
+        d["params"] = json.loads(crypto.decrypt(d.get("params") or "") or "{}")
         return d
 
     def close(self) -> None:

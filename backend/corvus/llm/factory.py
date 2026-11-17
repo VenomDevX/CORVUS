@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 import structlog
 
+from .. import egress
 from .anthropic import AnthropicProvider
 from .base import Delta, Message
 from .gemini import GeminiProvider
@@ -58,6 +59,14 @@ def build_provider(name: str, vault: KeyVault):
     raise ValueError(f"unknown provider: {name}")
 
 
+def cloud_label(provider) -> str | None:
+    """Display name of the active provider when it is off-machine, else None."""
+    name = getattr(provider, "current_name", None)
+    if not name or name == "ollama" or name not in PROVIDERS:
+        return None
+    return PROVIDERS[name].label
+
+
 def model_setting_key(provider: str) -> str:
     return f"model:{provider}"
 
@@ -74,9 +83,18 @@ class ProviderManager:
         self.reload()
 
     def reload(self) -> None:
+        import os
+        import sys
+
         name = self.repo.get_setting("provider") or "ollama"
         if name not in PROVIDERS:
             name = "ollama"
+        if os.environ.get("CORVUS_TEST_PROVIDER") == "scripted" and not getattr(sys, "frozen", False):
+            from .scripted import ScriptedProvider
+
+            self._delegate = ScriptedProvider()  # e2e tests only, never in a packaged build
+            log.warning("provider_scripted_for_tests")
+            return
         self._delegate = build_provider(name, self.vault)
         log.info("provider_active", provider=name)
 
@@ -89,14 +107,24 @@ class ProviderManager:
         return self.repo.get_setting(model_setting_key(name)) or PROVIDERS[name].default_model
 
     # -- delegated LLMProvider surface ---------------------------------------
+    # Every call to a cloud provider is recorded in the session egress log
+    # (size + kinds of content, never the text) for the Privacy view.
+
+    def _record(self, kind: str, messages, model: str) -> None:
+        label = cloud_label(self)
+        if label:
+            egress.record_messages(label, kind, messages, model)
 
     def stream_chat(self, messages: list[Message], model: str) -> AsyncIterator[Delta]:
+        self._record("chat", messages, model)
         return self._delegate.stream_chat(messages, model)
 
     def stream_chat_with_tools(self, messages, model, tools) -> AsyncIterator[Delta]:
+        self._record("chat", messages, model)
         return self._delegate.stream_chat_with_tools(messages, model, tools)
 
     async def complete(self, messages: list[Message], model: str) -> str:
+        self._record("background (memory)", messages, model)
         return await self._delegate.complete(messages, model)
 
     async def list_models(self) -> list[str]:
@@ -104,5 +132,10 @@ class ProviderManager:
 
     async def describe_image(self, image_path: str, model: str) -> str:
         if hasattr(self._delegate, "describe_image"):
+            label = cloud_label(self)
+            if label:
+                import os
+
+                egress.record(label, "image", os.path.getsize(image_path), ["image"], model)
             return await self._delegate.describe_image(image_path, model)
         raise RuntimeError("the active provider can't describe images")

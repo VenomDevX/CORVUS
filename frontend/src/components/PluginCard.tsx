@@ -18,6 +18,7 @@ export function PluginCard({ plugin, onChange }: { plugin: Plugin; onChange: () 
   }
 
   async function toggleEnabled() {
+    // Enabling opens a native consent dialog (main process); cancel is a no-op.
     if (plugin.enabled) await api.disablePlugin(plugin.id);
     else await api.enablePlugin(plugin.id);
     onChange();

@@ -87,11 +87,29 @@ class PluginManager:
         return {p for p in raw.split(",") if p}
 
     def code_hash(self, manifest: PluginManifest) -> str | None:
-        """SHA-256 of all Python files in the plugin directory."""
-        if not manifest.path.exists():
+        """SHA-256 over every file in the plugin (relative path + bytes).
+
+        Covers manifest.json (entry, permissions), data files and renames, not
+        just *.py contents - anything that can change what runs is approved.
+        """
+        if manifest.path is None or not manifest.path.exists():
             return None
         hasher = hashlib.sha256()
-        # Sort files to ensure deterministic hashing order
+        files = sorted(
+            (f for f in manifest.path.rglob("*")
+             if f.is_file() and "__pycache__" not in f.relative_to(manifest.path).parts),
+            key=lambda f: f.relative_to(manifest.path).as_posix(),
+        )
+        for f in files:
+            hasher.update(f.relative_to(manifest.path).as_posix().encode("utf-8") + b"\0")
+            hasher.update(f.read_bytes())
+            hasher.update(b"\0")
+        return hasher.hexdigest()
+
+    @staticmethod
+    def _legacy_hash(manifest: PluginManifest) -> str:
+        """The pre-0.5 approval hash (*.py contents only), for migration."""
+        hasher = hashlib.sha256()
         for py_file in sorted(manifest.path.rglob("*.py")):
             hasher.update(py_file.read_bytes())
         return hasher.hexdigest()
@@ -157,6 +175,11 @@ class PluginManager:
         # update, tampering) requires an explicit re-enable to re-approve.
         current = self.code_hash(manifest)
         approved = self.approved_hash(manifest.id)
+        if approved and approved != current and approved == self._legacy_hash(manifest):
+            # Approved under the old .py-only hash and the code is unchanged:
+            # re-pin to the full-tree hash instead of forcing a re-approval.
+            self.repo.set_setting(_hash_key(manifest.id), current)
+            approved = current
         if approved != current:
             self.errors[manifest.id] = (
                 "plugin code changed since it was approved — disable and re-enable "
@@ -201,7 +224,8 @@ class PluginManager:
             raise PluginError("plugin unpacks too large (8 MB max)")
         for info in files:
             p = PurePosixPath(info.filename.replace("\\", "/"))
-            if p.is_absolute() or ".." in p.parts or (p.parts and ":" in p.parts[0]):
+            # ":" anywhere is a drive or an NTFS alternate data stream; NUL truncates.
+            if p.is_absolute() or ".." in p.parts or any(":" in s or "\x00" in s for s in p.parts):
                 raise PluginError(f"unsafe path in archive: {info.filename}")
 
         # Locate manifest.json at the root or one folder deep (GitHub-style zip).

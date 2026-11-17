@@ -9,6 +9,15 @@ from ..workflows.engine import WorkflowEngine, WorkflowError
 from .registry import ActionResult, ActionSpec, Registry, Risk
 
 
+def _describe_create(args: dict) -> str:
+    steps = args.get("steps") or []
+    names = ", ".join(str(s.get("action")) for s in steps if isinstance(s, dict)) or "no steps"
+    trigger = args.get("trigger") or "manual"
+    when = {"schedule": f" every day at {args.get('at')}",
+            "voice": f" when you say “{args.get('phrase')}”"}.get(trigger, " when you run it")
+    return f"Save workflow “{args.get('name')}” that runs {names}{when}?"
+
+
 def register_workflow_actions(reg: Registry, engine: WorkflowEngine) -> None:
     async def create_workflow(name: str, steps: list, trigger: str = "manual",
                               at: str | None = None, phrase: str | None = None) -> ActionResult:
@@ -39,7 +48,8 @@ def register_workflow_actions(reg: Registry, engine: WorkflowEngine) -> None:
             "at": {"type": "string", "description": "HH:MM for a scheduled workflow"},
             "phrase": {"type": "string", "description": "Spoken phrase for a voice workflow"},
         }, "required": ["name", "steps"]},
-        Risk.LOW, create_workflow, category="workflows",
+        Risk.MEDIUM, create_workflow, category="workflows",
+        confirm_prompt=lambda a: _describe_create(a),
     ))
 
     async def run_workflow(name: str) -> ActionResult:
@@ -74,5 +84,6 @@ def register_workflow_actions(reg: Registry, engine: WorkflowEngine) -> None:
     reg.register(ActionSpec(
         "delete_workflow", "Delete a saved workflow by name.",
         {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
-        Risk.LOW, delete_workflow, category="workflows",
+        Risk.MEDIUM, delete_workflow, category="workflows",
+        confirm_prompt=lambda a: f"Delete the saved workflow “{a.get('name')}”?",
     ))

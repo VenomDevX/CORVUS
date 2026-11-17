@@ -1,28 +1,59 @@
 /**
- * Typed client for the Corvus backend (FastAPI on 127.0.0.1:8765).
+ * Typed client for the Corvus backend (FastAPI on a random loopback port).
  * REST for CRUD, one WebSocket per in-flight generation for token streaming.
  */
 
-const BACKEND_HTTP = "http://127.0.0.1:8765";
-const BACKEND_WS = "ws://127.0.0.1:8765";
-
-/**
- * Per-launch auth token the backend enforces (SECURITY.md item 1). Fetched
- * once from the main process via the preload bridge; empty outside Electron
- * (vitest, plain browser against a manual dev backend, which doesn't enforce).
- */
+// Outside Electron (vitest, plain browser against a manual dev backend) the
+// default dev port is used; inside it, the main process supplies the port it
+// verified by handshake (SECURITY.md item 1).
+const DEV_PORT = 8765;
+let backendPort = DEV_PORT;
 let backendToken = "";
-let tokenFetch: Promise<string> | null = null;
+let infoFetch: Promise<string> | null = null;
+
+const httpBase = () => `http://127.0.0.1:${backendPort}`;
+const wsBase = () => `ws://127.0.0.1:${backendPort}`;
 
 function ensureToken(): Promise<string> {
-  tokenFetch ??= (window.corvus?.getBackendToken?.() ?? Promise.resolve("")).then(
-    (token) => (backendToken = token ?? ""),
+  const bridge = window.corvus?.getBackendInfo;
+  infoFetch ??= (bridge ? bridge() : Promise.resolve({ token: "", port: DEV_PORT })).then(
+    (info) => {
+      backendToken = info?.token ?? "";
+      backendPort = info?.port || DEV_PORT;
+      return backendToken;
+    },
     () => "",
   );
-  return tokenFetch;
+  return infoFetch;
 }
+/** The backend restarts on a new port after a crash or data wipe: drop the
+ * cached port so the next call asks the main process again. */
+function forgetBackend() {
+  infoFetch = null;
+}
+/** The verified backend port (for display). */
+export const currentBackendPort = () => backendPort;
+
 // Warm the cache immediately so WebSocket URLs (built synchronously) have it.
 void ensureToken();
+
+// Backend died: its port may be re-bound by anything. Port 0 fails every
+// request until the respawned backend passes the handshake and we re-fetch.
+window.corvus?.onBackendLost?.(() => {
+  backendPort = 0;
+  forgetBackend();
+  void ensureToken();
+});
+
+async function backendFetch(path: string, init?: RequestInit): Promise<Response> {
+  await ensureToken();
+  try {
+    return await fetch(`${httpBase()}${path}`, init);
+  } catch (err) {
+    forgetBackend();
+    throw err;
+  }
+}
 
 /** `?token=…` suffix for WebSocket URLs and plain-href endpoints. */
 function tokenQuery(): string {
@@ -91,7 +122,7 @@ export interface LogEntry {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = await ensureToken();
-  const res = await fetch(`${BACKEND_HTTP}${path}`, {
+  const res = await backendFetch(path, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -115,7 +146,7 @@ export const api = {
     request<ChatMessage[]>(`/conversations/${conversationId}/messages`),
   listMemories: () => request<Memory[]>("/memories"),
   deleteMemory: (id: number) => request<{ ok: boolean }>(`/memories/${id}`, { method: "DELETE" }),
-  exportMemoriesUrl: () => `${BACKEND_HTTP}/memories/export${tokenQuery()}`,
+  exportMemoriesUrl: () => `${httpBase()}/memories/export${tokenQuery()}`,
   getSettings: () => request<BackendSettings>("/settings"),
   systemSpecs: () => request<SystemSpecs>("/system/specs"),
   updateSettings: (settings: Partial<BackendSettings>) =>
@@ -131,7 +162,7 @@ export const api = {
     const token = await ensureToken();
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${BACKEND_HTTP}/upload`, {
+    const res = await backendFetch("/upload", {
       method: "POST",
       body: form,
       headers: token ? { "X-Corvus-Token": token } : undefined,
@@ -148,40 +179,27 @@ export const api = {
   deleteWorkflow: (name: string) =>
     request<{ ok: boolean }>(`/workflows/${encodeURIComponent(name)}`, { method: "DELETE" }),
   listPlugins: () => request<Plugin[]>("/plugins"),
-  enablePlugin: (id: string) =>
-    request<{ loaded: boolean; error: string | null }>(`/plugins/${id}/enable`, { method: "POST" }),
+  // Enabling, granting and installing go through the main process, which
+  // shows a native consent dialog the renderer can't fake (SECURITY.md item 4).
+  enablePlugin: async (id: string) => {
+    if (!window.corvus) throw new Error("plugins can only be enabled in the Corvus app");
+    return window.corvus.enablePlugin(id);
+  },
   disablePlugin: (id: string) => request<{ ok: boolean }>(`/plugins/${id}/disable`, { method: "POST" }),
-  installPlugin: async (file: File): Promise<Plugin> => {
-    const token = await ensureToken();
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch(`${BACKEND_HTTP}/plugins/install`, {
-      method: "POST",
-      body: form,
-      headers: token ? { "X-Corvus-Token": token } : undefined,
-    });
-    if (!res.ok) {
-      let detail = `install failed (${res.status})`;
-      try {
-        const body = (await res.json()) as { detail?: string };
-        if (body.detail) detail = body.detail;
-      } catch {
-        /* keep generic message */
-      }
-      throw new Error(detail);
-    }
-    return res.json();
+  /** Opens a native file picker; null when the user cancels. */
+  installPlugin: async (): Promise<Plugin | null> => {
+    if (!window.corvus) throw new Error("plugins can only be installed in the Corvus app");
+    return (await window.corvus.installPlugin()) as Plugin | null;
   },
   uninstallPlugin: (id: string) =>
     request<{ ok: boolean }>(`/plugins/${id}`, { method: "DELETE" }),
   listReminders: () => request<Reminder[]>("/reminders"),
   cancelReminder: (id: number) =>
     request<{ ok: boolean }>(`/reminders/${id}`, { method: "DELETE" }),
-  setPluginPermissions: (id: string, permissions: string[]) =>
-    request<{ ok: boolean; granted: string[] }>(`/plugins/${id}/permissions`, {
-      method: "PUT",
-      body: JSON.stringify({ permissions }),
-    }),
+  setPluginPermissions: async (id: string, permissions: string[]) => {
+    if (!window.corvus) throw new Error("plugin permissions can only be changed in the Corvus app");
+    return window.corvus.setPluginPermissions(id, permissions);
+  },
   studioVoices: () => request<StudioVoices>("/studio/voices"),
   generateVoiceover: (body: GenerateVoiceoverBody) =>
     request<Voiceover>("/studio/generate", { method: "POST", body: JSON.stringify(body) }),
@@ -189,10 +207,10 @@ export const api = {
   deleteVoiceover: (id: number) =>
     request<{ ok: boolean }>(`/studio/generations/${id}`, { method: "DELETE" }),
   voiceoverAudioUrl: (id: number) =>
-    `${BACKEND_HTTP}/studio/generations/${id}/audio${tokenQuery()}`,
+    `${httpBase()}/studio/generations/${id}/audio${tokenQuery()}`,
   previewVoice: async (engine: VoiceEngine, voice: string): Promise<Blob> => {
     const token = await ensureToken();
-    const res = await fetch(`${BACKEND_HTTP}/studio/preview`, {
+    const res = await backendFetch("/studio/preview", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -233,7 +251,7 @@ export const api = {
     request<MediaGeneration[]>(`/media/generations?kind=${kind}`),
   deleteMedia: (id: number) =>
     request<{ ok: boolean }>(`/media/generations/${id}`, { method: "DELETE" }),
-  mediaFileUrl: (id: number) => `${BACKEND_HTTP}/media/generations/${id}/file${tokenQuery()}`,
+  mediaFileUrl: (id: number) => `${httpBase()}/media/generations/${id}/file${tokenQuery()}`,
   ragStatus: () => request<RagStatus>("/rag/status"),
   ragIndex: (path: string) =>
     request<{ ok: boolean; files: number; added: number; skipped: number; removed: number }>(
@@ -250,7 +268,63 @@ export const api = {
     }),
   clearProviderKey: (provider: string) =>
     request<{ ok: boolean }>(`/providers/key/${provider}`, { method: "DELETE" }),
+  egress: () => request<{ cloud_provider: string | null; entries: EgressEntry[] }>("/egress"),
+  retention: () => request<Retention>("/data/retention"),
+  setRetention: (values: Partial<Retention>) =>
+    request<Retention>("/data/retention", { method: "PATCH", body: JSON.stringify(values) }),
+  exportData: async (passphrase: string): Promise<Blob> => {
+    const token = await ensureToken();
+    const res = await backendFetch("/data/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { "X-Corvus-Token": token } : {}) },
+      body: JSON.stringify({ passphrase }),
+    });
+    if (!res.ok) throw new Error(await errorDetail(res, "export failed"));
+    return res.blob();
+  },
+  importData: async (file: File, passphrase: string) => {
+    const token = await ensureToken();
+    const form = new FormData();
+    form.append("file", file);
+    form.append("passphrase", passphrase);
+    const res = await backendFetch("/data/import", {
+      method: "POST",
+      body: form,
+      headers: token ? { "X-Corvus-Token": token } : undefined,
+    });
+    if (!res.ok) throw new Error(await errorDetail(res, "import failed"));
+    return (await res.json()) as Record<string, number>;
+  },
+  /** Native confirmation in the main process, then wipe + backend restart. */
+  wipeData: async () => {
+    if (!window.corvus) throw new Error("data can only be deleted from the Corvus app");
+    return window.corvus.wipeData();
+  },
 };
+
+async function errorDetail(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { detail?: string };
+    return body.detail ?? `${fallback} (${res.status})`;
+  } catch {
+    return `${fallback} (${res.status})`;
+  }
+}
+
+export interface EgressEntry {
+  time: string;
+  destination: string;
+  model: string;
+  kind: string;
+  chars: number;
+  contains: string[];
+}
+
+export interface Retention {
+  screenshots: number;
+  uploads: number;
+  downloads: number;
+}
 
 export interface MediaProfile {
   tier: "low" | "mid" | "high";
@@ -396,7 +470,7 @@ export function connectNotifications(
   onEvent: (event: NotificationEvent) => void,
   onClose: () => void,
 ): { close: () => void } {
-  const ws = new WebSocket(`${BACKEND_WS}/ws/notifications${tokenQuery()}`);
+  const ws = new WebSocket(`${wsBase()}/ws/notifications${tokenQuery()}`);
   ws.onmessage = (e) => onEvent(JSON.parse(e.data) as NotificationEvent);
   ws.onclose = onClose;
   ws.onerror = () => ws.close();
@@ -443,7 +517,7 @@ export function connectVoice(
   onEvent: (event: VoiceEvent) => void,
   onClose: () => void,
 ): VoiceSocket {
-  const ws = new WebSocket(`${BACKEND_WS}/ws/voice${tokenQuery()}`);
+  const ws = new WebSocket(`${wsBase()}/ws/voice${tokenQuery()}`);
   ws.onmessage = (event) => onEvent(JSON.parse(event.data) as VoiceEvent);
   ws.onclose = onClose;
   ws.onerror = () => ws.close();
@@ -499,7 +573,7 @@ export function streamChat(
   onFrame: (frame: StreamFrame) => void,
   onClose: () => void,
 ): StreamHandle {
-  const ws = new WebSocket(`${BACKEND_WS}/ws/chat${tokenQuery()}`);
+  const ws = new WebSocket(`${wsBase()}/ws/chat${tokenQuery()}`);
   ws.onopen = () =>
     ws.send(
       JSON.stringify({

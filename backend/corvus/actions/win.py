@@ -154,12 +154,13 @@ def launch_app(target: str) -> None:
         raise RuntimeError(f"Couldn't find an app called “{target}”.") from exc
 
 
-def close_app(image: str) -> int:
-    """Terminate processes by image name; returns how many were asked to close."""
+def close_app(image: str) -> bool:
+    """Ask processes with this image name to close (WM_CLOSE, no /F, so the
+    app can prompt to save). False when nothing by that name was running."""
     image = _check_plain_name(image)
     exe = image if image.lower().endswith(".exe") else f"{image}.exe"
-    result = _run(["taskkill", "/IM", exe, "/F"])
-    return 0 if "not found" in (result.stderr + result.stdout).lower() else 1
+    result = _run(["taskkill", "/IM", exe])
+    return result.returncode == 0 and "not found" not in (result.stderr + result.stdout).lower()
 
 
 def open_path(path: Path) -> None:

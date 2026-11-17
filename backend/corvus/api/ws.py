@@ -27,6 +27,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from ..config import SYSTEM_PROMPT
 from ..llm.agent import _is_conversational, agent_system_prompt, run_agent_turn
 from ..llm.base import Message, describe_error
+from ..llm.factory import cloud_label
 from ..memory.extractor import extract_memory
 
 ws_router = APIRouter()
@@ -159,7 +160,8 @@ async def chat(ws: WebSocket) -> None:
     try:
         outcome = await run_agent_turn(
             provider, model, messages, registry, confirm, emit=emit, log_action=log_action,
-            should_stop=cancelled.is_set,
+            should_stop=cancelled.is_set, include_tools=include_tools,
+            cloud_provider=cloud_label(provider),
         )
         assistant_text = outcome.text
     except Exception as exc:

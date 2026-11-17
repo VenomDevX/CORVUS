@@ -13,6 +13,7 @@ const TRIGGER_LABEL: Record<Workflow["trigger_type"], (w: Workflow) => string> =
   idle: (w) => `after ${w.trigger_config.minutes ?? "?"} min idle`,
   folder: (w) => `new file in ${w.trigger_config.path ?? "?"}`,
   voice: (w) => `say “${w.trigger_config.phrase ?? "?"}”`,
+  hotkey: (w) => `press ${w.trigger_config.keys ?? "?"}`,
 };
 
 /** Saved workflows: run or delete them here. Create new ones by asking Corvus
@@ -48,7 +49,7 @@ export function WorkflowsPanel() {
       <p className="mb-3 text-body-sm text-fg-muted">
         Multi-step routines. Ask Corvus in chat to create one — e.g. “make a workflow called morning
         that opens Chrome and Spotify.” Run it here, by voice, on a schedule, every few minutes, when Corvus starts, when you step away,
-        or when a new file lands in a folder.
+        when a new file lands in a folder, or with a keyboard shortcut.
       </p>
       {workflows.length === 0 ? (
         <p className="text-body text-fg-muted">No workflows yet.</p>

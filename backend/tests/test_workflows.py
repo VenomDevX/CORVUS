@@ -109,7 +109,7 @@ def test_validate_trigger(tmp_path):
         ("schedule", {"at": "08:00", "days": []}), ("interval", {"every_minutes": 0}),
         ("interval", {"every_minutes": True}), ("idle", {}), ("voice", {"phrase": "  "}),
         ("folder", {"path": str(tmp_path / "missing")}), ("folder", {"path": "relative/dir"}),
-        ("hotkey", {}),
+        ("telepathy", {}),
     ]:
         with pytest.raises(WorkflowError):
             validate_trigger(kind, config)
@@ -206,7 +206,7 @@ def test_old_database_migrates_trigger_check(tmp_path):
     conn.execute("INSERT INTO workflows (name, steps, trigger_type) VALUES ('new', '[]', 'folder')")
     assert [r["name"] for r in conn.execute("SELECT name FROM workflows ORDER BY id")] == ["kept", "new"]
     with pytest.raises(sqlite3.IntegrityError):
-        conn.execute("INSERT INTO workflows (name, steps, trigger_type) VALUES ('bad', '[]', 'hotkey')")
+        conn.execute("INSERT INTO workflows (name, steps, trigger_type) VALUES ('bad', '[]', 'nope')")
     conn.close()
 
 
@@ -228,3 +228,17 @@ async def test_create_workflow_action_maps_trigger_args(repo, tmp_path):
     assert not bad.ok and "Idle minutes" in bad.message
     extra = await reg.execute("create_workflow", {**args, "name": "y", "surprise": 1})
     assert not extra.ok
+
+
+def test_hotkey_validation_and_uniqueness(repo):
+    assert validate_trigger("hotkey", {"keys": "shift + ctrl + m"}) == {"keys": "Ctrl+Shift+M"}
+    assert validate_trigger("hotkey", {"keys": "Control+Alt+F9"}) == {"keys": "Ctrl+Alt+F9"}
+    for keys in ["Ctrl+C", "Alt+Space", "M", "Ctrl+Ctrl+M", "Ctrl+Win+M", "Ctrl+Alt+Enter",
+                 "Ctrl+Alt+F25", "Ctrl+Shift+C", "", None]:
+        with pytest.raises(WorkflowError):
+            validate_trigger("hotkey", {"keys": keys})
+    engine = WorkflowEngine(repo, build_registry([]))
+    engine.create("a", [{"action": "system_status"}], "hotkey", {"keys": "Ctrl+Alt+M"})
+    engine.create("a", [{"action": "system_status"}], "hotkey", {"keys": "Ctrl+Alt+M"})  # update ok
+    with pytest.raises(WorkflowError, match="already runs"):
+        engine.create("b", [{"action": "system_status"}], "hotkey", {"keys": "alt+ctrl+m"})

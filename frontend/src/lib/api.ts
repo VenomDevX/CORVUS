@@ -403,7 +403,15 @@ export interface Workflow {
   id: number;
   name: string;
   steps: WorkflowStep[];
-  trigger_type: "manual" | "schedule" | "interval" | "startup" | "idle" | "folder" | "voice";
+  trigger_type:
+    | "manual"
+    | "schedule"
+    | "interval"
+    | "startup"
+    | "idle"
+    | "folder"
+    | "voice"
+    | "hotkey";
   trigger_config: {
     at?: string;
     days?: number[];
@@ -411,6 +419,7 @@ export interface Workflow {
     minutes?: number;
     path?: string;
     phrase?: string;
+    keys?: string;
   };
   enabled: boolean;
 }

@@ -31,7 +31,10 @@ ALLOWED_RISK = {Risk.SAFE, Risk.LOW}
 # Workflow-management actions can't be steps (no recursion, no self-editing).
 BARRED_ACTIONS = {"create_workflow", "run_workflow", "delete_workflow"}
 # Must match the CHECK constraint in memory/db.py.
-TRIGGERS = ("manual", "schedule", "interval", "startup", "idle", "folder", "voice")
+TRIGGERS = ("manual", "schedule", "interval", "startup", "idle", "folder", "voice", "hotkey")
+_HOTKEY_MODIFIERS = {"ctrl": "Ctrl", "control": "Ctrl", "alt": "Alt", "shift": "Shift"}
+# Corvus's own global shortcuts (electron/main.ts): a workflow can't take them.
+_RESERVED_HOTKEYS = {"Ctrl+Shift+C"}
 # In-progress downloads and temp files: the finished file arrives under its real name.
 _PARTIAL_SUFFIXES = (".crdownload", ".part", ".partial", ".tmp", ".download")
 
@@ -62,6 +65,26 @@ def _minutes(value, label: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 1440:
         raise WorkflowError(f"{label} must be a whole number of minutes from 1 to 1440.")
     return value
+
+
+def _hotkey(raw) -> str:
+    """Canonical Electron accelerator ("Ctrl+Alt+M") or WorkflowError.
+
+    At least two of Ctrl/Alt/Shift plus a letter, digit or F-key, so a workflow
+    can never swallow ordinary typing or a single-modifier combo like Ctrl+C.
+    """
+    *mods, key = [p.strip() for p in str(raw or "").split("+")]
+    key = key.upper()
+    canon = {_HOTKEY_MODIFIERS.get(m.lower()) for m in mods}
+    if (not re.fullmatch(r"[A-Z0-9]|F([1-9]|1[0-9]|2[0-4])", key) or None in canon
+            or len(canon) != len(mods) or len(canon) < 2):
+        raise WorkflowError(
+            "A hotkey needs two of Ctrl, Alt and Shift plus a letter, digit or F-key, e.g. Ctrl+Alt+M."
+        )
+    accel = "+".join([m for m in ("Ctrl", "Alt", "Shift") if m in canon] + [key])
+    if accel in _RESERVED_HOTKEYS:
+        raise WorkflowError(f"{accel} is one of Corvus's own shortcuts; pick another.")
+    return accel
 
 
 def validate_trigger(kind: str, config: dict | None) -> dict:
@@ -96,6 +119,8 @@ def validate_trigger(kind: str, config: dict | None) -> dict:
         if not re.search(r"\w", phrase):
             raise WorkflowError("A voice workflow needs a phrase to listen for.")
         return {"phrase": phrase}
+    if kind == "hotkey":
+        return {"keys": _hotkey(config.get("keys"))}
     return {}  # manual, startup
 
 
@@ -148,6 +173,11 @@ class WorkflowEngine:
                trigger_config: dict | None = None) -> dict:
         clean = self.validate_steps(steps)
         config = validate_trigger(trigger_type, trigger_config)
+        if trigger_type == "hotkey":
+            for other in self.list():
+                if (other["name"] != name and other["trigger_type"] == "hotkey"
+                        and other["trigger_config"].get("keys") == config["keys"]):
+                    raise WorkflowError(f"{config['keys']} already runs “{other['name']}”.")
         row = self.repo.create_workflow(name, clean, trigger_type, config)
         self._reschedule()
         return self._decode(row)

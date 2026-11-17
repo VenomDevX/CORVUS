@@ -19,7 +19,8 @@ def _trigger_config(args: dict) -> dict:
     return {"interval": {"every_minutes": args.get("every_minutes")},
             "idle": {"minutes": args.get("idle_minutes")},
             "folder": {"path": args.get("folder")},
-            "voice": {"phrase": args.get("phrase")}}.get(trigger, {})
+            "voice": {"phrase": args.get("phrase")},
+            "hotkey": {"keys": args.get("hotkey")}}.get(trigger, {})
 
 
 def _describe_create(args: dict) -> str:
@@ -37,8 +38,9 @@ def _describe_create(args: dict) -> str:
         # Anything that can write to the folder (a download, a sync client) can set this off.
         "folder": f" whenever a new file appears in {args.get('folder')}",
         "voice": f" when you say “{args.get('phrase')}”",
+        "hotkey": f" when you press {args.get('hotkey')} anywhere in Windows",
     }.get(trigger, " when you run it")
-    unattended = "" if trigger in ("manual", "voice") else " It will run on its own, without asking."
+    unattended = "" if trigger in ("manual", "voice", "hotkey") else " It will run on its own, without asking."
     return f"Save workflow “{args.get('name')}” that runs {names}{when}?{unattended}"
 
 
@@ -56,7 +58,8 @@ def register_workflow_actions(reg: Registry, engine: WorkflowEngine) -> None:
         "Create or update a saved workflow: an ordered list of steps, each an action name with "
         "arguments. trigger: 'manual'; 'schedule' (at='HH:MM', optional days); 'interval' "
         "(every_minutes); 'startup' (when Corvus starts); 'idle' (idle_minutes without input); "
-        "'folder' (folder = full path; runs when a new file appears there); 'voice' (phrase). "
+        "'folder' (folder = full path; runs when a new file appears there); 'voice' (phrase); "
+        "'hotkey' (hotkey = global shortcut with two of Ctrl/Alt/Shift, e.g. 'Ctrl+Alt+M'). "
         "Only safe and low-risk actions are allowed in workflows.",
         {"type": "object", "properties": {
             "name": {"type": "string"},
@@ -76,6 +79,7 @@ def register_workflow_actions(reg: Registry, engine: WorkflowEngine) -> None:
                              "description": "Minutes without input before an idle workflow runs"},
             "folder": {"type": "string", "description": "Full folder path for a folder workflow"},
             "phrase": {"type": "string", "description": "Spoken phrase for a voice workflow"},
+            "hotkey": {"type": "string", "description": "Global shortcut for a hotkey workflow, e.g. Ctrl+Alt+M"},
         }, "required": ["name", "steps"], "additionalProperties": False},
         Risk.MEDIUM, create_workflow, category="workflows",
         confirm_prompt=lambda a: _describe_create(a),

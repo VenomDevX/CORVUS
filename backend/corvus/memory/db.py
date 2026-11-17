@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS {name} (
     steps TEXT NOT NULL,
     trigger_type TEXT NOT NULL DEFAULT 'manual'
         CHECK (trigger_type IN ('manual', 'schedule', 'interval', 'startup',
-                                'idle', 'folder', 'voice')),
+                                'idle', 'folder', 'voice', 'hotkey')),
     trigger_config TEXT NOT NULL DEFAULT '{{}}',
     enabled INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -94,7 +94,7 @@ def _migrate_workflows(conn: sqlite3.Connection) -> None:
     row = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='workflows'").fetchone()
     if row is None:
         conn.executescript(WORKFLOWS_TABLE.format(name="workflows"))
-    elif "'folder'" not in row[0]:
+    elif "'hotkey'" not in row[0]:
         conn.executescript(
             "BEGIN;"
             + WORKFLOWS_TABLE.format(name="workflows_new")

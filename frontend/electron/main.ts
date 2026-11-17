@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createTray, destroyTray } from "./tray";
 import { registerIpc } from "./ipc";
 import { backendUrl, startBackend, stopBackend } from "./backend-launcher";
+import { startHotkeySync } from "./hotkeys";
 import { contentSecurityPolicy, isAllowedNavigation } from "./guards";
 import { initAutoUpdate } from "./updater";
 
@@ -244,6 +245,7 @@ if (!gotLock) {
     });
     if (!altSpaceOk) console.warn("Alt+Space is taken by another app; Ctrl+Shift+C still works.");
     void startBackend(isDev, backendToken, adminToken);
+    startHotkeySync(backendToken);
     void initAutoUpdate(() => mainWindow, isDev);
   });
 

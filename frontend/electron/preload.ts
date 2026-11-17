@@ -24,6 +24,9 @@ const corvusBridge = {
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("corvus:check-for-updates"),
   installUpdate: (): Promise<void> => ipcRenderer.invoke("corvus:install-update"),
   installOllama: (): Promise<boolean> => ipcRenderer.invoke("corvus:install-ollama"),
+  onBackendLost: (callback: () => void): void => {
+    ipcRenderer.on("corvus:backend-lost", () => callback());
+  },
   onUpdateStatus: (callback: (status: UpdateStatus) => void): (() => void) => {
     const listener = (_e: unknown, status: UpdateStatus) => callback(status);
     ipcRenderer.on("corvus:update-status", listener);

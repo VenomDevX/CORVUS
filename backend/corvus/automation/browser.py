@@ -135,6 +135,7 @@ class BrowserEngine:
         self.downloads_dir = downloads_dir
         self.downloads_dir.mkdir(parents=True, exist_ok=True)
         self.headless = headless
+        self._internal_hosts: dict[str, bool] = {}
         self._pw = None
         self._browser = None
         self._context = None
@@ -207,10 +208,20 @@ class BrowserEngine:
         log.info("browser_launched", headless=self.headless)
 
     async def _guard_navigation(self, route) -> None:
+        # Every http(s) request, not just navigations: page scripts, images and
+        # forms can reach LAN services too. Verdicts are cached per host.
+        # ponytail: cache lives for the engine, so a host that later resolves
+        # elsewhere keeps its first verdict; add a TTL if that matters.
         request = route.request
-        if (request.is_navigation_request() and request.url.startswith(("http://", "https://"))
-                and await is_internal_host(request.url)):
-            log.warning("browser_internal_navigation_blocked", url=request.url)
+        host = urlparse(request.url).hostname
+        if request.url.startswith(("http://", "https://")) and host:
+            if host not in self._internal_hosts:
+                self._internal_hosts[host] = await is_internal_host(request.url)
+            blocked = self._internal_hosts[host]
+        else:
+            blocked = False
+        if blocked:
+            log.warning("browser_internal_request_blocked", url=request.url)
             await route.abort("blockedbyclient")
             return
         await route.continue_()

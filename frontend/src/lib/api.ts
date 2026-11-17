@@ -37,6 +37,14 @@ export const currentBackendPort = () => backendPort;
 // Warm the cache immediately so WebSocket URLs (built synchronously) have it.
 void ensureToken();
 
+// Backend died: its port may be re-bound by anything. Port 0 fails every
+// request until the respawned backend passes the handshake and we re-fetch.
+window.corvus?.onBackendLost?.(() => {
+  backendPort = 0;
+  forgetBackend();
+  void ensureToken();
+});
+
 async function backendFetch(path: string, init?: RequestInit): Promise<Response> {
   await ensureToken();
   try {

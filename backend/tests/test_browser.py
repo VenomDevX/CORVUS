@@ -134,3 +134,24 @@ async def test_screenshot_written(engine, tmp_path):
     dest = tmp_path / "shot.png"
     await engine.screenshot(dest)
     assert dest.exists() and dest.stat().st_size > 0
+
+
+async def test_guard_blocks_internal_subresource_requests(tmp_path):
+    """Not only navigations: a page's fetch/img to a LAN host is aborted too."""
+    eng = BrowserEngine(tmp_path / "dl", headless=True)
+
+    class Route:
+        def __init__(self, url):
+            self.request = type("R", (), {"url": url, "is_navigation_request": lambda s: False})()
+            self.result = None
+
+        async def abort(self, _reason):
+            self.result = "aborted"
+
+        async def continue_(self):
+            self.result = "continued"
+
+    internal, external = Route("http://192.168.1.1/admin"), Route("https://1.1.1.1/x.png")
+    await eng._guard_navigation(internal)
+    await eng._guard_navigation(external)
+    assert (internal.result, external.result) == ("aborted", "continued")

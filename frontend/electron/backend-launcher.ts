@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
+import { BrowserWindow } from "electron";
 import { verifyBackend } from "./guards";
 
 const RESTART_DELAY_MS = 1000;
@@ -109,6 +110,9 @@ function spawnBackend(isDev: boolean, token: string, adminToken: string): void {
     child = null;
     if (shuttingDown || restartTimer) return;
     resetReady();
+    // The old port is free now and any local process may bind it: tell the
+    // renderer to stop using it before it sends the token there.
+    for (const w of BrowserWindow.getAllWindows()) w.webContents.send("corvus:backend-lost");
     console.log(`[Corvus] respawning backend in ${RESTART_DELAY_MS}ms`);
     restartTimer = setTimeout(() => {
       restartTimer = null;

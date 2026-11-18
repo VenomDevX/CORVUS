@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 $installer = Get-ChildItem -Path "dist-installer" -Filter "Corvus-Setup-*.exe" |
   Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $installer) { throw "No Corvus-Setup-*.exe in dist-installer/" }
+$version = $installer.BaseName -replace '^Corvus-Setup-', ''
 
 $installDir = Join-Path $env:LOCALAPPDATA "Programs\Corvus"
 $log = Join-Path $env:LOCALAPPDATA "Corvus\logs\corvus.log"
@@ -22,10 +23,23 @@ try {
   $deadline = (Get-Date).AddSeconds(90)
   $ok = $false
   while ((Get-Date) -lt $deadline) {
-    if ((Test-Path $log) -and (Get-Item $log).LastWriteTime -gt $startedAt -and
-        (Select-String -Path $log -Pattern '"event": "corvus_start"' -SimpleMatch -Quiet)) {
-      $ok = $true
-      break
+    # Only a start line from this launch counts: an old one from a previous
+    # run is ignored by its timestamp (UTC; survives log rotation, unlike
+    # file mtime or line offsets).
+    if (Test-Path $log) {
+      $last = Select-String -Path $log -Pattern '"event": "corvus_start"' -SimpleMatch |
+        Select-Object -Last 1
+      if ($last) {
+        $entry = $last.Line | ConvertFrom-Json
+        $at = [datetime]::Parse($entry.timestamp, $null, [Globalization.DateTimeStyles]::RoundtripKind)
+        if ($at -gt $startedAt.ToUniversalTime()) {
+          if ($entry.version -ne $version) {
+            throw "Backend started as version $($entry.version), expected $version"
+          }
+          $ok = $true
+          break
+        }
+      }
     }
     if ($app.HasExited) { throw "Corvus exited early with code $($app.ExitCode)" }
     Start-Sleep -Seconds 2

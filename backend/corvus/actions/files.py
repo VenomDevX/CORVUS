@@ -5,6 +5,7 @@ won't touch system directories even if the model asks. Destructive ops are
 still gated by confirmation at the registry level; this is defense in depth.
 """
 
+import re
 import shutil
 from pathlib import Path
 
@@ -15,15 +16,42 @@ class PathNotAllowed(Exception):
     pass
 
 
+# "C:\Users\<name>\rest" or "/Users/<name>/rest" (also /home/<name>).
+_HOME_ALIAS = re.compile(r"^(?:[a-zA-Z]:)?[\\/]+(?:users|home)[\\/]+([^\\/]+)(?:[\\/]+(.*))?$", re.IGNORECASE)
+
+
+def _unalias_home(raw: str) -> str:
+    r"""Local models invent home folders ("C:\Users\YourUsername\Desktop",
+    "/Users/your-username/..."). A home folder that doesn't exist on this PC
+    means the user's own, so map it there; real paths are left alone."""
+    raw = raw.strip()
+    m = _HOME_ALIAS.match(raw)
+    try:
+        real_user = bool(m) and Path(raw[: m.end(1)]).exists()
+    except OSError:  # e.g. "<" in a made-up name
+        real_user = False
+    if not m or real_user:
+        return raw
+    return str(USER_ROOT / (m.group(2) or ""))
+
+
 def safe_path(raw: str) -> Path:
     """Resolve a path and ensure it stays within the user profile."""
-    p = Path(raw).expanduser()
+    p = Path(_unalias_home(raw)).expanduser()
     if not p.is_absolute():
         p = USER_ROOT / p
     resolved = p.resolve()
     if USER_ROOT not in resolved.parents and resolved != USER_ROOT:
         raise PathNotAllowed(f"{resolved} is outside your user folder; Corvus won't touch it.")
     return resolved
+
+
+def shown(raw: object) -> str:
+    """The path a confirmation card should show: where the action really lands."""
+    try:
+        return str(safe_path(str(raw)))
+    except (PathNotAllowed, OSError, ValueError):
+        return str(raw)
 
 
 def list_dir(path: str) -> list[dict]:

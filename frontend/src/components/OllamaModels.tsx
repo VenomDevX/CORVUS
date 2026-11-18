@@ -75,9 +75,11 @@ export function OllamaModels() {
     );
   }
 
-  const installed = new Set(specs.ollama.models.map((m) => m.name));
+  // Ollama lists "phi3.5" as "phi3.5:latest"; the catalog uses the bare name.
+  const bare = (name: string) => name.replace(/:latest$/, "");
+  const installed = new Set(specs.ollama.models.map((m) => bare(m.name)));
   // Curated catalog first, then anything else the user already has installed.
-  const extras = specs.ollama.models.filter((m) => !specs.catalog.some((c) => c.id === m.name));
+  const extras = specs.ollama.models.filter((m) => !specs.catalog.some((c) => c.id === bare(m.name)));
 
   async function download(id: string) {
     setPulling(id);
@@ -105,7 +107,7 @@ export function OllamaModels() {
   }
 
   function row(id: string, label: string, meta: string, fit?: keyof typeof FIT_LABEL) {
-    const isInstalled = installed.has(id);
+    const isInstalled = installed.has(bare(id));
     const isActive = id === activeModel;
     return (
       <div

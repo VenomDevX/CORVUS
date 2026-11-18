@@ -43,10 +43,10 @@ export function ConfirmationCard() {
       <div className="flex gap-2">
         <button
           onClick={() => answer(true)}
-          className={`rounded px-4 py-2 text-body font-medium text-white transition-colors duration-fast ${
+          className={`rounded px-4 py-2 text-body font-medium transition-colors duration-fast ${
             pending.risk === "high"
-              ? "bg-danger hover:bg-danger/85"
-              : "bg-accent shadow-glow hover:bg-accent-bright"
+              ? "bg-danger text-white hover:bg-danger/85"
+              : "bg-accent text-accent-fg shadow-glow hover:bg-accent-bright"
           }`}
         >
           Yes, do it

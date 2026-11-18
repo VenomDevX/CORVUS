@@ -128,7 +128,7 @@ export function ProviderSettings() {
             <button
               onClick={() => void saveKey()}
               disabled={busy || !keyInput.trim()}
-              className="rounded bg-accent px-3 py-2 text-body text-white transition-colors duration-fast enabled:hover:bg-accent-bright disabled:opacity-40"
+              className="rounded bg-accent px-3 py-2 text-body text-accent-fg transition-colors duration-fast enabled:hover:bg-accent-bright disabled:opacity-40"
             >
               Save
             </button>

@@ -102,7 +102,8 @@ export function OnboardingSetup({ onComplete }: { onComplete: () => void }) {
       .catch(() => setError("Couldn't load the provider list."));
   }, [step]);
 
-  const installed = new Set(specs?.ollama.models.map((m) => m.name) ?? []);
+  // Ollama lists "phi3.5" as "phi3.5:latest"; the catalog uses the bare name.
+  const installed = new Set(specs?.ollama.models.map((m) => m.name.replace(/:latest$/, "")) ?? []);
 
   async function chooseModel(id: string) {
     setModel(id);

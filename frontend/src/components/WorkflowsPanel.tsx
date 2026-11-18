@@ -72,7 +72,7 @@ export function WorkflowsPanel() {
                 <button
                   onClick={() => void run(w.name)}
                   disabled={running === w.name}
-                  className="rounded bg-accent px-3 py-1.5 text-body-sm text-white transition-colors duration-fast enabled:hover:bg-accent-bright disabled:opacity-50"
+                  className="rounded bg-accent px-3 py-1.5 text-body-sm text-accent-fg transition-colors duration-fast enabled:hover:bg-accent-bright disabled:opacity-50"
                 >
                   {running === w.name ? "Running…" : "▶ Run"}
                 </button>

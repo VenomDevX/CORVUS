@@ -616,7 +616,7 @@ function BackendPage() {
   return (
     <>
       <h2 className="mb-6 text-h3 tracking-tight font-medium">Backend Status</h2>
-      <p className="text-body">
+      <div className="text-body">
         {backendOnline ? (
           <div className="mt-6 flex flex-col gap-1 text-[12px] text-fg-muted">
             <span className="text-success">● Corvus core online (127.0.0.1:{currentBackendPort()})</span>
@@ -625,7 +625,7 @@ function BackendPage() {
         ) : (
           <span className="text-danger">● Corvus core offline</span>
         )}
-      </p>
+      </div>
     </>
   );
 }

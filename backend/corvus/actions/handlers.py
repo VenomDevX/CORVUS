@@ -236,11 +236,11 @@ def register_all(reg: Registry) -> None:
     # -- File management ------------------------------------------------------
     def list_folder(path: str) -> ActionResult:
         entries = files.list_dir(path)
-        return ActionResult(True, f"{len(entries)} item(s) in {path}.", {"entries": entries})
+        return ActionResult(True, f"{len(entries)} item(s) in {files.shown(path)}.", {"entries": entries})
 
     reg.register(ActionSpec(
-        "list_folder", "List the contents of a folder.",
-        _str_param("path", "Folder path or name"),
+        "list_folder", "List the files and folders inside a folder on this PC, e.g. what's in Downloads or on the Desktop.",
+        _str_param("path", "Folder relative to the home folder, e.g. 'Downloads', 'Desktop', 'Documents/projects'"),
         Risk.SAFE, list_folder, category="files", reads_local_data=True,
     ))
 
@@ -250,9 +250,9 @@ def register_all(reg: Registry) -> None:
 
     reg.register(ActionSpec(
         "create_folder", "Create a new folder.",
-        _str_param("path", "New folder path"),
+        _str_param("path", "New folder path relative to the home folder, e.g. 'Desktop/new-folder'"),
         Risk.MEDIUM, create_folder,
-        confirm_prompt=lambda a: f"Create a new folder at {a.get('path')}?",
+        confirm_prompt=lambda a: f"Create a new folder at {files.shown(a.get('path'))}?",
         category="files",
     ))
 
@@ -265,7 +265,7 @@ def register_all(reg: Registry) -> None:
         {"type": "object", "properties": {"src": {"type": "string"}, "dest": {"type": "string"}},
          "required": ["src", "dest"]},
         Risk.MEDIUM, move_item, blocking=True,
-        confirm_prompt=lambda a: f"Move “{a.get('src')}” to “{a.get('dest')}”?",
+        confirm_prompt=lambda a: f"Move “{files.shown(a.get('src'))}” to “{files.shown(a.get('dest'))}”?",
         category="files",
     ))
 
@@ -278,7 +278,7 @@ def register_all(reg: Registry) -> None:
         {"type": "object", "properties": {"src": {"type": "string"}, "dest": {"type": "string"}},
          "required": ["src", "dest"]},
         Risk.MEDIUM, copy_item, blocking=True,
-        confirm_prompt=lambda a: f"Copy “{a.get('src')}” to “{a.get('dest')}”?",
+        confirm_prompt=lambda a: f"Copy “{files.shown(a.get('src'))}” to “{files.shown(a.get('dest'))}”?",
         category="files",
     ))
 
@@ -303,7 +303,7 @@ def register_all(reg: Registry) -> None:
         "delete_item", "Delete a file or folder (moves it to the Recycle Bin).",
         _str_param("path", "Path to delete"),
         Risk.MEDIUM, delete_item,
-        confirm_prompt=lambda a: f"Move “{a.get('path')}” to the Recycle Bin? You can restore it from there.",
+        confirm_prompt=lambda a: f"Move “{files.shown(a.get('path'))}” to the Recycle Bin? You can restore it from there.",
         category="files",
     ))
 
@@ -316,7 +316,7 @@ def register_all(reg: Registry) -> None:
         {"type": "object", "properties": {"src": {"type": "string"}, "dest": {"type": "string"}},
          "required": ["src", "dest"]},
         Risk.MEDIUM, zip_folder,
-        confirm_prompt=lambda a: f"Create a zip of “{a.get('src')}” at “{a.get('dest')}”?",
+        confirm_prompt=lambda a: f"Create a zip of “{files.shown(a.get('src'))}” at “{files.shown(a.get('dest'))}”?",
         category="files",
     ))
 
@@ -329,7 +329,7 @@ def register_all(reg: Registry) -> None:
         {"type": "object", "properties": {"src": {"type": "string"}, "dest": {"type": "string"}},
          "required": ["src", "dest"]},
         Risk.MEDIUM, extract_zip, blocking=True,
-        confirm_prompt=lambda a: f"Extract “{a.get('src')}” into “{a.get('dest')}”?",
+        confirm_prompt=lambda a: f"Extract “{files.shown(a.get('src'))}” into “{files.shown(a.get('dest'))}”?",
         category="files",
     ))
 

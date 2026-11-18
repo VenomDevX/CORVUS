@@ -78,3 +78,17 @@ def test_safe_path_blocks_escape(tmp_path, monkeypatch):
     assert tmp_path.resolve() in inside.parents
     with pytest.raises(PathNotAllowed):
         f.safe_path("C:/Windows/System32/evil.dll")
+
+
+def test_safe_path_maps_made_up_home_folders(tmp_path, monkeypatch):
+    # Local models write "C:\Users\YourUsername\Desktop\x"; that user doesn't
+    # exist, so it means this user's home. A real other user's folder doesn't.
+    import corvus.actions.files as f
+    home = tmp_path / "Users" / "me"
+    (tmp_path / "Users" / "Public").mkdir(parents=True)
+    home.mkdir()
+    monkeypatch.setattr(f, "USER_ROOT", home.resolve())
+    assert f.safe_path(r"C:\Users\<YourUsername>\Desktop\x") == home.resolve() / "Desktop" / "x"
+    assert f.safe_path("/Users/your-username/Downloads") == home.resolve() / "Downloads"
+    assert f.shown(r"C:\Users\YourUsername\Desktop") == str(home.resolve() / "Desktop")
+    assert f._unalias_home("C:/Users/Public/x") == "C:/Users/Public/x"  # exists: not mapped

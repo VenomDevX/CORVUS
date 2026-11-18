@@ -127,6 +127,10 @@ _LOCAL_NOUNS = {
     "downloads", "desktop", "workflow", "reminder", "timer", "alarm",
 }
 _THIS_MACHINE = re.compile(r"\b(my|this (pc|computer|laptop|machine))\b")
+# "Remember that I like Rust": memory is extracted after every turn, so this is
+# chat. Given tools, a 7B model grabs one instead of confirming (it once copied
+# the fact to the clipboard). "Remember to ..." stays a possible reminder.
+_MEMORY_NOTE = re.compile(r"^(please\s+)?(remember|note|keep in mind)\b(?!\s+to\b)")
 
 # What a source of outside-world content is called in a taint prompt.
 _SOURCE_LABEL = {
@@ -156,7 +160,7 @@ async def _is_conversational(text: str) -> bool:
     vetoes the shortcut ("write me an email and copy it to the clipboard").
     """
     t = text.strip().lower()
-    if t.rstrip("!?.") in _GREETINGS:
+    if t.rstrip("!?.") in _GREETINGS or _MEMORY_NOTE.match(t):
         return True
     words = re.findall(r"[a-z0-9']+", t)
     if any(w in _ACTION_VERBS or w in _LOCAL_NOUNS for w in words) or _THIS_MACHINE.search(t):
@@ -273,7 +277,7 @@ async def _run_one(
     taint = taint if taint is not None else {"source": None}
     spec = registry.get(call.name)
     if spec is None:
-        return ActionResult(False, f"Unknown action: {call.name}")
+        return ActionResult(False, f"Unknown action: {call.name}. No such tool exists; answer the user directly in words.")
 
     await _emit(emit, {
         "type": "action_proposed",
@@ -403,6 +407,12 @@ def agent_system_prompt(registry: Registry, include_tools: bool = True) -> str:
             "• CRITICAL — search_documents is ONLY for when the user asks about THEIR OWN files:",
             "  e.g. 'search my notes for...', 'what does my PDF say about...', 'find in my documents'.",
             "  NEVER call search_documents for general questions, greetings, or coding help.",
+            "",
+            "• FILE PATHS are relative to the user's home folder: write 'Desktop/notes', 'Downloads',",
+            "  'Documents/report.txt'. NEVER invent placeholders like 'YourUsername' or '/Users/...'.",
+            "• 'What's in my Downloads/Desktop/a folder' → call list_folder, not search_documents.",
+            "• MEMORY is automatic: when the user says 'remember X', just confirm in a sentence.",
+            "  There is no remember tool.",
             "",
             "• If a tool fails or returns no results, continue answering with your built-in knowledge.",
             "  Never let a failed tool become the final answer. Never mention 'indexed documents',",

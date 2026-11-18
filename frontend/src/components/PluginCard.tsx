@@ -70,7 +70,7 @@ export function PluginCard({ plugin, onChange }: { plugin: Plugin; onChange: () 
             className={`rounded px-3 py-1.5 text-body-sm transition-colors duration-fast ${
               plugin.enabled
                 ? "bg-white/10 text-fg hover:bg-danger/20 hover:text-danger"
-                : "bg-accent text-white hover:bg-accent-bright"
+                : "bg-accent text-accent-fg hover:bg-accent-bright"
             }`}
           >
             {plugin.enabled ? "Disable" : "Enable"}

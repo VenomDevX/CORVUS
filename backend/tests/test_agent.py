@@ -260,6 +260,9 @@ from corvus.llm.agent import _is_conversational  # noqa: E402
     ("open chrome", False),
     ("remind me in 10 minutes to stretch", False),
     ("explain what's on my screen", False),
+    ("Remember that my favourite editor is VS Code.", True),
+    ("keep in mind I use Windows", True),
+    ("remember to open chrome at 5", False),
 ])
 async def test_conversational_classifier(text, conversational):
     assert await _is_conversational(text) is conversational

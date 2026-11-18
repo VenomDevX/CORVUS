@@ -322,3 +322,34 @@ async def test_list_models():
 
     provider = make_provider(handler)
     assert await provider.list_models() == ["qwen2.5-coder:latest"]
+
+
+async def test_ensure_running_starts_local_ollama_once(monkeypatch):
+    import corvus.llm.ollama as mod
+
+    up = {"v": False}
+    launches = []
+
+    async def reachable(self):
+        return up["v"]
+
+    def launch():
+        launches.append(1)
+        up["v"] = True
+        return True
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr(OllamaProvider, "_reachable", reachable)
+    monkeypatch.setattr(mod, "_launch_ollama", launch)
+    monkeypatch.setattr(mod.asyncio, "sleep", no_sleep)
+    p = OllamaProvider("http://127.0.0.1:11434")
+    await p._ensure_running()
+    await p._ensure_running()  # already up: no second launch
+    assert launches == [1]
+
+    remote = OllamaProvider("http://10.0.0.5:11434")
+    up["v"] = False
+    await remote._ensure_running()  # never launches for a remote server
+    assert launches == [1]

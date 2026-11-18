@@ -2,10 +2,18 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type Workflow } from "../lib/api";
 import { useCorvus } from "../state/store";
 
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
 const TRIGGER_LABEL: Record<Workflow["trigger_type"], (w: Workflow) => string> = {
   manual: () => "manual",
-  schedule: (w) => `daily at ${w.trigger_config.at ?? "?"}`,
+  schedule: ({ trigger_config: c }) =>
+    `${c.days?.length ? c.days.map((d) => DAYS[d]).join(", ") : "daily"} at ${c.at ?? "?"}`,
+  interval: (w) => `every ${w.trigger_config.every_minutes ?? "?"} min`,
+  startup: () => "when Corvus starts",
+  idle: (w) => `after ${w.trigger_config.minutes ?? "?"} min idle`,
+  folder: (w) => `new file in ${w.trigger_config.path ?? "?"}`,
   voice: (w) => `say “${w.trigger_config.phrase ?? "?"}”`,
+  hotkey: (w) => `press ${w.trigger_config.keys ?? "?"}`,
 };
 
 /** Saved workflows: run or delete them here. Create new ones by asking Corvus
@@ -40,7 +48,8 @@ export function WorkflowsPanel() {
       <h2 className="mb-1 text-h4">Workflows</h2>
       <p className="mb-3 text-body-sm text-fg-muted">
         Multi-step routines. Ask Corvus in chat to create one — e.g. “make a workflow called morning
-        that opens Chrome and Spotify.” Run it here, by voice, or on a schedule.
+        that opens Chrome and Spotify.” Run it here, by voice, on a schedule, every few minutes, when Corvus starts, when you step away,
+        when a new file lands in a folder, or with a keyboard shortcut.
       </p>
       {workflows.length === 0 ? (
         <p className="text-body text-fg-muted">No workflows yet.</p>

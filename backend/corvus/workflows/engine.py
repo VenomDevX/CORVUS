@@ -3,8 +3,9 @@
 A workflow reuses the Milestone 6 action registry - each step is an action name
 plus arguments. Workflows are for routines (open my apps, read my schedule), so
 high-risk actions are barred from them; those must stay in interactive chat
-where the confirmation card is shown. Workflows trigger manually, on a daily
-schedule, or by a spoken phrase.
+where the confirmation card is shown. Workflows trigger manually, at a time of
+day (optionally on given weekdays), every N minutes, when Corvus starts, after
+N idle minutes, when a new file lands in a folder, or by a spoken phrase.
 """
 
 from __future__ import annotations
@@ -13,8 +14,10 @@ import asyncio
 import contextlib
 import json
 import re
+import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 
 import structlog
 
@@ -27,10 +30,98 @@ log = structlog.get_logger("corvus")
 ALLOWED_RISK = {Risk.SAFE, Risk.LOW}
 # Workflow-management actions can't be steps (no recursion, no self-editing).
 BARRED_ACTIONS = {"create_workflow", "run_workflow", "delete_workflow"}
+# Must match the CHECK constraint in memory/db.py.
+TRIGGERS = ("manual", "schedule", "interval", "startup", "idle", "folder", "voice", "hotkey")
+_HOTKEY_MODIFIERS = {"ctrl": "Ctrl", "control": "Ctrl", "alt": "Alt", "shift": "Shift"}
+# Corvus's own global shortcuts (electron/main.ts): a workflow can't take them.
+_RESERVED_HOTKEYS = {"Ctrl+Shift+C"}
+# In-progress downloads and temp files: the finished file arrives under its real name.
+_PARTIAL_SUFFIXES = (".crdownload", ".part", ".partial", ".tmp", ".download")
 
 
 class WorkflowError(Exception):
     pass
+
+
+def idle_seconds() -> float:
+    """Seconds since the last keyboard/mouse input in this Windows session."""
+    if sys.platform != "win32":
+        return 0.0
+    import ctypes
+
+    class LastInputInfo(ctypes.Structure):
+        _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+
+    info = LastInputInfo(ctypes.sizeof(LastInputInfo))
+    if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+        return 0.0
+    tick = ctypes.windll.kernel32.GetTickCount
+    tick.restype = ctypes.c_uint
+    # Both are 32-bit millisecond tick counts; mask so the 49-day wrap still subtracts.
+    return ((tick() - info.dwTime) & 0xFFFFFFFF) / 1000
+
+
+def _minutes(value, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 1440:
+        raise WorkflowError(f"{label} must be a whole number of minutes from 1 to 1440.")
+    return value
+
+
+def _hotkey(raw) -> str:
+    """Canonical Electron accelerator ("Ctrl+Alt+M") or WorkflowError.
+
+    At least two of Ctrl/Alt/Shift plus a letter, digit or F-key, so a workflow
+    can never swallow ordinary typing or a single-modifier combo like Ctrl+C.
+    """
+    *mods, key = [p.strip() for p in str(raw or "").split("+")]
+    key = key.upper()
+    canon = {_HOTKEY_MODIFIERS.get(m.lower()) for m in mods}
+    if (not re.fullmatch(r"[A-Z0-9]|F([1-9]|1[0-9]|2[0-4])", key) or None in canon
+            or len(canon) != len(mods) or len(canon) < 2):
+        raise WorkflowError(
+            "A hotkey needs two of Ctrl, Alt and Shift plus a letter, digit or F-key, e.g. Ctrl+Alt+M."
+        )
+    accel = "+".join([m for m in ("Ctrl", "Alt", "Shift") if m in canon] + [key])
+    if accel in _RESERVED_HOTKEYS:
+        raise WorkflowError(f"{accel} is one of Corvus's own shortcuts; pick another.")
+    return accel
+
+
+def validate_trigger(kind: str, config: dict | None) -> dict:
+    """Check a trigger's settings and return only the keys it uses."""
+    config = config or {}
+    if kind not in TRIGGERS:
+        raise WorkflowError(f"Unknown trigger '{kind}'. Use one of: {', '.join(TRIGGERS)}.")
+    if kind == "schedule":
+        try:  # normalize "8:00" -> "08:00" so string comparison orders correctly
+            at = datetime.strptime(str(config.get("at", "")), "%H:%M").strftime("%H:%M")
+        except ValueError:
+            raise WorkflowError("A scheduled workflow needs a time as HH:MM, e.g. 08:30.") from None
+        days = config.get("days")
+        if days is None:
+            return {"at": at}
+        if (not isinstance(days, list) or not days
+                or any(isinstance(d, bool) or not isinstance(d, int) or not 0 <= d <= 6 for d in days)):
+            raise WorkflowError("days must be a list of weekdays, 0 (Monday) to 6 (Sunday).")
+        return {"at": at, "days": sorted(set(days))}
+    if kind == "interval":
+        return {"every_minutes": _minutes(config.get("every_minutes"), "every_minutes")}
+    if kind == "idle":
+        return {"minutes": _minutes(config.get("minutes"), "Idle minutes")}
+    if kind == "folder":
+        raw = str(config.get("path") or "").strip()
+        path = Path(raw).expanduser() if raw else None
+        if not path or not path.is_absolute() or not path.is_dir():
+            raise WorkflowError("A folder workflow needs the full path of an existing folder.")
+        return {"path": str(path.resolve())}
+    if kind == "voice":
+        phrase = str(config.get("phrase") or "").strip()
+        if not re.search(r"\w", phrase):
+            raise WorkflowError("A voice workflow needs a phrase to listen for.")
+        return {"phrase": phrase}
+    if kind == "hotkey":
+        return {"keys": _hotkey(config.get("keys"))}
+    return {}  # manual, startup
 
 
 @dataclass
@@ -48,6 +139,12 @@ class WorkflowEngine:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._scheduler: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
+        self._running: set[str] = set()
+        # Per-trigger memory between ticks (in memory: a restart re-baselines,
+        # so nothing fires just because Corvus was closed for a while).
+        self._last_interval: dict[str, datetime] = {}
+        self._idle_fired: set[str] = set()
+        self._folder_seen: dict[tuple[str, str], set[str]] = {}
 
     # -- validation & CRUD ----------------------------------------------------
 
@@ -75,7 +172,13 @@ class WorkflowEngine:
     def create(self, name: str, steps: list, trigger_type: str = "manual",
                trigger_config: dict | None = None) -> dict:
         clean = self.validate_steps(steps)
-        row = self.repo.create_workflow(name, clean, trigger_type, trigger_config)
+        config = validate_trigger(trigger_type, trigger_config)
+        if trigger_type == "hotkey":
+            for other in self.list():
+                if (other["name"] != name and other["trigger_type"] == "hotkey"
+                        and other["trigger_config"].get("keys") == config["keys"]):
+                    raise WorkflowError(f"{config['keys']} already runs “{other['name']}”.")
+        row = self.repo.create_workflow(name, clean, trigger_type, config)
         self._reschedule()
         return self._decode(row)
 
@@ -139,8 +242,14 @@ class WorkflowEngine:
 
     # -- scheduler ------------------------------------------------------------
 
-    async def start(self) -> None:
+    async def start(self, run_startup: bool = True) -> None:
+        """Start the trigger loop. run_startup=False after a crash restart, so a
+        respawned backend doesn't re-run the launch routine."""
         self._loop = asyncio.get_running_loop()
+        if run_startup:
+            for row in self.repo.list_workflows():
+                if row["trigger_type"] == "startup" and row["enabled"]:
+                    self._spawn(row["name"])
         self._scheduler = self._loop.create_task(self._schedule_loop())
         log.info("workflow_engine_started")
 
@@ -156,43 +265,89 @@ class WorkflowEngine:
         pass
 
     async def _schedule_loop(self) -> None:
-        """Fire 'schedule' workflows at their daily HH:MM (minute resolution)."""
-        # Keyed by (name, date) so a skipped minute (sleep, slow tick) still
-        # fires late the same day, and a new day always resets. Times already
-        # past at startup are marked done: no surprise catch-up runs on launch.
+        """Check every timed/watching trigger once a minute (minute resolution)."""
+        # ponytail: one 60s tick for all triggers; folder/idle react within a
+        # minute. Add a faster watcher (ReadDirectoryChangesW) if that's too slow.
         fired: set[tuple[str, object]] = set()
         first = True
         while True:
             now = datetime.now()
-            hhmm, today = now.strftime("%H:%M"), now.date()
             for row in self.repo.list_workflows():
-                if row["trigger_type"] != "schedule" or not row["enabled"]:
+                if not row["enabled"]:
                     continue
-                try:  # normalize "8:00" -> "08:00" so string comparison orders correctly
-                    at = datetime.strptime(
-                        str(json.loads(row["trigger_config"]).get("at", "")), "%H:%M"
-                    ).strftime("%H:%M")
-                except ValueError:
+                try:
+                    due = self._due(row["name"], row["trigger_type"],
+                                    json.loads(row["trigger_config"]), now, first, fired)
+                except Exception as exc:  # noqa: BLE001 - one bad row must never stop the loop
+                    log.warning("workflow_trigger_check_failed", workflow=row["name"], error=str(exc))
                     continue
-                key = (row["name"], today)
-                if not at or at > hhmm or key in fired:
-                    continue
-                fired.add(key)
-                if not first or at == hhmm:
+                if due:
                     self._spawn(row["name"])
             first = False
-            fired = {k for k in fired if k[1] == today}
+            fired = {k for k in fired if k[1] == now.date()}
             # Align to the next minute boundary.
             await asyncio.sleep(60 - datetime.now().second)
 
+    def _due(self, name: str, kind: str, config: dict, now: datetime,
+             first: bool, fired: set) -> bool:
+        """Whether a workflow's trigger fires on this tick. Updates trigger memory."""
+        if kind == "schedule":
+            # Keyed by (name, date) so a skipped minute (sleep, slow tick) still
+            # fires late the same day, and a new day always resets. Times already
+            # past at startup are marked done: no surprise catch-up runs on launch.
+            try:
+                at = datetime.strptime(str(config.get("at", "")), "%H:%M").strftime("%H:%M")
+            except ValueError:
+                return False
+            days = config.get("days")
+            key = (name, now.date())
+            if (days and now.weekday() not in days) or at > now.strftime("%H:%M") or key in fired:
+                return False
+            fired.add(key)
+            return not first or at == now.strftime("%H:%M")
+        if kind == "interval":
+            last = self._last_interval.get(name)
+            if last is not None and now - last < timedelta(minutes=config["every_minutes"]):
+                return False
+            self._last_interval[name] = now
+            return last is not None  # the first tick only starts the clock
+        if kind == "idle":
+            # Once per idle stretch: re-arms when input resumes.
+            if idle_seconds() < config["minutes"] * 60:
+                self._idle_fired.discard(name)
+                return False
+            if name in self._idle_fired:
+                return False
+            self._idle_fired.add(name)
+            return True
+        if kind == "folder":
+            key = (name, config["path"])
+            try:
+                names = {e.name for e in Path(config["path"]).iterdir()
+                         if e.is_file() and not e.name.lower().endswith(_PARTIAL_SUFFIXES)}
+            except OSError:
+                return False  # folder gone or unreadable: wait for it to come back
+            seen = self._folder_seen.get(key)
+            self._folder_seen[key] = names
+            # The first look is the baseline; only files added after it count.
+            return seen is not None and bool(names - seen)
+        return False
+
     def _spawn(self, name: str) -> None:
         """Run a workflow without blocking the scheduler tick."""
+        if name in self._running:
+            log.info("workflow_already_running", workflow=name)
+            return
+
         async def go() -> None:
             try:
                 await self.run(name)
             except Exception as exc:
                 log.warning("workflow_scheduled_run_failed", workflow=name, error=str(exc))
+            finally:
+                self._running.discard(name)
 
+        self._running.add(name)
         task = asyncio.get_running_loop().create_task(go())
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)

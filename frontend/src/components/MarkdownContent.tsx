@@ -1,6 +1,9 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Copy, Check } from "lucide-react";
@@ -56,11 +59,27 @@ function isSafeUrl(url: string | undefined): boolean {
   }
 }
 
+/** Models write maths as \[ ... \] and \( ... \); remark-math reads $$.
+ * Fenced code is left alone. Single $ stays text so "$1.10" isn't maths. */
+export function normalizeMath(md: string): string {
+  return md
+    .split(/(```[\s\S]*?(?:```|$))/)
+    .map((part, i) =>
+      i % 2
+        ? part
+        : part
+            .replace(/\\\[([\s\S]+?)\\\]/g, (_, m: string) => "\n$$\n" + m.trim() + "\n$$\n")
+            .replace(/\\\(([\s\S]+?)\\\)/g, (_, m: string) => "$$" + m.trim() + "$$"),
+    )
+    .join("");
+}
+
 export function MarkdownContent({ content }: { content: string }) {
   return (
     <div className="markdown min-w-0 space-y-2 [overflow-wrap:anywhere] [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-white/10 [&_th]:bg-white/5 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           a: ({ href, children }) => (
             <a
@@ -97,7 +116,7 @@ export function MarkdownContent({ content }: { content: string }) {
           },
         }}
       >
-        {content}
+        {normalizeMath(content)}
       </ReactMarkdown>
     </div>
   );

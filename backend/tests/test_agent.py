@@ -406,3 +406,31 @@ async def test_coding_questions_are_chat_even_with_function_names():
     assert await _is_conversational("Give me 3 python functions to reverse a list")
     assert not await _is_conversational("delete the leetcode folder on my desktop")
     assert not await _is_conversational("open my python project folder")
+
+
+async def test_study_questions_are_chat():
+    from corvus.llm.agent import _is_conversational
+    assert await _is_conversational("A family has two children. At least one of them is a boy. What is the probability that both are boys?")
+    assert await _is_conversational("Case study: revenue $2,000,000, COGS $1,200,000, 25% tax. What is its net income?")
+    assert not await _is_conversational("can you open notepad?")
+    assert not await _is_conversational("is my battery low?")
+
+
+async def test_coding_question_with_action_words_is_chat():
+    # Live: "delete" in Edit Distance offered tools; the model invented
+    # write_code and Corvus overwrote the clipboard five times.
+    from corvus.llm.agent import _is_conversational
+    assert await _is_conversational(
+        "LeetCode Hard - Edit Distance: write a Python function min_distance(word1, word2) "
+        "returning the minimum number of insert/delete/replace operations.")
+    assert not await _is_conversational("delete the leetcode folder on my desktop")
+    assert not await _is_conversational("copy the python solution to my clipboard")
+
+
+async def test_long_study_question_beats_weak_verbs():
+    from corvus.llm.agent import _is_conversational
+    assert await _is_conversational(
+        "Two trains start 300 km apart and travel toward each other at 70 and 80 km/h. After how many hours do they meet?")
+    assert await _is_conversational(
+        "Case study: revenue $2,000,000, COGS $1,200,000, opex $500,000, 25% tax. What is its net income? Show each step.")
+    assert not await _is_conversational("can you start chrome?")

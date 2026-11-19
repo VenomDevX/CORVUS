@@ -396,7 +396,9 @@ def register_all(reg: Registry) -> None:
             "something. NEVER use for greetings or general questions."
         ),
         _str_param("text", "Text to copy"),
-        Risk.LOW, set_clipboard, category="clipboard",
+        # Only the last copy survives, and a looping model overwrote the
+        # clipboard five times in one turn.
+        Risk.LOW, set_clipboard, category="clipboard", once_per_turn=True,
     ))
 
     # -- System monitoring ----------------------------------------------------

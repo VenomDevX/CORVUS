@@ -109,7 +109,8 @@ async def test_bad_arguments_fail_before_confirmation_with_valid_names():
         asked.append(name)
         return True
 
-    result = await _run_one(ToolCall("make_dir", {"folder": "x"}), reg, confirm, None, None)
+    # Two unknown names: not a single misnamed parameter the agent could repair.
+    result = await _run_one(ToolCall("make_dir", {"folder": "x", "where": "y"}), reg, confirm, None, None)
     assert not result.ok and not asked and not ran  # no confirmation card for a call that can't run
     assert "unknown folder" in result.message and "missing path" in result.message
     assert "Valid parameters: path" in result.message

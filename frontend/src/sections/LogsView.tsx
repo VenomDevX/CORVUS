@@ -43,7 +43,7 @@ export function LogsView() {
           <p className="text-fg-faint">No log entries yet.</p>
         ) : (
           entries.map((e, i) => (
-            <div key={i} className="whitespace-pre-wrap break-all py-0.5">
+            <div key={i} className="whitespace-pre-wrap py-0.5 [overflow-wrap:anywhere]">
               <span className="text-fg-faint">{e.timestamp}</span>{" "}
               <span className={LEVEL_COLOR[e.level] ?? "text-fg-muted"}>[{e.level}]</span>{" "}
               <span className="text-fg">{e.event}</span>

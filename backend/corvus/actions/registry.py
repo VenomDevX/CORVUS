@@ -53,6 +53,12 @@ class ActionSpec:
     # Result carries the user's local data (screen, files, documents,
     # clipboard) to the model - with a cloud provider that leaves the machine.
     reads_local_data: bool = False
+    # Checks the schema can't express (e.g. a workflow's steps), run with the
+    # argument check: an error here fails the call before any confirmation card.
+    precheck: Callable[[dict[str, Any]], str | None] | None = None
+    # At most one successful run per chat turn (desktop notifications: a 7B
+    # model sent five toasts to "report" one error).
+    once_per_turn: bool = False
 
     @property
     def requires_confirmation(self) -> bool:
@@ -81,7 +87,7 @@ class ActionSpec:
         else:
             problems = _schema_problem(self.parameters, args)
             if problems is None:
-                return None
+                return self.precheck(args) if self.precheck else None
         return (f"Invalid arguments for {self.name} ({problems}). "
                 f"Valid parameters: {', '.join(props) or 'none'}.")
 

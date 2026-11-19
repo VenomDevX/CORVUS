@@ -77,8 +77,9 @@ function MessageItem({ m, index, initialCount }: { m: any, index: number, initia
               </div>
             </div>
           ) : (
-            <div className="liquid-glass rounded-xl px-4 py-3 text-fg">
-              {m.content && <MarkdownContent content={m.content} />}
+            <div className="liquid-glass max-w-full rounded-xl px-4 py-3 text-fg">
+              {/* As typed: markdown dropped path backslashes before punctuation (C:\files\*.txt showed as C:\files*.txt). */}
+              {m.content && <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.content}</p>}
             </div>
           )}
           {!isEditing && (
@@ -89,7 +90,8 @@ function MessageItem({ m, index, initialCount }: { m: any, index: number, initia
         <>
           {m.content ? (
             <div className="flex flex-col items-start gap-1 max-w-[80%] group">
-              <div className="px-4 py-3 text-fg">
+              {/* max-w-full: a long code line otherwise widens the reply past the column. */}
+              <div className="max-w-full px-4 py-3 text-fg">
                 <MarkdownContent content={m.content} />
               </div>
               <div className="flex w-full justify-start items-start gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">

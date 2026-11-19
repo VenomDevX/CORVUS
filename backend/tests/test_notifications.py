@@ -97,3 +97,53 @@ async def test_reminder_waits_for_a_subscriber(repo):
     assert (await asyncio.wait_for(q.get(), 1))["message"] == "missed"
     assert repo.pending_reminders() == []
     await hub.stop()
+
+
+def test_cancel_without_id_cancels_only_the_newest():
+    from corvus.actions.notify_handlers import register_notification_actions
+    from corvus.actions.registry import Registry
+
+    class Hub:
+        pending = [{"id": 3, "kind": "reminder", "text": "a", "fire_at": "x"},
+                   {"id": 5, "kind": "timer", "text": "b", "fire_at": "y"}]
+        cancelled = []
+        def list_pending(self): return self.pending
+        def cancel(self, i): self.cancelled.append(i); return True
+
+    reg, hub = Registry(), Hub()
+    register_notification_actions(reg, hub)
+    reg.get("cancel_reminder").handler()
+    assert hub.cancelled == [5]
+
+
+def test_day_and_time_resolve_without_the_model_doing_dates():
+    from datetime import datetime
+
+    from corvus.actions.notify_handlers import _resolve_day_time
+    now = datetime(2026, 11, 19, 2, 53)  # a Thursday
+    assert _resolve_day_time("tomorrow", "9am", now) == datetime(2026, 11, 20, 9, 0)
+    assert _resolve_day_time(None, "09:00", now) == datetime(2026, 11, 19, 9, 0)
+    assert _resolve_day_time(None, "1:30", now) == datetime(2026, 11, 20, 1, 30)
+    assert _resolve_day_time("monday", "5:30pm", now) == datetime(2026, 11, 23, 17, 30)
+    assert _resolve_day_time("Thursday", "1am", now) == datetime(2026, 11, 26, 1, 0)
+    for day, t in (("today", "1am"), ("someday", "9am"), (None, "25:00"), (None, "soon")):
+        try:
+            _resolve_day_time(day, t, now)
+        except ValueError:
+            continue
+        raise AssertionError((day, t))
+
+
+def test_clock_time_in_at_is_read_as_time():
+    # Live: the model sent {"day": "tomorrow", "at": "09:00"} twice.
+    from corvus.actions.notify_handlers import register_notification_actions
+    from corvus.actions.registry import Registry
+
+    class Hub:
+        scheduled = []
+        def schedule(self, text, kind, fire): self.scheduled.append(fire); return {"id": 1}
+
+    reg, hub = Registry(), Hub()
+    register_notification_actions(reg, hub)
+    res = reg.get("set_reminder").handler(text="Call mom", day="tomorrow", at="09:00")
+    assert res.ok and hub.scheduled[0].hour == 9

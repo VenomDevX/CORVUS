@@ -25,10 +25,10 @@ import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ..config import SYSTEM_PROMPT
-from ..llm.agent import _is_conversational, agent_system_prompt, run_agent_turn
+from ..llm.agent import agent_system_prompt, needs_tools, run_agent_turn
 from ..llm.base import Message, describe_error
 from ..llm.factory import cloud_label
-from ..memory.extractor import extract_memory
+from ..memory.extractor import extract_memory, recall_prompt
 
 ws_router = APIRouter()
 log = structlog.get_logger("corvus")
@@ -92,8 +92,10 @@ async def chat(ws: WebSocket) -> None:
     history = repo.list_messages(conversation_id)[-MAX_HISTORY_MESSAGES:]
     # For conversational queries, skip tool schemas in the system prompt to
     # free context window for small models and prevent function-call fixation.
-    include_tools = not await _is_conversational(content)
-    system = SYSTEM_PROMPT + "\n\n" + agent_system_prompt(registry, include_tools=include_tools)
+    prev_user = next((m["content"] for m in reversed(history[:-1]) if m["role"] == "user"), None)
+    include_tools = await needs_tools(content, prev_user)
+    system = (SYSTEM_PROMPT + "\n\n" + agent_system_prompt(registry, include_tools=include_tools)
+              + recall_prompt(repo))
     messages = [Message("system", system)] + [Message(m["role"], m["content"]) for m in history]
     model = ws.app.state.active_model()
 
@@ -156,6 +158,7 @@ async def chat(ws: WebSocket) -> None:
 
     assistant_text = ""
     error: str | None = None
+    ran_actions = False
     log.info("chat_turn_start", conversation_id=conversation_id, model=model)
     try:
         outcome = await run_agent_turn(
@@ -164,6 +167,7 @@ async def chat(ws: WebSocket) -> None:
             cloud_provider=cloud_label(provider),
         )
         assistant_text = outcome.text
+        ran_actions = bool(outcome.actions_run)
     except Exception as exc:
         error = describe_error(exc, provider)
         log.error("chat_turn_error", conversation_id=conversation_id, error=error)
@@ -192,7 +196,10 @@ async def chat(ws: WebSocket) -> None:
         cancelled=cancelled.is_set(),
     )
 
-    if assistant_text and not cancelled.is_set():
+    # A turn that ran actions was a task, not a fact about the user: those
+    # turns stored "Reminder set for 9am" and a workflow that had failed,
+    # which recall then fed back as things to do.
+    if assistant_text and not cancelled.is_set() and not ran_actions:
         # Non-blocking background pass; failures only log. Keep a reference:
         # the loop holds tasks weakly, so an unreferenced one can be GC'd mid-run.
         task = asyncio.create_task(

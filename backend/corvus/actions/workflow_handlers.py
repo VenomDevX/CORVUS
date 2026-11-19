@@ -5,7 +5,13 @@ opens Chrome and Spotify"), so these actions are how a workflow gets defined
 and triggered by voice or chat.
 """
 
-from ..workflows.engine import TRIGGERS, WorkflowEngine, WorkflowError
+from ..workflows.engine import (
+    TRIGGERS,
+    WorkflowEngine,
+    WorkflowError,
+    _folder_path,
+    validate_trigger,
+)
 from .registry import ActionResult, ActionSpec, Registry, Risk
 
 _DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -36,12 +42,24 @@ def _describe_create(args: dict) -> str:
         "startup": " every time Corvus starts",
         "idle": f" after {args.get('idle_minutes')} minutes with no keyboard or mouse input",
         # Anything that can write to the folder (a download, a sync client) can set this off.
-        "folder": f" whenever a new file appears in {args.get('folder')}",
+        "folder": f" whenever a new file appears in {_folder_path(str(args.get('folder') or ''))}",
         "voice": f" when you say “{args.get('phrase')}”",
         "hotkey": f" when you press {args.get('hotkey')} anywhere in Windows",
     }.get(trigger, " when you run it")
     unattended = "" if trigger in ("manual", "voice", "hotkey") else " It will run on its own, without asking."
     return f"Save workflow “{args.get('name')}” that runs {names}{when}?{unattended}"
+
+
+def _create_problem(engine: WorkflowEngine, args: dict) -> str | None:
+    """Why this workflow can't be saved, checked before the confirmation card:
+    live, the user was asked to approve a workflow whose step didn't exist."""
+    try:
+        engine.validate_steps(args.get("steps") or [])
+        trigger = args.get("trigger") or "manual"
+        validate_trigger(trigger, _trigger_config({**args, "trigger": trigger}))
+    except WorkflowError as exc:
+        return str(exc)
+    return None
 
 
 def register_workflow_actions(reg: Registry, engine: WorkflowEngine) -> None:
@@ -60,7 +78,10 @@ def register_workflow_actions(reg: Registry, engine: WorkflowEngine) -> None:
         "(every_minutes); 'startup' (when Corvus starts); 'idle' (idle_minutes without input); "
         "'folder' (folder = full path; runs when a new file appears there); 'voice' (phrase); "
         "'hotkey' (hotkey = global shortcut with two of Ctrl/Alt/Shift, e.g. 'Ctrl+Alt+M'). "
-        "Only safe and low-risk actions are allowed in workflows.",
+        "Only safe and low-risk actions are allowed in workflows. Step examples: "
+        "{'action': 'open_app', 'arguments': {'app': 'notepad'}}, "
+        "{'action': 'notify', 'arguments': {'title': 'Corvus', 'message': 'Good morning'}}. "
+        "Leave trigger out (manual) unless the user said when it should run.",
         {"type": "object", "properties": {
             "name": {"type": "string"},
             "steps": {"type": "array", "items": {"type": "object", "properties": {
@@ -77,12 +98,13 @@ def register_workflow_actions(reg: Registry, engine: WorkflowEngine) -> None:
                               "description": "Minutes between runs for an interval workflow"},
             "idle_minutes": {"type": "integer", "minimum": 1, "maximum": 1440,
                              "description": "Minutes without input before an idle workflow runs"},
-            "folder": {"type": "string", "description": "Full folder path for a folder workflow"},
+            "folder": {"type": "string", "description": "Folder for a folder workflow: a full path, or relative to the home folder (e.g. Downloads\\invoices)"},
             "phrase": {"type": "string", "description": "Spoken phrase for a voice workflow"},
             "hotkey": {"type": "string", "description": "Global shortcut for a hotkey workflow, e.g. Ctrl+Alt+M"},
         }, "required": ["name", "steps"], "additionalProperties": False},
         Risk.MEDIUM, create_workflow, category="workflows",
         confirm_prompt=lambda a: _describe_create(a),
+        precheck=lambda a: _create_problem(engine, a),
     ))
 
     async def run_workflow(name: str) -> ActionResult:

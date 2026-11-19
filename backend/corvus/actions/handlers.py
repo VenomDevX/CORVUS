@@ -149,7 +149,7 @@ def register_all(reg: Registry) -> None:
         return ActionResult(True, f"Saved a screenshot to {dest}.", {"path": str(dest)})
 
     reg.register(ActionSpec(
-        "take_screenshot", "Capture a screenshot of the primary display.",
+        "take_screenshot", "Take a screenshot of the user's screen (primary display).",
         _NO_PARAMS, Risk.SAFE, take_screenshot, category="display",
     ))
 
@@ -221,11 +221,11 @@ def register_all(reg: Registry) -> None:
                 (p for p in root.rglob(f"*{query}*") if p.resolve().is_relative_to(root)), 25
             )
         ]
-        msg = f"Found {len(matches)} match(es) for “{query}” in {folder}."
+        msg = f"Found {len(matches)} match(es) for “{query}” in {root}."
         return ActionResult(True, msg, {"matches": matches})
 
     reg.register(ActionSpec(
-        "search_files", "Search for files by name within a user folder.",
+        "search_files", "Find files by name on this PC (e.g. 'find my resume'), within a user folder.",
         {"type": "object", "properties": {
             "query": {"type": "string"},
             "folder": {"type": "string", "description": "downloads/documents/desktop or a path", "default": "documents"},

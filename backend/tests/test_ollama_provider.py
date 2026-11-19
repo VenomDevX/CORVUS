@@ -190,9 +190,10 @@ async def test_fenced_json_tool_call_is_recovered_with_args():
     assert calls[0].arguments == {"app": "Chrome"}
 
 
-async def test_json_content_not_matching_a_tool_is_left_as_text():
-    # Ordinary JSON the user asked for must pass through as text, not be
-    # misread as an action.
+async def test_call_to_a_made_up_tool_goes_to_the_agent_not_the_user():
+    # qwen2.5-coder answers "what's 15% of 240" with a call to an invented
+    # "calculate_percentage". Shown as text it's raw JSON; as a call the agent
+    # replies "Unknown action" and the model answers in words.
     def handler(request: httpx.Request) -> httpx.Response:
         blob = '{"name": "not_a_registered_action", "arguments": {}}'
         return ndjson_response([{"message": {"content": blob}, "done": True}])
@@ -202,8 +203,8 @@ async def test_json_content_not_matching_a_tool_is_left_as_text():
     deltas = [
         d async for d in provider.stream_chat_with_tools([Message("user", "give me json")], "m", tools)
     ]
-    assert "not_a_registered_action" in "".join(d.content for d in deltas)
-    assert [c for d in deltas for c in d.tool_calls] == []
+    assert "not_a_registered_action" not in "".join(d.content for d in deltas)
+    assert [c.name for d in deltas for c in d.tool_calls] == ["not_a_registered_action"]
 
 
 async def test_plain_text_streams_incrementally_with_tools_available():

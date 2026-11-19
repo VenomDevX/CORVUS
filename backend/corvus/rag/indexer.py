@@ -340,8 +340,8 @@ def register_rag_actions(registry, index: DocsIndex) -> None:
         ActionSpec(
             name="search_documents",
             description=(
-                "Search the user's locally indexed documents (PDFs, notes, text files) for passages "
-                "relevant to a query. ONLY use when the user EXPLICITLY asks about their own files, "
+                "Search the TEXT INSIDE the user's indexed documents (PDFs, notes) for passages "
+                "relevant to a query. To find files by name use search_files. ONLY use when the user EXPLICITLY asks about their own files, "
                 "notes, or documents — e.g. 'search my files for X', 'what does my PDF say about Y'. "
                 "NEVER use for general knowledge questions, greetings, coding help, or explanations, "
                 "or to see what's in a folder (that's list_folder)."

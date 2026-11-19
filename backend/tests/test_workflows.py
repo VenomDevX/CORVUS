@@ -242,3 +242,34 @@ def test_hotkey_validation_and_uniqueness(repo):
     engine.create("a", [{"action": "system_status"}], "hotkey", {"keys": "Ctrl+Alt+M"})  # update ok
     with pytest.raises(WorkflowError, match="already runs"):
         engine.create("b", [{"action": "system_status"}], "hotkey", {"keys": "alt+ctrl+m"})
+
+
+def test_folder_trigger_maps_made_up_and_relative_paths(tmp_path, monkeypatch):
+    # Live test: the model sent C:\Users\YourUsername\corvus-trigger-test.
+    from corvus.actions import files
+    from corvus.workflows.engine import validate_trigger
+    monkeypatch.setattr(files, "USER_ROOT", tmp_path)
+    (tmp_path / "inbox").mkdir()
+    want = {"path": str((tmp_path / "inbox").resolve())}
+    assert validate_trigger("folder", {"path": r"C:\Users\YourUsername\inbox"}) == want
+    assert validate_trigger("folder", {"path": "inbox"}) == want
+
+
+def test_step_with_bad_arguments_rejected_at_save(engine):
+    # Live: a hotkey workflow saved open_app without "app" and failed on every press.
+    with pytest.raises(WorkflowError, match="missing app"):
+        engine.create("quicknote", [{"action": "open_app", "arguments": {}}])
+    with pytest.raises(WorkflowError, match="unknown app_name"):
+        engine.create("quicknote", [{"action": "open_app", "arguments": {"app": "x", "app_name": "notepad"}}])
+
+
+async def test_invalid_workflow_fails_before_the_confirmation_card(engine):
+    # Live: the user was asked to approve a workflow whose step didn't exist.
+    from corvus.actions.registry import Registry
+    from corvus.actions.workflow_handlers import register_workflow_actions
+    reg = Registry()
+    register_workflow_actions(reg, engine)
+    spec = reg.get("create_workflow")
+    problem = spec.argument_error({"name": "focus", "steps": [{"action": "set_volume", "arguments": {}}]})
+    assert problem and "set_volume" in problem and "open_app" in problem
+    assert spec.argument_error({"name": "f", "steps": [{"action": "open_app", "arguments": {"app": "x"}}]}) is None

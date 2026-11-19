@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { SectionShell } from "./SectionShell";
 import { api, type BrowserStatus, type DownloadItem } from "../lib/api";
 import { useCorvus } from "../state/store";
 
-/** Downloads section: files Corvus has saved via browser automation, plus the
+/** Downloads tab (inside Tasks): files Corvus has saved via browser automation, plus the
  * browser session status and the sites you've consented to log in to. */
 export function DownloadsView() {
   const [items, setItems] = useState<DownloadItem[]>([]);
@@ -25,18 +24,14 @@ export function DownloadsView() {
   }, [backendOnline, refresh]);
 
   return (
-    <SectionShell
-      title="Downloads"
-      actions={
+    <div>
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-body-sm">
         <button
           onClick={() => void refresh()}
-          className="rounded bg-accent/20 px-3 py-1.5 text-body-sm text-accent-bright transition-colors duration-fast hover:bg-accent/30"
+          className="ml-auto order-last rounded px-2 py-1 text-caption text-fg-muted transition-colors duration-fast hover:bg-white/5 hover:text-fg"
         >
           Refresh
         </button>
-      }
-    >
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-body-sm">
         <span className={`h-2 w-2 rounded-full ${status?.open ? "bg-success" : "bg-fg-faint"}`} />
         <span className="text-fg-muted">
           Browser {status?.open ? "session active" : status?.available ? "idle" : "unavailable"}
@@ -76,6 +71,6 @@ export function DownloadsView() {
           ))}
         </ul>
       )}
-    </SectionShell>
+    </div>
   );
 }

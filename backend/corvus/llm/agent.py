@@ -86,6 +86,15 @@ _GREETINGS = {
     "good evening", "good afternoon", "sup", "yo", "hola", "namaste",
     "thanks", "thank you", "bye", "goodbye", "good night",
 }
+# A programming question anywhere in the message: "LeetCode Two Sum ... give
+# solutions named is_valid_stack(s)". Offered tools, the model answered with
+# {"name": "is_valid_stack", ...} instead of code, 4 times out of 5.
+_CODING_QUESTION = re.compile(
+    r"\b(leetcode|hackerrank|codeforces|time complexity|space complexity|big[- ]o|algorithm|"
+    r"solutions?\b(?= (in|for|to|named|using))|"
+    r"(python|java|javascript|typescript|c\+\+|c#|golang|rust|sql|kotlin|swift)"
+    r" (function|solution|code|program|class|script|implementation)s?)"
+)
 _KNOWLEDGE_STARTS = (
     "what is", "what are", "what was", "what were", "what does", "what do",
     "who is", "who are", "who was", "who were",
@@ -227,13 +236,26 @@ async def _is_conversational(text: str) -> bool:
     if t.rstrip("!?.") in _GREETINGS or _MEMORY_NOTE.match(t):
         return True
     words = re.findall(r"[a-z0-9']+", t)
+    # "Edit Distance: min insert/delete/replace operations" is a coding
+    # question, not a delete - unless it names something on this PC.
+    if _CODING_QUESTION.search(t) and not any(w in _LOCAL_NOUNS for w in words) and not _THIS_MACHINE.search(t):
+        return True
     if any(w in _ACTION_VERBS or w in _LOCAL_NOUNS for w in words) or _THIS_MACHINE.search(t):
         return False
-    if t.startswith(_KNOWLEDGE_STARTS) or t.startswith(_CODE_STARTS):
+    if t.startswith(_KNOWLEDGE_STARTS) or t.startswith(_CODE_STARTS) or _CODING_QUESTION.search(t):
+        return True
+    # A question with no action word and nothing about this PC is a study
+    # question. Offered tools, the model invented math_problem and
+    # calculate_net_income for "probability that both are boys?" and
+    # case-study maths, and one turn died in the loop guard. Long ones win
+    # over weak verbs too ("Two trains start 300 km apart ... meet?").
+    if "?" in t and len(words) >= 12:
         return True
     if any(w in _WEAK_ACTION_VERBS for w in words):
         return False
     if any(pattern in t for pattern in _CHAT_PATTERNS):
+        return True
+    if "?" in t:
         return True
     # Very short messages without action words are almost always chat.
     return len(words) <= 3

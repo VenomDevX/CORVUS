@@ -89,13 +89,16 @@ function MessageItem({ m, index, initialCount }: { m: any, index: number, initia
       ) : (
         <>
           {m.content ? (
-            <div className="flex flex-col items-start gap-1 max-w-[80%] group">
-              {/* max-w-full: a long code line otherwise widens the reply past the column. */}
-              <div className="max-w-full px-4 py-3 text-fg">
-                <MarkdownContent content={m.content} />
-              </div>
-              <div className="flex w-full justify-start items-start gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <MessageActionButtons content={m.content ?? ""} className="text-fg-muted" />
+            <div className="flex max-w-[85%] items-start gap-3 group">
+              <img src="./logo.png" alt="Corvus" className="mt-3.5 h-5 w-5 shrink-0 opacity-80" />
+              <div className="flex min-w-0 flex-col items-start gap-1">
+                {/* max-w-full: a long code line otherwise widens the reply past the column. */}
+                <div className="max-w-full rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 text-fg">
+                  <MarkdownContent content={m.content} />
+                </div>
+                <div className="flex w-full justify-start items-start gap-1 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <MessageActionButtons content={m.content ?? ""} className="text-fg-muted" />
+                </div>
               </div>
             </div>
           ) : actions && actions.length > 0 ? (
@@ -114,11 +117,20 @@ function MessageItem({ m, index, initialCount }: { m: any, index: number, initia
   );
 }
 
+// One per feature area, so the empty screen teaches what Corvus can do.
+const SUGGESTIONS = [
+  "Remind me in 10 minutes to stretch",
+  "Make a workflow called morning that opens Chrome",
+  "Find PDF files in my Downloads",
+  "Explain recursion with a Python example",
+];
+
 export function ChatView() {
   const messages = useCorvus((s) => s.messages);
   const orbState = useCorvus((s) => s.orbState);
   const level = useCorvus((s) => s.voice.level);
   const generating = useCorvus((s) => s.generating);
+  const send = useCorvus((s) => s.send);
   const scroller = useRef<HTMLDivElement>(null);
   // Stagger only the bubbles present on first render (history load); messages
   // that arrive live should appear immediately.
@@ -132,7 +144,7 @@ export function ChatView() {
 
   return (
     <div className="relative flex h-full flex-col gap-3">
-      <div className={`pointer-events-none ${empty ? "flex flex-1 flex-col items-center justify-center gap-6" : "absolute inset-0 z-0 overflow-hidden"}`}>
+      <div className={`pointer-events-none ${empty ? "flex flex-1 flex-col items-center justify-center gap-6" : "absolute inset-0 z-0 overflow-hidden opacity-20"}`}>
         <Orb state={orbState} level={level} backgroundMode={!empty} />
         {empty && (
           <div className="text-center">
@@ -140,6 +152,19 @@ export function ChatView() {
             <p className="mt-1 text-body text-fg-muted">
               Ask anything, or just say &ldquo;Hey Corvus&rdquo;.
             </p>
+          </div>
+        )}
+        {empty && (
+          <div className="pointer-events-auto flex max-w-2xl flex-wrap justify-center gap-2 px-4">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                onClick={() => send(s)}
+                className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-body-sm text-fg-muted transition-colors duration-fast hover:border-accent/40 hover:text-fg"
+              >
+                {s}
+              </button>
+            ))}
           </div>
         )}
       </div>

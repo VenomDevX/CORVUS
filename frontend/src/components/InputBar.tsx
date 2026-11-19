@@ -296,7 +296,7 @@ export function InputBar() {
                 onChange={(next) => void changeModel(next)}
                 options={(models.includes(model) ? models : [model, ...models])
                   .filter(Boolean)
-                  .map((m) => ({ value: m }))}
+                  .map((m) => ({ value: m, label: m.replace(/:latest$/, "") }))}
               />
             )}
           </div>

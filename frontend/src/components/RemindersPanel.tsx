@@ -56,7 +56,6 @@ export function RemindersPanel() {
 
   return (
     <section className="mb-6">
-      <h2 className="mb-1 text-h4">Reminders</h2>
       <p className="mb-3 text-body-sm text-fg-muted">
         Timers, alarms, and reminders you&rsquo;ve set. Cancel one and it never fires.
       </p>

@@ -132,13 +132,6 @@ const ACCENT_COLORS = [
   { value: "amethyst", hex: "#8B5CF6" },
   { value: "amber", hex: "#F59E0B" },
   { value: "ruby", hex: "#EF4444" },
-  { value: "ocean", hex: "#06B6D4" },
-  { value: "cyberpunk", hex: "#F472B6" },
-  { value: "forest", hex: "#059669" },
-  { value: "blush", hex: "#FECDD3" },
-  { value: "neon", hex: "#39FF14" },
-  { value: "midnight", hex: "#1E3A8A" },
-  { value: "black", hex: "#000000" },
 ] as const;
 
 const SCALE_MAP = ["compact", "default", "large"] as const;

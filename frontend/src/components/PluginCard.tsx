@@ -55,13 +55,14 @@ export function PluginCard({ plugin, onChange }: { plugin: Plugin; onChange: () 
           <p className="mt-1 text-body-sm text-fg-muted">{plugin.description}</p>
           <p className="mt-0.5 text-caption text-fg-faint">by {plugin.author}</p>
           {plugin.code_hash && (
-            <p className="mt-0.5 text-caption text-fg-faint">
+            <details className="mt-0.5 text-caption text-fg-faint">
+              <summary className="cursor-pointer select-none hover:text-fg-muted">Details</summary>
               Code hash{" "}
               <code className="rounded-sm bg-white/10 px-1 font-mono text-mono">
                 {plugin.code_hash.slice(0, 12)}
               </code>
               {" — "}enabling approves exactly this code; if it changes, Corvus asks again.
-            </p>
+            </details>
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">

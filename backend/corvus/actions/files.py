@@ -37,7 +37,10 @@ def _unalias_home(raw: str) -> str:
 
 def safe_path(raw: str) -> Path:
     """Resolve a path and ensure it stays within the user profile."""
-    p = Path(_unalias_home(raw)).expanduser()
+    try:
+        p = Path(_unalias_home(raw)).expanduser()
+    except RuntimeError as exc:  # "~other" names another user's home: never ours
+        raise PathNotAllowed(f"{raw} is outside your user folder; Corvus won't touch it.") from exc
     if not p.is_absolute():
         p = USER_ROOT / p
     resolved = p.resolve()

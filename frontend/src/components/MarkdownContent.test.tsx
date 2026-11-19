@@ -21,6 +21,15 @@ describe("MarkdownContent", () => {
     expect(screen.queryByRole("button", { name: "Copy code" })).toBeNull();
   });
 
+  it("renders \\[ \\] and \\( \\) maths with KaTeX but leaves prices and code alone", () => {
+    const { container } = render(
+      <MarkdownContent content={"So \\( t = 4 \\) s.\n\n\\[ t = \\sqrt{16} \\]\n\nThe ball costs $0.05 and the bat $1.05.\n\n```\nx = \"\\\\(raw\\\\)\"\n```"} />,
+    );
+    expect(container.querySelectorAll(".katex").length).toBe(2);
+    expect(container.textContent).toContain("The ball costs $0.05 and the bat $1.05.");
+    expect(container.querySelector("pre")?.textContent).toContain("\\\\(raw\\\\)");
+  });
+
   it("renders links", () => {
     render(<MarkdownContent content={"[Corvus](https://example.com)"} />);
     const link = screen.getByRole("link", { name: "Corvus" });

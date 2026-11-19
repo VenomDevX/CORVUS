@@ -58,7 +58,7 @@ function isSafeUrl(url: string | undefined): boolean {
 
 export function MarkdownContent({ content }: { content: string }) {
   return (
-    <div className="markdown space-y-2 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-white/10 [&_th]:bg-white/5 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5">
+    <div className="markdown min-w-0 space-y-2 [overflow-wrap:anywhere] [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-white/10 [&_th]:bg-white/5 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

@@ -112,7 +112,8 @@ def register_browser_actions(reg: Registry, browser: BrowserEngine, provider, ge
         return ActionResult(True, f"Saved a screenshot of the page to {dest}.", {"path": str(dest)})
 
     reg.register(ActionSpec(
-        "browser_screenshot", "Capture a screenshot of the current browser page.",
+        "browser_screenshot", "Capture the page open in Corvus's automated web browser. For a screenshot "
+        "of the user's screen use take_screenshot.",
         {"type": "object", "properties": {}}, Risk.SAFE, screenshot_page, category="browser",
     ))
 
@@ -161,7 +162,8 @@ def register_browser_actions(reg: Registry, browser: BrowserEngine, provider, ge
         )
 
     reg.register(ActionSpec(
-        "browser_open_login", "Open a website's sign-in page so the user can log in. Corvus never "
+        "browser_open_login", "Open a website's sign-in page so the user can log in (websites only, "
+        "never apps - use open_app for those). Corvus never "
         "types stored passwords; the browser's own credential manager handles it.",
         _STR("site", "The site to sign in to (URL or domain)"),
         Risk.HIGH, open_login,

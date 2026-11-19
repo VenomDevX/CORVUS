@@ -216,6 +216,32 @@ async def test_silent_tool_loop_is_broken():
     assert outcome.text == "Here's a summary."
 
 
+async def test_silent_retry_with_changed_call_still_runs():
+    # Live test: set_reminder failed (wrong year), the silent retry with the
+    # right date was cut by the loop breaker and leaked as JSON text.
+    calls = []
+    provider = FakeProvider(chunks=["Done."], tool_script=[
+        TurnResult("", [ToolCall("safe_act", {})]),
+        TurnResult("", [ToolCall("medium_act", {})]),
+        TurnResult("Done.", []),
+    ])
+    await run_agent_turn(provider, "m", [Message("user", "check")],
+                         build_registry(calls), always_yes, include_tools=True)
+    assert [name for name, _ in calls] == ["safe", "medium"]
+
+
+async def test_a_call_that_already_worked_is_not_repeated():
+    calls = []
+    provider = FakeProvider(chunks=["Done."], tool_script=[
+        TurnResult("", [ToolCall("safe_act", {})]),
+        TurnResult("ok", [ToolCall("safe_act", {})]),
+        TurnResult("Done.", []),
+    ])
+    await run_agent_turn(provider, "m", [Message("user", "check")],
+                         build_registry(calls), always_yes, include_tools=True)
+    assert len(calls) == 1
+
+
 async def test_include_tools_false_sends_no_tool_schemas():
     seen = []
 
@@ -266,3 +292,95 @@ from corvus.llm.agent import _is_conversational  # noqa: E402
 ])
 async def test_conversational_classifier(text, conversational):
     assert await _is_conversational(text) is conversational
+
+
+async def test_follow_up_to_a_chat_turn_stays_chat():
+    from corvus.llm.agent import needs_tools
+    code_q = "Write a Python function that checks if a string is a palindrome."
+    # Live test: given tools here, the model started a 30-minute timer.
+    assert await needs_tools("Now make it ignore spaces and case.", code_q) is False
+    assert await needs_tools("Now open notepad", code_q) is True
+    assert await needs_tools("Now make it ignore spaces and case.", None) is True
+
+
+async def test_made_up_tool_points_at_a_close_real_one():
+    from corvus.actions.registry import ActionResult, ActionSpec, Registry, Risk
+    from corvus.llm.agent import _run_one
+    from corvus.llm.base import ToolCall
+    reg = Registry()
+    reg.register(ActionSpec("set_volume", "Set volume.", {"type": "object", "properties": {}},
+                            Risk.SAFE, lambda: ActionResult(True, "ok")))
+    near = await _run_one(ToolCall("change_volume", {}), reg, None, None, None)
+    far = await _run_one(ToolCall("calculate_percentage", {}), reg, None, None, None)
+    assert "set_volume" in near.message
+    assert "without mentioning tools" in far.message
+
+
+async def test_null_optional_arguments_count_as_not_given():
+    # Live: {"reminder_id": null} and {"in_minutes": null} failed schema checks.
+    from corvus.actions.registry import ActionResult, ActionSpec, Registry, Risk
+    from corvus.llm.agent import _run_one
+    from corvus.llm.base import ToolCall
+    got = []
+    reg = Registry()
+    reg.register(ActionSpec("act", "x", {"type": "object", "properties": {
+        "n": {"type": "integer"}, "text": {"type": "string"}}, "required": ["text"]},
+        Risk.SAFE, lambda **kw: got.append(kw) or ActionResult(True, "ok")))
+    res = await _run_one(ToolCall("act", {"text": "hi", "n": None}), reg, None, None, None)
+    assert res.ok and got == [{"text": "hi"}]
+
+
+async def test_same_action_with_same_required_args_runs_once():
+    # Live: one "set a timer for 2 minutes" made three timers (labels differed).
+    from corvus.actions.registry import ActionResult, ActionSpec, Registry, Risk
+    got = []
+    reg = Registry()
+    reg.register(ActionSpec("set_timer", "x", {"type": "object", "properties": {
+        "minutes": {"type": "number"}, "label": {"type": "string"}}, "required": ["minutes"]},
+        Risk.SAFE, lambda **kw: got.append(kw) or ActionResult(True, "ok")))
+    provider = FakeProvider(chunks=["Done."], tool_script=[
+        TurnResult("", [ToolCall("set_timer", {"minutes": 2})]),
+        TurnResult("", [ToolCall("set_timer", {"minutes": 2, "label": "Reminder"})]),
+        TurnResult("x", [ToolCall("set_timer", {"minutes": 4})]),
+        TurnResult("Done.", []),
+    ])
+    await run_agent_turn(provider, "m", [Message("user", "t")], reg, always_yes, include_tools=True)
+    assert [g["minutes"] for g in got] == [2, 4]
+
+
+async def test_one_misnamed_required_argument_is_renamed():
+    from corvus.actions.registry import ActionResult, ActionSpec, Registry, Risk
+    from corvus.llm.agent import _run_one
+    from corvus.llm.base import ToolCall
+    got = []
+    reg = Registry()
+    reg.register(ActionSpec("list_folder", "x", {"type": "object", "properties": {
+        "path": {"type": "string"}}, "required": ["path"]},
+        Risk.SAFE, lambda **kw: got.append(kw) or ActionResult(True, "ok")))
+    res = await _run_one(ToolCall("list_folder", {"folder": "Downloads"}), reg, None, None, None)
+    assert res.ok and got == [{"path": "Downloads"}]
+
+
+async def test_silent_turn_after_a_successful_action_reports_it():
+    provider = FakeProvider(chunks=[], tool_script=[
+        TurnResult("", [ToolCall("safe_act", {})]), TurnResult("", []),
+    ])
+    out = await run_agent_turn(provider, "m", [Message("user", "x")], build_registry([]),
+                               always_yes, include_tools=True)
+    assert out.text == "did safe thing"
+
+
+async def test_once_per_turn_action_runs_once_whatever_the_arguments():
+    from corvus.actions.registry import ActionResult, ActionSpec, Registry, Risk
+    got = []
+    reg = Registry()
+    reg.register(ActionSpec("notify", "x", {"type": "object", "properties": {
+        "title": {"type": "string"}}, "required": ["title"]},
+        Risk.SAFE, lambda **kw: got.append(kw) or ActionResult(True, "sent"), once_per_turn=True))
+    provider = FakeProvider(chunks=["Done."], tool_script=[
+        TurnResult("", [ToolCall("notify", {"title": "Error"})]),
+        TurnResult("x", [ToolCall("notify", {"title": "Corvus"})]),
+        TurnResult("Done.", []),
+    ])
+    await run_agent_turn(provider, "m", [Message("user", "t")], reg, always_yes, include_tools=True)
+    assert len(got) == 1

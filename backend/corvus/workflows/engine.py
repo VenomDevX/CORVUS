@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import difflib
 import json
 import re
 import sys
@@ -21,6 +22,7 @@ from pathlib import Path
 
 import structlog
 
+from ..actions import files
 from ..actions.registry import Risk
 
 log = structlog.get_logger("corvus")
@@ -87,6 +89,13 @@ def _hotkey(raw) -> str:
     return accel
 
 
+def _folder_path(raw: str) -> Path:
+    r"""Where a folder trigger watches. Made-up home folders
+    ("C:\Users\YourUsername\x") and bare names ("my-folder") mean the user's own."""
+    path = Path(files._unalias_home(raw)).expanduser()
+    return path if path.is_absolute() else files.USER_ROOT / path
+
+
 def validate_trigger(kind: str, config: dict | None) -> dict:
     """Check a trigger's settings and return only the keys it uses."""
     config = config or {}
@@ -110,8 +119,8 @@ def validate_trigger(kind: str, config: dict | None) -> dict:
         return {"minutes": _minutes(config.get("minutes"), "Idle minutes")}
     if kind == "folder":
         raw = str(config.get("path") or "").strip()
-        path = Path(raw).expanduser() if raw else None
-        if not path or not path.is_absolute() or not path.is_dir():
+        path = _folder_path(raw) if raw else None
+        if not path or not path.is_dir():
             raise WorkflowError("A folder workflow needs the full path of an existing folder.")
         return {"path": str(path.resolve())}
     if kind == "voice":
@@ -160,13 +169,31 @@ class WorkflowEngine:
                 raise WorkflowError(f"'{name}' can't be used as a workflow step.")
             spec = self.registry.get(name)
             if spec is None:
-                raise WorkflowError(f"Unknown action in workflow: {name}")
+                allowed = sorted(s.name for s in self.registry.all()
+                                 if s.risk in ALLOWED_RISK and s.name not in BARRED_ACTIONS)
+                near = difflib.get_close_matches(str(name), allowed, n=1, cutoff=0.6)
+                hint = (f" Did you mean {near[0]}? Retry create_workflow with that step; don't run it now."
+                        if near else "")
+                raise WorkflowError(f"Unknown action in workflow: {name}.{hint} "
+                                    f"Workflow steps can use: {', '.join(allowed)}.")
             if spec.risk not in ALLOWED_RISK:
                 raise WorkflowError(
-                    f"'{name}' is {spec.risk.value}-risk and can't run unattended in a workflow; "
-                    "ask for it directly in chat instead."
+                    # Wording matters: "ask for it in chat instead" made a 7B model
+                    # run the step on the spot (a login page for example.com).
+                    f"'{name}' is {spec.risk.value}-risk, so workflows can't include it. Check the "
+                    "step is the right action (apps open with open_app); otherwise tell the user. "
+                    "Don't run it now."
                 )
-            clean.append({"action": name, "arguments": step.get("arguments", {})})
+            args = step.get("arguments") or {}
+            if not isinstance(args, dict):
+                raise WorkflowError(f"Step '{name}': arguments must be an object.")
+            required = set(spec.parameters.get("required", []))
+            args = {k: v for k, v in args.items() if v is not None or k in required}
+            # Checked now, while the model can still fix it: a hotkey workflow
+            # once saved open_app without its app and failed on every press.
+            if (problem := spec.argument_error(args)) is not None:
+                raise WorkflowError(f"Step '{name}': {problem}")
+            clean.append({"action": name, "arguments": args})
         return clean
 
     def create(self, name: str, steps: list, trigger_type: str = "manual",

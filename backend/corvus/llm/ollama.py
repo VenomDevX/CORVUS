@@ -79,7 +79,8 @@ def _json_start(text: str) -> int:
     return match.start() if match else -1
 
 
-def _parse_tool_objects(text: str, valid_names: set[str]) -> list[ToolCall]:
+def _parse_tool_objects(text: str, valid_names: set[str] | None) -> list[ToolCall]:
+    """Tool-call objects in `text`; valid_names=None accepts any name."""
     text = text.strip()
     if text.startswith("`" * 3):
         text = re.sub(r"^`{3}[a-zA-Z]*\s*", "", text)
@@ -100,7 +101,7 @@ def _parse_tool_objects(text: str, valid_names: set[str]) -> list[ToolCall]:
                 args = json.loads(args)
             except json.JSONDecodeError:
                 args = {}
-        if name in valid_names and isinstance(args, dict):
+        if isinstance(name, str) and name and (valid_names is None or name in valid_names) and isinstance(args, dict):
             calls.append(ToolCall(name=name, arguments=args))
     return calls
 
@@ -349,6 +350,13 @@ class OllamaProvider:
                     if done:
                         held = buffer[emitted:]
                         text_calls = _extract_text_tool_calls(held, valid_names) if held.strip() else []
+                        if not text_calls and not emitted_native_calls and held.strip():
+                            # The whole reply is a call to a tool that doesn't exist
+                            # ("calculate_speed", "adjust_volume"); live tests hit this on
+                            # 1 in 3 math prompts. Pass it to the agent, which answers
+                            # "Unknown action" so the model retries or replies in words,
+                            # instead of showing the user raw JSON.
+                            text_calls = _parse_tool_objects(held, None)
                         if text_calls:
                             if not emitted_native_calls:
                                 yield Delta(content="", done=True, tool_calls=text_calls)

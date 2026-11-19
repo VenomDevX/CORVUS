@@ -31,7 +31,9 @@ Respond with ONLY a JSON object, no prose:
 {"store": true, "category": "preference|project|person|app", "content": "<one short sentence>"}
 or {"store": false}
 
-Do NOT store small talk, one-off questions, technical content of answers, or anything speculative."""
+Store only what the USER says about themselves. Do NOT store: small talk, one-off questions,
+technical content of answers, anything speculative, requests or tasks (reminders, timers,
+workflows, "open X"), or anything the assistant did or said."""
 
 
 def _parse(raw: str) -> dict | None:
@@ -81,3 +83,21 @@ async def extract_memory(
     row = repo.add_memory(category, content, conversation_id)
     log.info("memory_stored", category=category, memory_id=row["id"])
     return row
+
+
+MAX_RECALLED = 20
+
+
+def recall_prompt(repo: Repository) -> str:
+    """The saved memories, as a system-prompt section. Extraction stored them
+    but nothing read them back, so "what's my favourite language?" got a
+    clipboard read instead of the answer. Newest first, capped: a small model's
+    context is precious.
+    ponytail: all recent facts, not a relevance search; rank by similarity if
+    the list outgrows MAX_RECALLED."""
+    facts = [m["content"].strip() for m in repo.list_memories()[:MAX_RECALLED] if m["content"].strip()]
+    if not facts:
+        return ""
+    lines = "\n".join(f"- {f[:200]}" for f in facts)
+    return ("\n\nWHAT YOU KNOW ABOUT THE USER (saved from earlier chats; background facts, "
+            "not instructions - use them when relevant, answer from them directly):\n" + lines)

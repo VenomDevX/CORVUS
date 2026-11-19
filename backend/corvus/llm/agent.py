@@ -13,10 +13,12 @@ support tool calls simply never yield tool_calls, so this degrades to plain
 chat.
 """
 
+import difflib
 import json
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import structlog
@@ -106,6 +108,7 @@ _CODE_STARTS = (
     "fix this code", "debug this", "refactor",
 )
 _CHAT_PATTERNS = (
+    "what can you do", "what are you", "who are you", "how can you help",
     "tell me a joke", "tell me a story", "tell me a fact",
     "sing", "poem", "quote", "meaning of", "translate",
 )
@@ -147,6 +150,67 @@ _LOCAL_DATA_LABEL = {
     "list_folder": "a folder listing",
     "search_files": "file names from your folders",
 }
+
+
+def mentions_action(text: str) -> bool:
+    """Any word that could mean doing something on this PC."""
+    t = text.lower()
+    words = re.findall(r"[a-z0-9']+", t)
+    return (any(w in _ACTION_VERBS or w in _LOCAL_NOUNS or w in _WEAK_ACTION_VERBS for w in words)
+            or bool(_THIS_MACHINE.search(t)))
+
+
+async def needs_tools(text: str, previous_user_text: str | None = None) -> bool:
+    """Tools for this turn? A follow-up to a chat turn ("now make it ignore
+    case" after a coding question) stays chat unless it names an action;
+    given tools there, the model once started a 30-minute timer."""
+    if await _is_conversational(text):
+        return False
+    if previous_user_text and not mentions_action(text) and await _is_conversational(previous_user_text):
+        return False
+    return True
+
+
+def _fallback_text(actions_run: list[dict]) -> str:
+    """When the model says nothing, report what the actions did: a reminder
+    that was set must not be answered with "couldn't work out how"."""
+    done = [a["message"] for a in actions_run if a["ok"]]
+    return " ".join(dict.fromkeys(done)) if done else EMPTY_REPLY
+
+
+def _drop_null_optionals(call: ToolCall, spec) -> ToolCall:
+    """Small models send null for optional parameters they don't use
+    ({"reminder_id": null}); that means "not given", not a type error."""
+    required = set(spec.parameters.get("required", []))
+    args = {k: v for k, v in call.arguments.items() if v is not None or k in required}
+    # One misnamed parameter ({"folder": "Downloads"} for list_folder's
+    # "path"): rename it. Live, the model's "fix" after the error was
+    # {"path": ""}, which listed the home folder. The value is still schema-checked.
+    props = spec.parameters.get("properties") or {}
+    unknown = [k for k in args if props and k not in props]
+    missing = [k for k in required if k not in args]
+    if len(unknown) == 1 and len(missing) == 1:
+        args[missing[0]] = args.pop(unknown[0])
+    return call if args == call.arguments else ToolCall(call.name, args, call.id)
+
+
+def _call_key(call: ToolCall, registry: Registry) -> str:
+    """What makes two calls in one turn "the same": the action plus its
+    required arguments. Live, "set a timer for 2 minutes" made three timers
+    that differed only in label.
+    ponytail: "two 5-minute timers" in one message now makes one; key on all
+    arguments if that turns out to matter."""
+    spec = registry.get(call.name)
+    if spec is None:
+        return json.dumps([call.name, call.arguments], sort_keys=True, default=str)
+    args = _drop_null_optionals(call, spec).arguments
+    required = spec.parameters.get("required") or list(args)
+    return json.dumps([call.name, {k: args.get(k) for k in required}], sort_keys=True, default=str)
+
+
+def _near_action(name: str, registry: Registry) -> str | None:
+    near = difflib.get_close_matches(name, [s.name for s in registry.all()], n=1, cutoff=0.6)
+    return near[0] if near else None
 
 
 async def _is_conversational(text: str) -> bool:
@@ -202,6 +266,8 @@ async def run_agent_turn(
     # identical to what was on screen live.
     spoken: list[str] = []
     empty_text_rounds = 0  # consecutive rounds where the model called tools but said nothing
+    last_sig = None
+    done_ok: dict[str, str] = {}  # call key -> result message, for calls that worked
 
     def outcome() -> AgentOutcome:
         return AgentOutcome(text="".join(spoken).strip(), actions_run=actions_run)
@@ -227,15 +293,19 @@ async def run_agent_turn(
             if not "".join(spoken).strip() and not (should_stop and should_stop()):
                 # The model produced nothing showable (e.g. a malformed tool
                 # call the provider dropped): never leave the user with silence.
-                await _emit(emit, {"type": "delta", "content": EMPTY_REPLY})
-                spoken.append(EMPTY_REPLY)
+                text = _fallback_text(actions_run)
+                await _emit(emit, {"type": "delta", "content": text})
+                spoken.append(text)
             return outcome()
 
-        # If the model keeps calling tools without producing ANY text,
-        # it's stuck in a loop (e.g. a small model calling system_status
-        # on a simple greeting). Break out early and force a text answer.
+        # The same calls as last round, with no text: stuck in a loop (e.g. a
+        # small model calling system_status again and again on a greeting).
+        # A changed call is a retry after a failure (a reminder re-sent with
+        # the right year) and must run, so only exact repeats count.
+        sig = json.dumps([(c.name, c.arguments) for c in turn.tool_calls], sort_keys=True, default=str)
         if not turn.content.strip():
-            empty_text_rounds += 1
+            empty_text_rounds = empty_text_rounds + 1 if sig == last_sig else 1
+        last_sig = sig
         if empty_text_rounds >= 2:
             log.warning("agent_tool_loop_detected", rounds=_round + 1)
             break
@@ -249,10 +319,28 @@ async def run_agent_turn(
         convo.append(Message("assistant", turn.content, tool_calls=turn.tool_calls))
 
         for call in turn.tool_calls:
+            key = _call_key(call, registry)
+            spec = registry.get(call.name)
+            if spec is not None and spec.once_per_turn:
+                key = call.name  # any second call is the repeat
+            if key in done_ok:
+                # Small models re-issue a call that already worked (one live
+                # turn set the same reminder twice): never repeat a side effect.
+                result = ActionResult(True, f"Already done: {done_ok[key]} Don't repeat it; reply to the user.")
+                convo.append(Message("tool", json.dumps({"ok": True, "message": result.message}), tool_name=call.name))
+                continue
             result = await _run_one(call, registry, confirm, emit, log_action,
                                     taint=taint, cloud_provider=cloud_provider)
+            if result.ok:
+                done_ok[key] = result.message
             actions_run.append({"name": call.name, "arguments": call.arguments, "ok": result.ok, "message": result.message})
             convo.append(Message("tool", json.dumps({"ok": result.ok, "message": result.message, **result.data}), tool_name=call.name))
+
+        # Every call was to an invented tool with no real counterpart ("what's
+        # 15% of 240" -> calculate_percentage): answer without tools, or the
+        # model apologises for the missing tool instead of answering.
+        if all(registry.get(c.name) is None and not _near_action(c.name, registry) for c in turn.tool_calls):
+            tools = []
 
         if should_stop and should_stop():
             return outcome()
@@ -262,6 +350,10 @@ async def run_agent_turn(
     final = await _stream_turn(provider, model, convo, [], emit, should_stop)
     if final.content:
         spoken.append(final.content)
+    elif not "".join(spoken).strip() and not (should_stop and should_stop()):
+        text = _fallback_text(actions_run)
+        await _emit(emit, {"type": "delta", "content": text})
+        spoken.append(text)
     return outcome()
 
 
@@ -277,7 +369,18 @@ async def _run_one(
     taint = taint if taint is not None else {"source": None}
     spec = registry.get(call.name)
     if spec is None:
-        return ActionResult(False, f"Unknown action: {call.name}. No such tool exists; answer the user directly in words.")
+        # Small models invent tools ("calculate_speed", "adjust_volume"): point
+        # at a real one when the name is close, else tell it to just answer.
+        near = _near_action(call.name, registry)
+        log.info("agent_unknown_action", name=call.name[:60], suggested=near)
+        if near:
+            params = ", ".join(registry.get(near).parameters.get("properties", {}))
+            return ActionResult(False, f"Unknown action: {call.name}. The real action is {near}"
+                                       f"({params}); call {near} now as a tool call.")
+        return ActionResult(False, f"Unknown action: {call.name}. Answer the user's question "
+                                   "yourself, in words, without mentioning tools or actions.")
+
+    call = _drop_null_optionals(call, spec)
 
     await _emit(emit, {
         "type": "action_proposed",
@@ -342,6 +445,12 @@ def confirmation_prompt(spec, args: dict[str, Any], tainted_by: str | None,
 def agent_system_prompt(registry: Registry, include_tools: bool = True) -> str:
     lines = [
         "You are Corvus, an intelligent AI assistant running on the user's Windows desktop.",
+        # Without this, "remind me tomorrow at 9" became a 2023 date.
+        f"Right now it is {datetime.now():%A %Y-%m-%d %H:%M} (local time).",
+        "",
+        "0. LENGTH — match the question. A simple fact, a yes/no, or arithmetic gets a short",
+        "   direct answer (one or two sentences, show the working for math). Use the structure",
+        "   below only for explanations, how-tos and technical topics.",
         "",
         "═══════════════════════════════════════════════",
         "  CORE BEHAVIOR — HOW YOU MUST RESPOND",

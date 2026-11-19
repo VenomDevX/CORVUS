@@ -24,7 +24,7 @@ from ..config import SYSTEM_PROMPT
 from ..llm.agent import agent_system_prompt, run_agent_turn
 from ..llm.factory import cloud_label
 from ..llm.base import Message, describe_error
-from ..memory.extractor import extract_memory
+from ..memory.extractor import extract_memory, recall_prompt
 from .stt import Transcriber
 from .tts import SentenceChunker, Speaker
 from .vad import FRAME_SAMPLES, EnergyVAD, Segmenter, rms
@@ -289,6 +289,7 @@ class VoicePipeline:
         voice_system = SYSTEM_PROMPT + "\nYou are in voice mode: keep replies short and conversational - a few sentences, no markdown, no code blocks unless asked to dictate code."
         if self.registry is not None:
             voice_system += "\n\n" + agent_system_prompt(self.registry)
+        voice_system += recall_prompt(self.repo)
         messages = [Message("system", voice_system)]
         messages += [Message(m["role"], m["content"]) for m in history]
         model = self._model()
@@ -299,6 +300,7 @@ class VoicePipeline:
         speak_task = asyncio.create_task(self._speak_loop(sentence_queue))
 
         parts: list[str] = []
+        ran_actions = False  # a task turn isn't a fact to remember (see api/ws.py)
 
         # Voice auto-approves safe and low-risk actions; medium/high are
         # declined because the user can't see a confirmation dialog.
@@ -315,12 +317,13 @@ class VoicePipeline:
 
         try:
             if self.registry is not None:
-                await run_agent_turn(
+                outcome = await run_agent_turn(
                     self.provider, model, messages, self.registry,
                     voice_confirm, emit=voice_emit,
                     should_stop=lambda: self._interrupt.is_set(),
                     max_rounds=2, cloud_provider=cloud_label(self.provider),
                 )
+                ran_actions = bool(outcome.actions_run)
                 # parts were already collected via voice_emit
             else:
                 # Fallback: plain chat without tools
@@ -354,7 +357,7 @@ class VoicePipeline:
             return
 
         self._set_state("idle")
-        if assistant_text and not self._interrupt.is_set():
+        if assistant_text and not self._interrupt.is_set() and not ran_actions:
             asyncio.create_task(
                 extract_memory(
                     self.provider, self._model(), self.repo,

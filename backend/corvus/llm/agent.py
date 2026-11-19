@@ -318,7 +318,16 @@ async def run_agent_turn(
         # Record the assistant's tool request in the running history.
         convo.append(Message("assistant", turn.content, tool_calls=turn.tool_calls))
 
+        offered = {t["function"]["name"] for t in tools if isinstance(t.get("function"), dict)}
         for call in turn.tool_calls:
+            if call.name not in offered and registry.get(call.name) is not None:
+                # A real action the model wasn't offered this round (a chat turn
+                # has no tools; JSON in its reply, maybe echoed from pasted or
+                # injected text, must not run anything).
+                result = ActionResult(False, f"{call.name} isn't available for this message. "
+                                             "Answer the user in words.")
+                convo.append(Message("tool", json.dumps({"ok": False, "message": result.message}), tool_name=call.name))
+                continue
             key = _call_key(call, registry)
             spec = registry.get(call.name)
             if spec is not None and spec.once_per_turn:

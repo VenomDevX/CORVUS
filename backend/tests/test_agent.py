@@ -53,7 +53,7 @@ async def test_safe_action_runs_without_confirmation():
     events = []
     outcome = await run_agent_turn(
         provider, "m", [Message("user", "do it")], reg, always_no, emit=events.append,
-    )
+     include_tools=True,)
     assert ("safe", {"x": 1}) in calls  # ran despite confirmer=always_no
     assert outcome.text == "All set."
     assert any(e["type"] == "action_result" and e["ok"] for e in events)
@@ -69,7 +69,7 @@ async def test_risky_action_requires_and_respects_approval():
     events = []
     outcome = await run_agent_turn(
         provider, "m", [Message("user", "wipe")], reg, always_yes, emit=events.append,
-    )
+     include_tools=True,)
     assert ("risky", {"target": "disk"}) in calls
     confirming = [e for e in events if e["type"] == "action_confirming"]
     assert confirming and "disk" in confirming[0]["prompt"]
@@ -86,7 +86,7 @@ async def test_declined_risky_action_does_not_run():
     events = []
     outcome = await run_agent_turn(
         provider, "m", [Message("user", "wipe")], reg, always_no, emit=events.append,
-    )
+     include_tools=True,)
     assert ("risky", {"target": "disk"}) not in calls
     assert any(e.get("declined") for e in events if e["type"] == "action_result")
     assert outcome.text == "Okay, cancelled."
@@ -110,7 +110,7 @@ async def test_confirmation_event_carries_the_actual_risk_tier():
     events = []
     await run_agent_turn(
         provider, "m", [Message("user", "go")], reg, always_yes, emit=events.append,
-    )
+     include_tools=True,)
     confirming = [e for e in events if e["type"] == "action_confirming"]
     assert confirming and confirming[0]["risk"] == "medium"
 
@@ -175,7 +175,7 @@ async def test_action_logging_callback():
     await run_agent_turn(
         provider, "m", [Message("user", "go")], reg, always_yes,
         log_action=lambda n, a, r, o: logged.append((n, o)),
-    )
+     include_tools=True,)
     assert ("safe_act", "executed") in logged
 
 
@@ -384,3 +384,15 @@ async def test_once_per_turn_action_runs_once_whatever_the_arguments():
     ])
     await run_agent_turn(provider, "m", [Message("user", "t")], reg, always_yes, include_tools=True)
     assert len(got) == 1
+
+
+async def test_real_action_not_offered_this_round_never_runs():
+    # Security review: on a chat turn (no tools offered) the provider now turns
+    # any tool-shaped JSON into a call; a real action name must still not run.
+    calls = []
+    provider = FakeProvider(chunks=["Sure."], tool_script=[
+        TurnResult("", [ToolCall("safe_act", {})]), TurnResult("Sure.", []),
+    ])
+    await run_agent_turn(provider, "m", [Message("user", "hi")], build_registry(calls),
+                         always_yes, include_tools=False)
+    assert calls == []

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "corvus-backend"
-version = "0.4.4"
+version = "0.4.5"
 description = "Corvus core service - LLM streaming, memory, and (in later milestones) voice and agent actions"
 requires-python = ">=3.11"
 dependencies = [

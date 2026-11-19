@@ -183,7 +183,10 @@ export function HistoryView() {
                           <div className="flex min-w-0 flex-1 items-center gap-4">
                             <button
                               onClick={(e) => toggleSelection(c.id, e)}
-                              className="shrink-0 p-1 text-gray-500 hover:text-white transition-colors"
+                              aria-label={isSelected ? "Deselect" : "Select"}
+                              className={`shrink-0 p-1 text-gray-500 hover:text-white transition-opacity ${
+                                isSelected || selectedIds.size > 0 ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"
+                              }`}
                             >
                               {isSelected ? (
                                 <CheckSquare className="h-5 w-5 text-white" />

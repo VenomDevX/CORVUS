@@ -86,6 +86,15 @@ _GREETINGS = {
     "good evening", "good afternoon", "sup", "yo", "hola", "namaste",
     "thanks", "thank you", "bye", "goodbye", "good night",
 }
+# A programming question anywhere in the message: "LeetCode Two Sum ... give
+# solutions named is_valid_stack(s)". Offered tools, the model answered with
+# {"name": "is_valid_stack", ...} instead of code, 4 times out of 5.
+_CODING_QUESTION = re.compile(
+    r"\b(leetcode|hackerrank|codeforces|time complexity|space complexity|big[- ]o|algorithm|"
+    r"solutions?\b(?= (in|for|to|named|using))|"
+    r"(python|java|javascript|typescript|c\+\+|c#|golang|rust|sql|kotlin|swift)"
+    r" (function|solution|code|program|class|script|implementation)s?)"
+)
 _KNOWLEDGE_STARTS = (
     "what is", "what are", "what was", "what were", "what does", "what do",
     "who is", "who are", "who was", "who were",
@@ -229,7 +238,7 @@ async def _is_conversational(text: str) -> bool:
     words = re.findall(r"[a-z0-9']+", t)
     if any(w in _ACTION_VERBS or w in _LOCAL_NOUNS for w in words) or _THIS_MACHINE.search(t):
         return False
-    if t.startswith(_KNOWLEDGE_STARTS) or t.startswith(_CODE_STARTS):
+    if t.startswith(_KNOWLEDGE_STARTS) or t.startswith(_CODE_STARTS) or _CODING_QUESTION.search(t):
         return True
     if any(w in _WEAK_ACTION_VERBS for w in words):
         return False

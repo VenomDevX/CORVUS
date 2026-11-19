@@ -20,6 +20,7 @@ confirmation also declines that action.
 
 import asyncio
 import contextlib
+import re
 
 import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -35,6 +36,16 @@ log = structlog.get_logger("corvus")
 
 MAX_HISTORY_MESSAGES = 40
 _background: set[asyncio.Task] = set()
+
+
+def chat_title(content: str, limit: int = 48) -> str:
+    """First clause of the first message, cut at a word: "LeetCode Merge
+    Intervals: give 2 Python solutions named ..." -> "LeetCode Merge Intervals"."""
+    first = re.split(r"(?<=\S)[.:?!\n]\s", content.strip() + " ", maxsplit=1)[0].strip()
+    first = first.rstrip(".:?!") or content.strip()
+    if len(first) <= limit:
+        return first
+    return first[:limit].rsplit(" ", 1)[0].rstrip(",;-") + "…"
 
 
 @ws_router.websocket("/ws/chat")
@@ -68,8 +79,7 @@ async def chat(ws: WebSocket) -> None:
     edit_message_id = _int_or_none(start.get("edit_message_id"))
 
     if conversation_id is None or repo.get_conversation(conversation_id) is None:
-        title = content[:60] + ("…" if len(content) > 60 else "")
-        conversation_id = repo.create_conversation(title)["id"]
+        conversation_id = repo.create_conversation(chat_title(content))["id"]
 
     if edit_message_id is not None:
         msg = repo.get_message(edit_message_id)

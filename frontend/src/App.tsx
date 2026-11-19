@@ -18,8 +18,6 @@ import { HistoryView } from "./sections/HistoryView";
 import { StudioView } from "./sections/StudioView";
 import { SettingsView } from "./sections/SettingsView";
 import { TasksView } from "./sections/TasksView";
-import { DownloadsView } from "./sections/DownloadsView";
-import { ExtensionsView } from "./sections/ExtensionsView";
 import { PluginsView } from "./sections/PluginsView";
 import { useCorvus, type Section } from "./state/store";
 import { applyThemeVars } from "./lib/theme";
@@ -41,8 +39,6 @@ const SECTIONS: Record<Section, () => JSX.Element> = {
   history: HistoryView,
   settings: SettingsView,
   tasks: TasksView,
-  extensions: ExtensionsView,
-  downloads: DownloadsView,
   plugins: PluginsView,
 };
 
@@ -50,7 +46,6 @@ export default function App() {
   const theme = useCorvus((s) => s.theme);
   const section = useCorvus((s) => s.section);
   const setBackendOnline = useCorvus((s) => s.setBackendOnline);
-  const newConversation = useCorvus((s) => s.newConversation);
   const voiceMode = useCorvus((s) => s.voiceMode);
   const accentColor = useCorvus((s) => s.accentColor);
   const fontFamily = useCorvus((s) => s.fontFamily);
@@ -173,26 +168,15 @@ export default function App() {
         <CommandPalette />
         <AnimatePresence>{voiceMode && <VoiceMode />}</AnimatePresence>
         {/* Draggable titlebar strip (native window buttons overlay the right edge) */}
-        <header className="titlebar-drag flex h-10 shrink-0 items-center gap-2 px-4">
+        <header className="titlebar-drag flex h-8 shrink-0 items-center gap-2 px-4">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="titlebar-no-drag rounded p-1 text-fg-muted hover:bg-white/5 hover:text-fg md:hidden"
           >
             <Menu className="h-4 w-4" />
           </button>
-          <img src="./logo.png" alt="" className="h-4 w-4 hidden md:block" />
-          <span className="text-caption text-fg-muted hidden md:inline">Corvus</span>
-          <button
-            onClick={() => {
-              newConversation();
-              useCorvus.getState().setSection("chat");
-            }}
-            className="titlebar-no-drag ml-4 rounded px-2 py-0.5 text-caption text-fg-muted transition-colors duration-fast hover:bg-accent/10 hover:text-fg"
-          >
-            + New chat
-          </button>
         </header>
-        <div className="flex min-h-0 flex-1 gap-4 p-4 pt-1">
+        <div className="flex min-h-0 flex-1 gap-4 pb-4 pr-4">
           <div className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <Sidebar />
           </div>
@@ -202,7 +186,7 @@ export default function App() {
               onClick={() => setSidebarOpen(false)}
             />
           )}
-          <main className="min-w-0 flex-1 max-w-full">
+          <main className="min-w-0 flex-1 max-w-full pl-4 md:pl-0">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={section}

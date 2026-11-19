@@ -4,6 +4,8 @@ import { api, type ActionLogEntry, type ActionSpec, type RiskTier } from "../lib
 import { useCorvus } from "../state/store";
 import { WorkflowsPanel } from "../components/WorkflowsPanel";
 import { RemindersPanel } from "../components/RemindersPanel";
+import { Tabs } from "../components/ui/Tabs";
+import { DownloadsView } from "./DownloadsView";
 
 const RISK_ORDER: RiskTier[] = ["safe", "low", "medium", "high"];
 const RISK_STYLE: Record<RiskTier, string> = {
@@ -18,12 +20,17 @@ const OUTCOME_STYLE: Record<ActionLogEntry["outcome"], string> = {
   failed: "text-danger",
 };
 
-/** Tasks section: the capabilities Corvus can perform (the action registry)
- * and a log of what it has actually done. Multi-step saved workflows arrive
- * in Milestone 8. */
+type Tab = "workflows" | "reminders" | "activity" | "downloads" | "capabilities";
+
+/** "search_documents" -> "Search documents": the log is for people, not code. */
+const humanize = (name: string) => name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, " ");
+
+/** Tasks section: workflows, reminders, what Corvus has done, browser
+ * downloads, and the capabilities it can perform (the action registry). */
 export function TasksView() {
   const [specs, setSpecs] = useState<ActionSpec[]>([]);
   const [log, setLog] = useState<ActionLogEntry[]>([]);
+  const [tab, setTab] = useState<Tab>("workflows");
   const backendOnline = useCorvus((s) => s.backendOnline);
 
   const refresh = useCallback(async () => {
@@ -53,12 +60,22 @@ export function TasksView() {
         </button>
       }
     >
-      <WorkflowsPanel />
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: "workflows", label: "Workflows" },
+          { value: "reminders", label: "Reminders" },
+          { value: "activity", label: "Activity" },
+          { value: "downloads", label: "Downloads" },
+          { value: "capabilities", label: "What Corvus can do" },
+        ]}
+      />
+      {tab === "workflows" && <WorkflowsPanel />}
+      {tab === "reminders" && <RemindersPanel />}
+      {tab === "downloads" && <DownloadsView />}
 
-      <RemindersPanel />
-
-      <section className="mb-6">
-        <h2 className="mb-1 text-h4">Recent activity</h2>
+      {tab === "activity" && <section className="mb-6">
         <p className="mb-3 text-body-sm text-fg-muted">
           Everything Corvus has done on your PC, most recent first. High-risk actions were confirmed
           by you before running.
@@ -72,7 +89,7 @@ export function TasksView() {
                 <span className={OUTCOME_STYLE[entry.outcome]}>
                   {entry.outcome === "executed" ? "✓" : entry.outcome === "declined" ? "⊘" : "✕"}
                 </span>
-                <span className="font-mono text-mono text-fg">{entry.action}</span>
+                <span className="shrink-0 text-fg" title={entry.action}>{humanize(entry.action)}</span>
                 <span className="flex-1 truncate text-fg-muted">{entry.message}</span>
                 <span className="text-caption text-fg-faint">
                   {new Date(entry.created_at + "Z").toLocaleTimeString()}
@@ -81,10 +98,9 @@ export function TasksView() {
             ))}
           </ul>
         )}
-      </section>
+      </section>}
 
-      <section>
-        <h2 className="mb-1 text-h4">What Corvus can do</h2>
+      {tab === "capabilities" && <section>
         <p className="mb-3 text-body-sm text-fg-muted">
           {specs.length} actions across {Object.keys(byCategory).length} categories. Just ask in
           chat — Corvus picks the right one.
@@ -108,7 +124,7 @@ export function TasksView() {
             </div>
           ))}
         </div>
-      </section>
+      </section>}
     </SectionShell>
   );
 }

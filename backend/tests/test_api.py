@@ -267,3 +267,13 @@ def test_describe_error_missing_model_and_bad_key():
     assert "isn't installed" in describe_error(status_err(404), P())  # no body: generic
     assert "rejected the API key" in describe_error(status_err(401), Cloud())
     assert describe_error(status_err(404), Cloud()) == "raw"  # non-Ollama 404 untouched
+
+
+def test_chat_title_is_first_clause():
+    from corvus.api.ws import chat_title
+    assert chat_title("LeetCode Merge Intervals: give 2 Python solutions named merge_sort") == "LeetCode Merge Intervals"
+    assert chat_title("hi") == "hi"
+    assert chat_title("what is 3.5 times 2?") == "what is 3.5 times 2"
+    assert chat_title(r"open C:\Users\me\file.txt please") == r"open C:\Users\me\file.txt please"
+    long = chat_title("word " * 40)
+    assert long.endswith("…") and len(long) <= 49

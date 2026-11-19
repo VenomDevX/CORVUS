@@ -396,3 +396,13 @@ async def test_real_action_not_offered_this_round_never_runs():
     await run_agent_turn(provider, "m", [Message("user", "hi")], build_registry(calls),
                          always_yes, include_tools=False)
     assert calls == []
+
+
+async def test_coding_questions_are_chat_even_with_function_names():
+    # Live: given tools, "solutions named is_valid_stack(s)" came back as
+    # {"name": "is_valid_stack", ...} instead of code, 4 times out of 5.
+    from corvus.llm.agent import _is_conversational
+    assert await _is_conversational("LeetCode Valid Parentheses: give 2 Python solutions named is_valid_stack(s)")
+    assert await _is_conversational("Give me 3 python functions to reverse a list")
+    assert not await _is_conversational("delete the leetcode folder on my desktop")
+    assert not await _is_conversational("open my python project folder")

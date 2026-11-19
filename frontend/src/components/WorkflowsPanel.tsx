@@ -45,7 +45,6 @@ export function WorkflowsPanel() {
 
   return (
     <section className="mb-6">
-      <h2 className="mb-1 text-h4">Workflows</h2>
       <p className="mb-3 text-body-sm text-fg-muted">
         Multi-step routines. Ask Corvus in chat to create one — e.g. “make a workflow called morning
         that opens Chrome and Spotify.” Run it here, by voice, on a schedule, every few minutes, when Corvus starts, when you step away,

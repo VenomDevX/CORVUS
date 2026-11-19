@@ -17,8 +17,6 @@ export type Section =
   | "history"
   | "tasks"
   | "settings"
-  | "extensions"
-  | "downloads"
   | "plugins";
 
 export type Theme = "dark" | "light" | "system" | "pink" | "green" | "blue" | "purple";
